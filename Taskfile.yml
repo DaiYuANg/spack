@@ -60,4 +60,8 @@ tasks:
   build:docker:
     desc: 构建 Docker 镜像
     cmds:
-      - docker build -t {{.BIN_NAME}}:latest .
+      - docker buildx build -t {{.BIN_NAME}}:latest .
+  
+  check:
+    cmds:
+      - go tool staticcheck ./...

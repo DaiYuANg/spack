@@ -18,22 +18,27 @@ func newKoanf() *koanf.Koanf {
 
 func loadConfig(k *koanf.Koanf, logger *zap.SugaredLogger) (*Config, error) {
 	def := defaultConfig()
-	err := k.Load(structs.Provider(def, "koanf"), nil)
-	if err != nil {
+
+	// 加载默认配置
+	if err := k.Load(structs.Provider(def, "koanf"), nil); err != nil {
 		return nil, err
 	}
-	err = k.Load(env.Provider(constant.EnvPrefix, ".", func(s string) string {
-		return strings.Replace(strings.ToLower(
-			strings.TrimPrefix(s, constant.EnvPrefix)), "_", ".", -1)
-	}), nil)
-	if err != nil {
+
+	// 使用 lo.Ternary 优化字符串映射函数
+	mapEnvKey := func(s string) string {
+		return strings.ReplaceAll(strings.ToLower(strings.TrimPrefix(s, constant.EnvPrefix)), "_", ".")
+	}
+	if err := k.Load(env.Provider(constant.EnvPrefix, ".", mapEnvKey), nil); err != nil {
 		return nil, err
 	}
-	logger.Debugf("all key%s", k.All())
-	err = k.Unmarshal("", &def)
-	if err != nil {
+
+	allKeys := k.All()
+	logger.Debugf("all key: %v", allKeys)
+
+	if err := k.Unmarshal("", &def); err != nil {
 		return nil, err
 	}
-	logger.Infof("loaded config %v", def)
+
+	logger.Infof("loaded config: %+v", def)
 	return &def, nil
 }

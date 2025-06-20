@@ -9,7 +9,7 @@ import (
 )
 
 func proxyMiddleware(app *fiber.App, config *config.Config, log *zap.SugaredLogger) {
-	if config.Proxy.Enabled() == false {
+	if !config.Proxy.Enabled() {
 		return
 	}
 
