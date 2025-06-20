@@ -3,10 +3,61 @@
 version: '3'
 
 vars:
-  GREETING: Hello, World!
+  BIN_NAME: sproxy
+  DIST_DIR: dist
+  # 默认平台
+  DEFAULT_GOOS: linux
+  DEFAULT_GOARCH: amd64
 
 tasks:
-  default:
+  clean:
     cmds:
-      - echo "{{.GREETING}}"
-    silent: true
+      - rm -rf {{.DIST_DIR}}
+
+  build:
+    desc: 构建当前平台（默认启用 CGO）
+    cmds:
+      - CGO_ENABLED=1 go build -o {{.DIST_DIR}}/{{.BIN_NAME}} .
+
+  build:all:
+    desc: 构建所有平台（含 CGO）
+    deps: [ build:linux, build:darwin, build:windows ]
+
+  build:linux:
+    desc: 构建 Linux 版本（带 CGO）
+    deps: [clean]
+    env:
+      GOOS: linux
+      GOARCH: amd64
+      CGO_ENABLED: 1
+    cmds:
+      - mkdir -p {{.DIST_DIR}}/linux
+      - go build -trimpath -ldflags="-s -w" -o {{.DIST_DIR}}/linux/{{.BIN_NAME}} .
+
+  build:darwin:
+    desc: 构建 macOS 版本（带 CGO）
+    env:
+      GOOS: darwin
+      GOARCH: amd64
+      CGO_ENABLED: 1
+    cmds:
+      - mkdir -p {{.DIST_DIR}}/darwin
+      - go build -trimpath -ldflags="-s -w" -o {{.DIST_DIR}}/darwin/{{.BIN_NAME}} .
+    deps: [clean]
+
+
+  build:windows:
+    desc: 构建 Windows 版本（带 CGO）
+    deps: [clean]
+    env:
+      GOOS: windows
+      GOARCH: amd64
+      CGO_ENABLED: 1
+    cmds:
+      - mkdir -p {{.DIST_DIR}}/windows
+      - go build -trimpath -ldflags="-s -w" -o {{.DIST_DIR}}/windows/{{.BIN_NAME}}.exe .
+
+  build:docker:
+    desc: 构建 Docker 镜像
+    cmds:
+      - docker build -t {{.BIN_NAME}}:latest .
