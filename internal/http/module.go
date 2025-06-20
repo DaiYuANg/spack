@@ -7,6 +7,8 @@ import (
 	"go.uber.org/fx"
 	"net/http"
 	"sproxy/internal/config"
+	"sproxy/internal/constant"
+	"sproxy/internal/http/image"
 	"sproxy/view"
 )
 
@@ -16,6 +18,7 @@ var Module = fx.Module("http",
 		newServer,
 	),
 	middlewareModule,
+	image.Module,
 	fx.Invoke(httpLifecycle),
 )
 
@@ -26,15 +29,11 @@ func newTemplateEngine() *html.Engine {
 func newServer(engine *html.Engine, config *config.Config) *fiber.App {
 	app := fiber.New(
 		fiber.Config{
-			Views:             engine,
-			PassLocalsToViews: true,
-			Immutable:         true,
-			StreamRequestBody: true,
-			CompressedFileSuffixes: map[string]string{
-				".gz":  ".gz",
-				".br":  ".br",
-				".zip": ".zip",
-			},
+			Views:                  engine,
+			PassLocalsToViews:      true,
+			Immutable:              true,
+			StreamRequestBody:      true,
+			CompressedFileSuffixes: constant.SupportCompressExt,
 			ErrorHandler: func(ctx fiber.Ctx, err error) error {
 				code := fiber.StatusInternalServerError
 

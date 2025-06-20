@@ -20,7 +20,13 @@ func httpLifecycle(dep LifecycleDependency) {
 	lc.Append(fx.StartStopHook(
 		func() {
 			go func() {
-				err := app.Listen(":" + strconv.Itoa(cfg.Http.Port))
+				err := app.Listen(":"+strconv.Itoa(cfg.Http.Port),
+					fiber.ListenConfig{
+						DisableStartupMessage: true,
+						EnablePrintRoutes:     true,
+						EnablePrefork:         false,
+					},
+				)
 				if err != nil {
 					panic(err)
 				}

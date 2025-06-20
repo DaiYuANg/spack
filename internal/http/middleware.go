@@ -13,7 +13,6 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/requestid"
 	"github.com/samber/lo"
 	"go.uber.org/fx"
-	"go.uber.org/zap"
 	"sproxy/internal/config"
 	"time"
 )
@@ -25,7 +24,6 @@ var middlewareModule = fx.Module("middleware",
 		loggerMiddleware,
 		requestIdMiddleware,
 		helmetMiddleware,
-		imageMiddleware,
 		limiterMiddleware,
 		faviconMiddleware,
 		spaMiddleware,
@@ -71,10 +69,6 @@ func limiterMiddleware(app *fiber.App, cfg *config.Config) {
 
 func faviconMiddleware(app *fiber.App) {
 	app.Use(favicon.New())
-}
-
-func imageMiddleware(app *fiber.App, config *config.Config, log *zap.SugaredLogger) {
-	app.Use(optimizedImageMiddleware(config, log))
 }
 
 func debugMiddleware(app *fiber.App, config *config.Config) {
