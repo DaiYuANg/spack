@@ -5,6 +5,7 @@ import (
 	"github.com/chai2010/webp"
 	"github.com/disintegration/imaging"
 	"github.com/gofiber/fiber/v3"
+	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"os"
 	"path/filepath"
@@ -16,6 +17,12 @@ var supportedExts = map[string]bool{
 	".jpg":  true,
 	".jpeg": true,
 	".png":  true,
+}
+
+type optimizedImageMiddlewareDependency struct {
+	fx.In
+	Config *config.Config
+	Log    *zap.SugaredLogger
 }
 
 func optimizedImageMiddleware(config *config.Config, log *zap.SugaredLogger) fiber.Handler {

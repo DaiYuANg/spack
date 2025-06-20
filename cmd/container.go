@@ -8,6 +8,7 @@ import (
 	"sproxy/internal/config"
 	"sproxy/internal/http"
 	"sproxy/internal/logger"
+	"sproxy/internal/watcher"
 )
 
 func container() *fx.App {
@@ -16,6 +17,7 @@ func container() *fx.App {
 		cache.Module,
 		logger.Module,
 		http.Module,
+		watcher.Module,
 		fx.WithLogger(func(log *zap.Logger) fxevent.Logger {
 			return &fxevent.ZapLogger{Logger: log}
 		}),

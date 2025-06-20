@@ -31,6 +31,7 @@ var middlewareModule = fx.Module("middleware",
 		spaMiddleware,
 		proxyMiddleware,
 		debugMiddleware,
+		setupPreload,
 	),
 )
 
@@ -45,7 +46,9 @@ func etagMiddleware(app *fiber.App) {
 }
 
 func loggerMiddleware(app *fiber.App) {
-	app.Use(logger.New())
+	app.Use(logger.New(logger.Config{
+		Format: "\"${ip} - - [${time}] \"${method} ${url} ${protocol}\" ${status} ${bytesSent} \"${referer}\" \"${ua}\"\\n\"",
+	}))
 }
 
 func requestIdMiddleware(app *fiber.App) {
