@@ -20,8 +20,13 @@ var Module = fx.Module("image",
 )
 
 func newKvMap() (*bbolt.DB, error) {
-	path := filepath.Join(os.TempDir(), "sproxy", "sproxy.image.db")
-	return bbolt.Open(path, 0600, nil)
+	tempDir := filepath.Join(os.TempDir(), "sproxy")
+	err := os.MkdirAll(tempDir, 0755)
+	if err != nil {
+		return nil, err
+	}
+	dbPath := filepath.Join(tempDir, "sproxy.image.db")
+	return bbolt.Open(dbPath, 0600, nil)
 }
 
 type MiddlewareDependency struct {

@@ -5,7 +5,6 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gofiber/fiber/v3"
 	"go.uber.org/zap"
-	"log"
 	"os"
 	"path/filepath"
 	"sproxy/internal/config"
@@ -83,8 +82,7 @@ func setupPreload(app *fiber.App, config *config.Config, logger *zap.SugaredLogg
 	htmlPath := filepath.Join(config.Spa.Static, "index.html")
 	preloads, err := parsePreloadLinksFromHTML(htmlPath, logger)
 	if err != nil {
-		log.Printf("Failed to parse preload links: %v", err)
-		return
+		logger.Fatalf("Failed to parse preload links: %v", err)
 	}
 	app.Use(preloadMiddleware(preloads, logger))
 }

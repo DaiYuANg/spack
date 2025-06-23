@@ -1,6 +1,9 @@
 package config
 
-import "github.com/samber/lo"
+import (
+	"github.com/samber/lo"
+	"strconv"
+)
 
 type Config struct {
 	Http  Http  `koanf:"http"`
@@ -12,6 +15,10 @@ type Config struct {
 
 type Http struct {
 	Port int `koanf:"port"`
+}
+
+func (h Http) GetPort() string {
+	return strconv.Itoa(h.Port)
 }
 
 type Spa struct {
