@@ -6,7 +6,6 @@ import (
 	"go.uber.org/fx"
 	"net/http"
 	"sproxy/internal/config"
-	"sproxy/internal/http/image"
 	"sproxy/view"
 )
 
@@ -16,7 +15,7 @@ var Module = fx.Module("http",
 		newServer,
 	),
 	middlewareModule,
-	image.Module,
+	//image.Module,
 	fx.Invoke(httpLifecycle),
 )
 

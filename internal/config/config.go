@@ -22,13 +22,23 @@ func (h Http) GetPort() string {
 }
 
 type Spa struct {
-	Static   string `koanf:"static"`
+	//Serve static spa config
+	Static string `koanf:"static"`
+	//default load file config like nginx try file
 	Fallback string `koanf:"fallback"`
-	Image    Image  `koanf:"image"`
+	//extra file config
+	Image Image `koanf:"image"`
+	//compression config
+	Compression Compression `koanf:"compression"`
 }
 
 type Image struct {
 	Webp bool `koanf:"webp"`
+}
+
+type Compression struct {
+	Enabled    bool     `koanf:"enabled"`
+	Algorithms []string `koanf:"algorithms"`
 }
 
 type Proxy struct {
@@ -55,5 +65,9 @@ func defaultConfig() Config {
 		},
 		Spa: Spa{
 			Fallback: "index.html",
+			Compression: Compression{
+				Enabled:    true,
+				Algorithms: []string{"gzip"},
+			},
 		}}
 }

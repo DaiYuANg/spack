@@ -6,14 +6,18 @@ import (
 	"go.uber.org/zap"
 	"sproxy/internal/cache"
 	"sproxy/internal/config"
+	"sproxy/internal/data"
 	"sproxy/internal/http"
 	"sproxy/internal/logger"
+	"sproxy/internal/scanner"
 	"sproxy/internal/watcher"
 )
 
 func container() *fx.App {
 	return fx.New(
 		config.Module,
+		data.Module,
+		scanner.Module,
 		cache.Module,
 		logger.Module,
 		http.Module,
