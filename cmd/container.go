@@ -4,6 +4,7 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"sproxy/internal/cache"
 	"sproxy/internal/config"
 	"sproxy/internal/http"
@@ -19,7 +20,9 @@ func container() *fx.App {
 		prometheus.Module,
 		http.Module,
 		fx.WithLogger(func(log *zap.Logger) fxevent.Logger {
-			return &fxevent.ZapLogger{Logger: log}
+			fxLogger := &fxevent.ZapLogger{Logger: log}
+			fxLogger.UseLogLevel(zapcore.DebugLevel)
+			return fxLogger
 		}),
 	)
 }

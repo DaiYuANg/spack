@@ -28,7 +28,7 @@ func httpLifecycle(dep LifecycleDependency) {
 					":"+cfg.Http.GetPort(),
 					fiber.ListenConfig{
 						DisableStartupMessage: true,
-						EnablePrintRoutes:     true,
+						EnablePrintRoutes:     false,
 						EnablePrefork:         cfg.Http.Prefork,
 						ShutdownTimeout:       1000,
 					},
