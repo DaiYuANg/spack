@@ -1,7 +1,6 @@
 package logger
 
 import (
-	"context"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -29,9 +28,9 @@ func sugaredLogger(log *zap.Logger) *zap.SugaredLogger {
 }
 
 func deferLogger(lc fx.Lifecycle, logger *zap.Logger) {
-	lc.Append(fx.Hook{
-		OnStop: func(ctx context.Context) error {
+	lc.Append(
+		fx.StopHook(func() error {
 			return logger.Sync()
-		},
-	})
+		}),
+	)
 }

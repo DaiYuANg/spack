@@ -3,14 +3,17 @@ package http
 import (
 	"github.com/gofiber/contrib/monitor"
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/cache"
 	"github.com/gofiber/fiber/v3/middleware/compress"
 	"github.com/gofiber/fiber/v3/middleware/etag"
 	expvarmw "github.com/gofiber/fiber/v3/middleware/expvar"
 	"github.com/gofiber/fiber/v3/middleware/favicon"
+	"github.com/gofiber/fiber/v3/middleware/healthcheck"
 	"github.com/gofiber/fiber/v3/middleware/helmet"
 	"github.com/gofiber/fiber/v3/middleware/limiter"
 	"github.com/gofiber/fiber/v3/middleware/logger"
 	"github.com/gofiber/fiber/v3/middleware/pprof"
+	recoverer "github.com/gofiber/fiber/v3/middleware/recover"
 	"github.com/gofiber/fiber/v3/middleware/requestid"
 	"github.com/samber/lo"
 	"go.uber.org/fx"
@@ -29,10 +32,13 @@ var middlewareModule = fx.Module("middleware",
 		faviconMiddleware,
 		monitorMiddleware,
 		registerPrometheus,
-		spaMiddleware,
+		healthcheckMiddleware,
+		cacheMiddleware,
 		proxyMiddleware,
 		debugMiddleware,
 		setupPreload,
+		spaMiddleware,
+		recoverMiddleware,
 	),
 )
 
@@ -47,9 +53,12 @@ func etagMiddleware(app *fiber.App) {
 }
 
 func loggerMiddleware(app *fiber.App) {
-	app.Use(logger.New(logger.Config{
-		Format: "\"${ip} - - [${time}] \"${method} ${url} ${protocol}\" ${status} ${bytesSent} \"${referer}\" \"${ua}\"\\n\"",
-	}))
+	app.Use(
+		logger.New(
+			logger.Config{
+				Format: "\"${ip} - - [${time}] \"${method} ${url} ${protocol}\" ${status} ${bytesSent} \"${referer}\" \"${ua}\"\\n\"\n",
+			}),
+	)
 }
 
 func requestIdMiddleware(app *fiber.App) {
@@ -84,4 +93,18 @@ func debugMiddleware(app *fiber.App, config *config.Config) {
 
 func monitorMiddleware(app *fiber.App) {
 	app.Get("/monitor", monitor.New())
+}
+
+func cacheMiddleware(app *fiber.App) {
+	app.Use(cache.New())
+}
+
+func recoverMiddleware(app *fiber.App) {
+	cfg := recoverer.ConfigDefault
+	cfg.EnableStackTrace = true
+	app.Use(recoverer.New(cfg))
+}
+
+func healthcheckMiddleware(app *fiber.App) {
+	app.Get(healthcheck.DefaultLivenessEndpoint, healthcheck.NewHealthChecker())
 }

@@ -2,6 +2,7 @@ package http
 
 import (
 	"github.com/gofiber/fiber/v3"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/samber/lo"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -14,9 +15,10 @@ import (
 
 type SpaMiddlewareDependency struct {
 	fx.In
-	App    *fiber.App
-	Config *config.Config
-	Log    *zap.SugaredLogger
+	App               *fiber.App
+	Config            *config.Config
+	Log               *zap.SugaredLogger
+	HttpRequestsTotal *prometheus.CounterVec
 }
 
 var SupportCompressExt = map[string]string{
@@ -31,27 +33,34 @@ var SupportCompressExt = map[string]string{
 }
 
 func spaMiddleware(dep SpaMiddlewareDependency) {
-	app, cfg, log := dep.App, dep.Config, dep.Log
+	app, cfg, log, total := dep.App, dep.Config, dep.Log, dep.HttpRequestsTotal
 
 	app.Use("/*", func(c fiber.Ctx) error {
+		incr := func(label string) {
+			total.WithLabelValues(c.Method(), c.Path(), label).Inc()
+		}
 		reqPath := strings.TrimPrefix(c.Path(), "/")
 		fullPath := filepath.Join(cfg.Spa.Static, reqPath)
 
 		// 优先尝试压缩文件
 		if tryServeCompressed(c, fullPath, log) {
+			incr("compress")
 			return nil
 		}
 
 		// 普通静态文件
 		if tryServeStatic(c, fullPath, log) {
+			incr("normal")
 			return nil
 		}
 
 		// fallback
 		if tryServeFallback(c, cfg, log) {
+			incr("fallback")
 			return nil
 		}
 
+		incr("not_found")
 		return fiber.ErrNotFound
 	})
 }

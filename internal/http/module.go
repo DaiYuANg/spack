@@ -15,7 +15,6 @@ var Module = fx.Module("http",
 		newServer,
 	),
 	middlewareModule,
-	//image.Module,
 	fx.Invoke(httpLifecycle),
 )
 
