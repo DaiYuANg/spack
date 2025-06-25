@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go 1.24
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.24
+
+      - name: Install task runner
+        run: |
+          curl -sL https://taskfile.dev/install.sh | sh -s -- -d
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Run task build
+        run: ./bin/task build
+
+      - name: Run tests
+        run: go test -v ./...
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image (multi-arch)
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/sproxy:latest
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            GOOS=linux
+            GOARCH=amd64

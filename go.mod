@@ -10,12 +10,10 @@ tool (
 
 require (
 	github.com/PuerkitoBio/goquery v1.10.3
-	github.com/chai2010/webp v1.4.0
+	github.com/adrg/xdg v0.5.3
 	github.com/dgraph-io/ristretto v0.2.0
-	github.com/disintegration/imaging v1.6.2
 	github.com/eko/gocache/lib/v4 v4.2.0
 	github.com/eko/gocache/store/ristretto/v4 v4.2.2
-	github.com/fsnotify/fsnotify v1.9.0
 	github.com/gofiber/fiber/v3 v3.0.0-beta.4
 	github.com/gofiber/template/html/v2 v2.1.3
 	github.com/joho/godotenv v1.5.1
@@ -24,7 +22,6 @@ require (
 	github.com/knadh/koanf/v2 v2.2.1
 	github.com/samber/lo v1.51.0
 	github.com/spf13/cobra v1.9.1
-	go.etcd.io/bbolt v1.4.1
 	go.uber.org/fx v1.24.0
 	go.uber.org/zap v1.27.0
 )
@@ -36,7 +33,6 @@ require (
 	github.com/Masterminds/semver/v3 v3.3.1 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.1.6 // indirect
-	github.com/adrg/xdg v0.5.3 // indirect
 	github.com/air-verse/air v1.62.0 // indirect
 	github.com/alecthomas/chroma/v2 v2.18.0 // indirect
 	github.com/andybalholm/brotli v1.2.0 // indirect
@@ -58,8 +54,8 @@ require (
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
+	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.8.0 // indirect
-	github.com/gabriel-vasile/mimetype v1.4.9 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-git/go-billy/v5 v5.6.2 // indirect
 	github.com/go-git/go-git/v5 v5.16.0 // indirect

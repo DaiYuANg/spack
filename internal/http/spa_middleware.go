@@ -7,7 +7,7 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"path/filepath"
-	internal_cache "sproxy/internal/cache"
+	internalcache "sproxy/internal/cache"
 	"sproxy/internal/config"
 	"sproxy/internal/constant"
 	"sproxy/pkg"
@@ -19,7 +19,7 @@ type SpaMiddlewareDependency struct {
 	App    *fiber.App
 	Config *config.Config
 	Log    *zap.SugaredLogger
-	Cache  *cache.Cache[*internal_cache.CachedFile] `name:"fileCache"`
+	Cache  *cache.Cache[*internalcache.CachedFile] `name:"fileCache"`
 }
 
 var SupportCompressExt = map[string]string{

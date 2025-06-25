@@ -8,6 +8,7 @@ vars:
   # 默认平台
   DEFAULT_GOOS: linux
   DEFAULT_GOARCH: amd64
+  CONTAINER_PLATFORM: --platform linux/amd64,linux/arm64
 
 tasks:
   clean:
@@ -17,7 +18,7 @@ tasks:
   build:
     desc: 构建当前平台（默认启用 CGO）
     cmds:
-      - CGO_ENABLED=1 go build -o {{.DIST_DIR}}/{{.BIN_NAME}} .
+      - go build -o {{.DIST_DIR}}/{{.BIN_NAME}} .
 
   build:all:
     desc: 构建所有平台（含 CGO）
@@ -25,11 +26,10 @@ tasks:
 
   build:linux:
     desc: 构建 Linux 版本（带 CGO）
-    deps: [clean]
+    deps: [ clean ]
     env:
       GOOS: linux
       GOARCH: amd64
-      CGO_ENABLED: 1
     cmds:
       - mkdir -p {{.DIST_DIR}}/linux
       - go build -trimpath -ldflags="-s -w" -o {{.DIST_DIR}}/linux/{{.BIN_NAME}} .
@@ -39,28 +39,45 @@ tasks:
     env:
       GOOS: darwin
       GOARCH: amd64
-      CGO_ENABLED: 1
     cmds:
       - mkdir -p {{.DIST_DIR}}/darwin
       - go build -trimpath -ldflags="-s -w" -o {{.DIST_DIR}}/darwin/{{.BIN_NAME}} .
-    deps: [clean]
+    deps: [ clean ]
 
 
   build:windows:
     desc: 构建 Windows 版本（带 CGO）
-    deps: [clean]
+    deps: [ clean ]
     env:
       GOOS: windows
       GOARCH: amd64
-      CGO_ENABLED: 1
     cmds:
       - mkdir -p {{.DIST_DIR}}/windows
       - go build -trimpath -ldflags="-s -w" -o {{.DIST_DIR}}/windows/{{.BIN_NAME}}.exe .
 
-  build:docker:
+  build:docker:distroless:
     desc: 构建 Docker 镜像
     cmds:
-      - docker buildx build -t {{.BIN_NAME}}:latest .
+      - docker buildx build {{.CONTAINER_PLATFORM}} --target distroless -t {{.BIN_NAME}}:latest -t {{.BIN_NAME}}:distroless .
+
+  build:docker:alpine:
+    desc: 构建 Docker 镜像
+    cmds:
+      - docker buildx build {{.CONTAINER_PLATFORM}} --target alpine -t {{.BIN_NAME}}:alpine .
+
+  build:docker:debian:
+    desc: 构建 Docker 镜像
+    cmds:
+      - docker buildx build {{.CONTAINER_PLATFORM}} --target debian -t {{.BIN_NAME}}:debian .
+
+  build:docker:scratch:
+    desc: 构建 Docker 镜像
+    cmds:
+      - docker buildx build {{.CONTAINER_PLATFORM}} --target scratch -t {{.BIN_NAME}}:scratch .
+
+  build:docker:
+    desc: build container
+    deps: [ build:docker:scratch,build:docker:distroless,build:docker:alpine,build:docker:debian ]
   
   check:
     cmds:
