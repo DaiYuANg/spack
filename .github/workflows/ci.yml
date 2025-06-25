@@ -66,11 +66,3 @@ jobs:
       - name: Build and push Docker images with Taskfile
         run: |
           ./bin/task build:docker
-
-      - name: Retag
-        run: |
-          ./bin/task retag
-
-      - name: push
-        run: |
-          ./bin/task push

@@ -10,7 +10,7 @@ vars:
   DEFAULT_GOARCH: amd64
   DOCKERHUB_REPO: daiyuang/sproxy
   GHCR_REPO: ghcr.io/daiyuang/sproxy
-  CONTAINER_PLATFORM: --platform linux/amd64,linux/arm64
+  CONTAINER_PLATFORM: linux/amd64,linux/arm64
 
 tasks:
   clean:
@@ -58,52 +58,58 @@ tasks:
       - go build -trimpath -ldflags="-s -w" -o {{.DIST_DIR}}/windows/{{.BIN_NAME}}.exe .
 
   build:docker:distroless:
-    desc: 构建 Docker 镜像
+    desc: 构建 Docker 镜像并推送到 DockerHub 和 GHCR（distroless）
     cmds:
-      - docker buildx build {{.CONTAINER_PLATFORM}} --target distroless -t {{.BIN_NAME}}:latest -t {{.BIN_NAME}}:distroless . --load
+      - |
+        docker buildx build \
+          --target distroless \
+          --platform {{.CONTAINER_PLATFORM}} \
+          -t {{.DOCKERHUB_REPO}}:distroless \
+          -t {{.DOCKERHUB_REPO}}:latest \
+          -t {{.GHCR_REPO}}:distroless \
+          -t {{.GHCR_REPO}}:latest \
+          --push \
+          .
 
   build:docker:alpine:
-    desc: 构建 Docker 镜像
+    desc: 构建 Alpine 运行时镜像
     cmds:
-      - docker buildx build {{.CONTAINER_PLATFORM}} --target alpine -t {{.BIN_NAME}}:alpine . --load
+      - |
+        docker buildx build \
+          --target alpine \
+          --platform {{.CONTAINER_PLATFORM}} \
+          -t {{.DOCKERHUB_REPO}}:alpine \
+          -t {{.GHCR_REPO}}:alpine \
+          --push \
+          .
 
   build:docker:debian:
-    desc: 构建 Docker 镜像
+    desc: 构建 Debian Slim 运行时镜像
     cmds:
-      - docker buildx build {{.CONTAINER_PLATFORM}} --target debian -t {{.BIN_NAME}}:debian . --load
+      - |
+        docker buildx build \
+          --target debian \
+          --platform {{.CONTAINER_PLATFORM}} \
+          -t {{.DOCKERHUB_REPO}}:debian \
+          -t {{.GHCR_REPO}}:debian \
+          --push \
+          .
 
   build:docker:scratch:
-    desc: 构建 Docker 镜像
+    desc: 构建 Scratch 运行时镜像
     cmds:
-      - docker buildx build {{.CONTAINER_PLATFORM}} --target scratch -t {{.BIN_NAME}}:scratch . --load
+      - |
+        docker buildx build \
+          --target scratch \
+          --platform {{.CONTAINER_PLATFORM}} \
+          -t {{.DOCKERHUB_REPO}}:scratch \
+          -t {{.GHCR_REPO}}:scratch \
+          --push \
+          .
 
   build:docker:
     desc: build container
     deps: [ build:docker:scratch,build:docker:distroless,build:docker:alpine,build:docker:debian ]
-
-  retag:
-    desc: retag
-    cmds:
-      - docker tag {{.BIN_NAME}}:distroless {{.DOCKERHUB_REPO}}:distroless
-      - docker tag {{.BIN_NAME}}:distroless {{.GHCR_REPO}}:distroless
-      - docker tag {{.BIN_NAME}}:alpine {{.DOCKERHUB_REPO}}:alpine
-      - docker tag {{.BIN_NAME}}:alpine {{.GHCR_REPO}}:alpine
-      - docker tag {{.BIN_NAME}}:debian {{.DOCKERHUB_REPO}}:debian
-      - docker tag {{.BIN_NAME}}:debian {{.GHCR_REPO}}:debian
-      - docker tag {{.BIN_NAME}}:scratch {{.DOCKERHUB_REPO}}:scratch
-      - docker tag {{.BIN_NAME}}:scratch {{.GHCR_REPO}}:scratch
-
-  push:
-    desc: push container
-    cmds:
-      - docker push {{.DOCKERHUB_REPO}}:distroless
-      - docker push {{.GHCR_REPO}}:distroless
-      - docker push {{.DOCKERHUB_REPO}}:alpine
-      - docker push {{.GHCR_REPO}}:alpine
-      - docker push {{.DOCKERHUB_REPO}}:debian
-      - docker push {{.GHCR_REPO}}:debian
-      - docker push {{.DOCKERHUB_REPO}}:scratch
-      - docker push {{.GHCR_REPO}}:scratch
 
   check:
     cmds:
