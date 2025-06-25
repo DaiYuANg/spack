@@ -60,27 +60,26 @@ tasks:
   build:docker:distroless:
     desc: 构建 Docker 镜像
     cmds:
-      - docker buildx build {{.CONTAINER_PLATFORM}} --target distroless -t {{.BIN_NAME}}:latest -t {{.BIN_NAME}}:distroless .
+      - docker buildx build {{.CONTAINER_PLATFORM}} --target distroless -t {{.BIN_NAME}}:latest -t {{.BIN_NAME}}:distroless . --load
 
   build:docker:alpine:
     desc: 构建 Docker 镜像
     cmds:
-      - docker buildx build {{.CONTAINER_PLATFORM}} --target alpine -t {{.BIN_NAME}}:alpine .
+      - docker buildx build {{.CONTAINER_PLATFORM}} --target alpine -t {{.BIN_NAME}}:alpine . --load
 
   build:docker:debian:
     desc: 构建 Docker 镜像
     cmds:
-      - docker buildx build {{.CONTAINER_PLATFORM}} --target debian -t {{.BIN_NAME}}:debian .
+      - docker buildx build {{.CONTAINER_PLATFORM}} --target debian -t {{.BIN_NAME}}:debian . --load
 
   build:docker:scratch:
     desc: 构建 Docker 镜像
     cmds:
-      - docker buildx build {{.CONTAINER_PLATFORM}} --target scratch -t {{.BIN_NAME}}:scratch .
+      - docker buildx build {{.CONTAINER_PLATFORM}} --target scratch -t {{.BIN_NAME}}:scratch . --load
 
   build:docker:
     desc: build container
     deps: [ build:docker:scratch,build:docker:distroless,build:docker:alpine,build:docker:debian ]
-
 
   retag:
     desc: retag
