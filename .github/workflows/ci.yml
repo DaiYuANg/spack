@@ -43,6 +43,19 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v2
         with:
@@ -53,3 +66,11 @@ jobs:
       - name: Build and push Docker images with Taskfile
         run: |
           ./bin/task build:docker
+
+      - name: Retag
+        run: |
+          ./bin/task retag
+
+      - name: push
+        run: |
+          ./bin/task push
