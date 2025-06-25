@@ -1,6 +1,7 @@
 package http
 
 import (
+	"github.com/gofiber/contrib/monitor"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/compress"
 	"github.com/gofiber/fiber/v3/middleware/etag"
@@ -26,6 +27,8 @@ var middlewareModule = fx.Module("middleware",
 		helmetMiddleware,
 		limiterMiddleware,
 		faviconMiddleware,
+		monitorMiddleware,
+		registerPrometheus,
 		spaMiddleware,
 		proxyMiddleware,
 		debugMiddleware,
@@ -77,4 +80,8 @@ func debugMiddleware(app *fiber.App, config *config.Config) {
 	}
 	app.Use(expvarmw.New())
 	app.Use(pprof.New(pprof.Config{Prefix: config.Debug.Prefix}))
+}
+
+func monitorMiddleware(app *fiber.App) {
+	app.Get("/monitor", monitor.New())
 }

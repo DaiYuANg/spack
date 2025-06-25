@@ -9,7 +9,6 @@ vars:
   DEFAULT_GOOS: linux
   DEFAULT_GOARCH: amd64
   DOCKERHUB_REPO: daiyuang/sproxy
-  GHCR_REPO: ghcr.io/daiyuang/sproxy
   CONTAINER_PLATFORM: linux/amd64,linux/arm64
 
 tasks:
@@ -66,8 +65,6 @@ tasks:
           --platform {{.CONTAINER_PLATFORM}} \
           -t {{.DOCKERHUB_REPO}}:distroless \
           -t {{.DOCKERHUB_REPO}}:latest \
-          -t {{.GHCR_REPO}}:distroless \
-          -t {{.GHCR_REPO}}:latest \
           --push \
           .
 
@@ -79,7 +76,6 @@ tasks:
           --target alpine \
           --platform {{.CONTAINER_PLATFORM}} \
           -t {{.DOCKERHUB_REPO}}:alpine \
-          -t {{.GHCR_REPO}}:alpine \
           --push \
           .
 
@@ -91,7 +87,6 @@ tasks:
           --target debian \
           --platform {{.CONTAINER_PLATFORM}} \
           -t {{.DOCKERHUB_REPO}}:debian \
-          -t {{.GHCR_REPO}}:debian \
           --push \
           .
 
@@ -103,7 +98,6 @@ tasks:
           --target scratch \
           --platform {{.CONTAINER_PLATFORM}} \
           -t {{.DOCKERHUB_REPO}}:scratch \
-          -t {{.GHCR_REPO}}:scratch \
           --push \
           .
 

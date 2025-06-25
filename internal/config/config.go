@@ -25,15 +25,8 @@ type Spa struct {
 	//Serve static spa config
 	Static string `koanf:"static"`
 	//default load file config like nginx try file
-	Fallback string `koanf:"fallback"`
-	//extra file config
-	Image Image `koanf:"image"`
-	//compression config
+	Fallback    string      `koanf:"fallback"`
 	Compression Compression `koanf:"compression"`
-}
-
-type Image struct {
-	Webp bool `koanf:"webp"`
 }
 
 type Compression struct {

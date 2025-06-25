@@ -1,13 +1,11 @@
 package config
 
 import (
-	"github.com/adrg/xdg"
 	"github.com/knadh/koanf/providers/env"
 	"github.com/knadh/koanf/providers/structs"
 	"github.com/knadh/koanf/v2"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"path/filepath"
 	"sproxy/internal/constant"
 	"strings"
 )
@@ -15,10 +13,6 @@ import (
 var Module = fx.Module("config", fx.Provide(
 	newKoanf,
 	loadConfig,
-	fx.Annotate(
-		basedDir,
-		fx.ResultTags(`name:"baseDir"`),
-	),
 ))
 
 func newKoanf() *koanf.Koanf {
@@ -50,8 +44,4 @@ func loadConfig(k *koanf.Koanf, logger *zap.SugaredLogger) (*Config, error) {
 
 	logger.Infof("loaded config: %+v", def)
 	return &def, nil
-}
-
-func basedDir() string {
-	return filepath.Join(xdg.CacheHome, "sproxy")
 }

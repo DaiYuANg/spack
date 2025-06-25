@@ -1,13 +1,11 @@
 package http
 
 import (
-	"github.com/eko/gocache/lib/v4/cache"
 	"github.com/gofiber/fiber/v3"
 	"github.com/samber/lo"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"path/filepath"
-	internalcache "sproxy/internal/cache"
 	"sproxy/internal/config"
 	"sproxy/internal/constant"
 	"sproxy/pkg"
@@ -19,7 +17,6 @@ type SpaMiddlewareDependency struct {
 	App    *fiber.App
 	Config *config.Config
 	Log    *zap.SugaredLogger
-	Cache  *cache.Cache[*internalcache.CachedFile] `name:"fileCache"`
 }
 
 var SupportCompressExt = map[string]string{
@@ -34,9 +31,9 @@ var SupportCompressExt = map[string]string{
 }
 
 func spaMiddleware(dep SpaMiddlewareDependency) {
-	app, cfg, log, _ := dep.App, dep.Config, dep.Log, dep.Cache
+	app, cfg, log := dep.App, dep.Config, dep.Log
 
-	app.Use("/", func(c fiber.Ctx) error {
+	app.Use("/*", func(c fiber.Ctx) error {
 		reqPath := strings.TrimPrefix(c.Path(), "/")
 		fullPath := filepath.Join(cfg.Spa.Static, reqPath)
 
