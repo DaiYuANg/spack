@@ -50,14 +50,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Docker image (multi-arch)
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/sproxy:latest
-          platforms: linux/amd64,linux/arm64
-          build-args: |
-            GOOS=linux
-            GOARCH=amd64
+      - name: Build and push Docker images with Taskfile
+        run: |
+          task build:docker
