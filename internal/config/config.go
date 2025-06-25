@@ -6,15 +6,28 @@ import (
 )
 
 type Config struct {
-	Http  Http  `koanf:"http"`
-	Spa   Spa   `koanf:"spa"`
-	Proxy Proxy `koanf:"proxy"`
-	Debug Debug `koanf:"debug"`
-	Limit Limit `koanf:"limit"`
+	Http       Http       `koanf:"http"`
+	Cache      Cache      `koanf:"cache"`
+	Spa        Spa        `koanf:"spa"`
+	Proxy      Proxy      `koanf:"proxy"`
+	Debug      Debug      `koanf:"debug"`
+	Limit      Limit      `koanf:"limit"`
+	Prometheus Prometheus `koanf:"prometheus"`
+	Logger     Logger     `koanf:"logger"`
+}
+
+type Logger struct {
+	Level string `koanf:"level"`
+}
+
+type Cache struct {
+	Max int64 `koanf:"max"`
 }
 
 type Http struct {
-	Port int `koanf:"port"`
+	Port      int  `koanf:"port"`
+	Prefork   bool `koanf:"prefork"`
+	LowMemory bool `koanf:"low_memory"`
 }
 
 func (h Http) GetPort() string {
@@ -25,13 +38,11 @@ type Spa struct {
 	//Serve static spa config
 	Static string `koanf:"static"`
 	//default load file config like nginx try file
-	Fallback    string      `koanf:"fallback"`
-	Compression Compression `koanf:"compression"`
+	Fallback string `koanf:"fallback"`
 }
 
-type Compression struct {
-	Enabled    bool     `koanf:"enabled"`
-	Algorithms []string `koanf:"algorithms"`
+type Prometheus struct {
+	Prefix string `koanf:"prefix"`
 }
 
 type Proxy struct {
@@ -40,6 +51,10 @@ type Proxy struct {
 }
 
 type Debug struct {
+	Prefix string `koanf:"prefix"`
+}
+
+type Monitor struct {
 	Prefix string `koanf:"prefix"`
 }
 
@@ -54,13 +69,12 @@ func (p Proxy) Enabled() bool {
 func defaultConfig() Config {
 	return Config{
 		Http: Http{
-			Port: 80,
+			Port:      80,
+			Prefork:   false,
+			LowMemory: true,
 		},
 		Spa: Spa{
 			Fallback: "index.html",
-			Compression: Compression{
-				Enabled:    true,
-				Algorithms: []string{"gzip"},
-			},
-		}}
+		},
+	}
 }
