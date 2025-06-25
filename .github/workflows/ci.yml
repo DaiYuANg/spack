@@ -52,4 +52,4 @@ jobs:
 
       - name: Build and push Docker images with Taskfile
         run: |
-          task build:docker
+          ./bin/task build:docker
