@@ -9,7 +9,7 @@ vars:
   DEFAULT_GOOS: linux
   DEFAULT_GOARCH: amd64
   DOCKERHUB_REPO: daiyuang/sproxy
-  CONTAINER_PLATFORM: linux/amd64,linux/arm64
+  CONTAINER_PLATFORM: linux/amd64,linux/arm64,linux/arm/v7,linux/ppc64le,linux/s390x
 
 tasks:
   clean:

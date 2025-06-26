@@ -5,6 +5,9 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/cache"
 	"github.com/gofiber/fiber/v3/middleware/compress"
+	"github.com/gofiber/fiber/v3/middleware/cors"
+	"github.com/gofiber/fiber/v3/middleware/earlydata"
+	"github.com/gofiber/fiber/v3/middleware/envvar"
 	"github.com/gofiber/fiber/v3/middleware/etag"
 	expvarmw "github.com/gofiber/fiber/v3/middleware/expvar"
 	"github.com/gofiber/fiber/v3/middleware/favicon"
@@ -17,13 +20,17 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/requestid"
 	"github.com/samber/lo"
 	"go.uber.org/fx"
+	"runtime/debug"
 	"sproxy/internal/config"
 	"time"
 )
 
 var middlewareModule = fx.Module("middleware",
 	fx.Invoke(
+		earlydataMiddleware,
+		corsMiddleware,
 		compressMiddleware,
+		envvarMiddleware,
 		etagMiddleware,
 		loggerMiddleware,
 		requestIdMiddleware,
@@ -107,4 +114,31 @@ func recoverMiddleware(app *fiber.App) {
 
 func healthcheckMiddleware(app *fiber.App) {
 	app.Get(healthcheck.DefaultLivenessEndpoint, healthcheck.NewHealthChecker())
+}
+
+func corsMiddleware(app *fiber.App) {
+	app.Use(cors.New())
+}
+
+func earlydataMiddleware(app *fiber.App) {
+	app.Use(earlydata.New(earlydata.Config{
+		Error: fiber.ErrTooEarly,
+	}))
+}
+
+func envvarMiddleware(app *fiber.App) {
+	info, _ := debug.ReadBuildInfo()
+	resp := map[string]string{
+		"main":     info.Main.Path,
+		"version":  info.Main.Version,
+		"mod_time": info.Main.Sum, // 这里没有编译时间，只有版本信息等
+	}
+	for _, setting := range info.Settings {
+		resp[setting.Key] = setting.Value
+	}
+	app.Use("/expose/envvars", envvar.New(
+		envvar.Config{
+			ExportVars: resp,
+		},
+	))
 }
