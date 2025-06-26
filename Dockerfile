@@ -7,14 +7,16 @@ ENV GO111MODULE=on \
 
 WORKDIR /app
 
-# 安装 Taskfile（可选，如果你不需要就移除）
-RUN apk add --no-cache curl && \
+# 安装 Taskfile
+RUN apk add --no-cache curl upx && \
     sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d
 
 COPY . .
 
 # 使用 task 或者 go build 构建静态二进制
 RUN ./bin/task build || go build -trimpath -ldflags="-s -w" -o dist/sproxy .
+
+RUN upx --best --lzma dist/sproxy
 
 FROM gcr.io/distroless/static:nonroot  AS distroless
 
