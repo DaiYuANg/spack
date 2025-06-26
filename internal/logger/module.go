@@ -10,8 +10,8 @@ import (
 var Module = fx.Module("logger_module", fx.Provide(newLogger, sugaredLogger), fx.Invoke(deferLogger))
 
 func newLogger() *zap.Logger {
-	encoderCfg := zap.NewDevelopmentEncoderConfig()           // 可用 zap.NewProductionEncoderConfig() 视需求选择
-	encoderCfg.EncodeLevel = zapcore.CapitalColorLevelEncoder // 日志级别带颜色（INFO、ERROR 等）
+	encoderCfg := zap.NewProductionEncoderConfig() // 可用 zap.NewProductionEncoderConfig() 视需求选择
+	encoderCfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
 
 	core := zapcore.NewCore(
 		zapcore.NewConsoleEncoder(encoderCfg), // 关键：使用 ConsoleEncoder 而不是 JSONEncoder

@@ -5,3 +5,9 @@ const (
 	EnvPrefix = "SPROXY_"
 	HTML      = ".html"
 )
+
+const (
+	Compress = "compress"
+	Normal   = "normal"
+	Fallback = "fallback"
+)
