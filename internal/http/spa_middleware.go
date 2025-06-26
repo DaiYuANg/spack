@@ -36,7 +36,8 @@ var SupportCompressExt = map[string]string{
 func spaMiddleware(dep SpaMiddlewareDependency) {
 	app, cfg, log, total := dep.App, dep.Config, dep.Log, dep.HttpRequestsTotal
 
-	app.Use("/*", func(c fiber.Ctx) error {
+	servePath := strings.TrimSpace(cfg.Spa.Path) + "*"
+	app.Use(servePath, func(c fiber.Ctx) error {
 		incr := func(label string) {
 			total.WithLabelValues(c.Method(), c.Path(), label).Inc()
 		}
@@ -136,7 +137,7 @@ func tryServeFallback(c fiber.Ctx, cfg *config.Config, log *zap.SugaredLogger) (
 	}
 
 	log.Debug("into fallback")
-	c.Set("Cache-Control", "no-cache")
+	c.Set(fiber.HeaderCacheControl, "no-cache")
 	err := c.SendFile(fallbackPath)
 
 	return err == nil, err

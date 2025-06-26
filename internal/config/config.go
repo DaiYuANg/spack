@@ -35,6 +35,7 @@ func (h Http) GetPort() string {
 }
 
 type Spa struct {
+	Path string `koanf:"path"`
 	//Serve static spa config
 	Static string `koanf:"static"`
 	//default load file config like nginx try file
@@ -74,6 +75,7 @@ func defaultConfig() Config {
 			LowMemory: true,
 		},
 		Spa: Spa{
+			Path:     "/",
 			Fallback: "index.html",
 		},
 	}

@@ -107,3 +107,7 @@ tasks:
   check:
     cmds:
       - go tool staticcheck ./...
+
+  lint:
+    cmds:
+      - go tool golangci-lint run
