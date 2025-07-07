@@ -3,7 +3,6 @@ package http
 import (
 	"context"
 	"github.com/gofiber/fiber/v3"
-	"github.com/samber/lo"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"sproxy/internal/config"
@@ -24,7 +23,7 @@ func httpLifecycle(dep LifecycleDependency) {
 			go func() {
 				localAddress := "http://127.0.0.1:" + cfg.Http.GetPort()
 				log.Debugf("Http Listening on %s", localAddress)
-				lo.Must0(app.Listen(
+				err := app.Listen(
 					":"+cfg.Http.GetPort(),
 					fiber.ListenConfig{
 						DisableStartupMessage: true,
@@ -32,7 +31,11 @@ func httpLifecycle(dep LifecycleDependency) {
 						EnablePrefork:         cfg.Http.Prefork,
 						ShutdownTimeout:       1000,
 					},
-				), "sproxy start fail")
+				)
+				if err != nil {
+					log.Errorf("sproxy start fail: %v", err) // 打印原始错误
+					panic(err)
+				}
 			}()
 		},
 		func(ctx context.Context) error {
