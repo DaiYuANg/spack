@@ -8,8 +8,18 @@ ENV GO111MODULE=on \
 WORKDIR /app
 
 # 安装 Taskfile
-RUN apt update && apt install curl upx-ucl && \
-    sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d
+RUN apt update && apt install -y curl xz-utils ca-certificates \
+    && ARCH=$(dpkg --print-architecture) && \
+    case "$ARCH" in \
+        amd64)   UPX_ARCH=amd64 ;; \
+        arm64)   UPX_ARCH=arm64 ;; \
+        *)       echo "Unsupported arch: $ARCH" && exit 1 ;; \
+    esac && \
+    curl -sSL "https://github.com/upx/upx/releases/download/v5.0.1/upx-5.0.1-${UPX_ARCH}_linux.tar.xz" \
+    | tar -xJ && mv upx-4.2.3-${UPX_ARCH}_linux/upx /usr/local/bin/ \
+    && rm -rf upx-4.2.3-${UPX_ARCH}_linux* \
+    && curl -sSfL https://taskfile.dev/install.sh | sh -s -- -d
+
 
 COPY . .
 
