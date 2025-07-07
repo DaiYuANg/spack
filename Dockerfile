@@ -28,12 +28,6 @@ USER nonroot:nonroot
 
 CMD ["/app/sproxy"]
 
-FROM scratch AS scratch
-
-COPY --from=builder /app/dist/sproxy /sproxy
-
-CMD ["/sproxy"]
-
 FROM alpine:latest AS alpine
 RUN adduser -D -g '' appuser
 WORKDIR /app

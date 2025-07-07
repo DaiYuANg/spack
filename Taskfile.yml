@@ -89,20 +89,9 @@ tasks:
           --push \
           .
 
-  build:docker:scratch:
-    desc: 构建 Scratch 运行时镜像
-    cmds:
-      - |
-        docker buildx build \
-          --target scratch \
-          --platform {{.CONTAINER_PLATFORM}} \
-          -t {{.DOCKERHUB_REPO}}:scratch \
-          --push \
-          .
-
   build:docker:
     desc: build container
-    deps: [ build:docker:scratch,build:docker:distroless,build:docker:alpine,build:docker:debian ]
+    deps: [ build:docker:distroless,build:docker:alpine,build:docker:debian ]
 
   check:
     cmds:
