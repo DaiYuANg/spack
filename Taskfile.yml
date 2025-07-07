@@ -55,18 +55,6 @@ tasks:
       - mkdir -p {{.DIST_DIR}}/windows
       - go build -trimpath -ldflags="-s -w" -o {{.DIST_DIR}}/windows/{{.BIN_NAME}}.exe .
 
-  build:docker:distroless:
-    desc: 构建 Docker 镜像并推送到 DockerHub 和 GHCR（distroless）
-    cmds:
-      - |
-        docker buildx build \
-          --target distroless \
-          --platform {{.CONTAINER_PLATFORM}} \
-          -t {{.DOCKERHUB_REPO}}:distroless \
-          -t {{.DOCKERHUB_REPO}}:latest \
-          --push \
-          .
-
   build:docker:alpine:
     desc: 构建 Alpine 运行时镜像
     cmds:
@@ -75,6 +63,7 @@ tasks:
           --target alpine \
           --platform {{.CONTAINER_PLATFORM}} \
           -t {{.DOCKERHUB_REPO}}:alpine \
+          -t {{.DOCKERHUB_REPO}}:latest \
           --push \
           .
 
@@ -91,7 +80,7 @@ tasks:
 
   build:docker:
     desc: build container
-    deps: [ build:docker:distroless,build:docker:alpine,build:docker:debian ]
+    deps: [ build:docker:alpine,build:docker:debian ]
 
   check:
     cmds:

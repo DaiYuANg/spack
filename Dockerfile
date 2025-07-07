@@ -31,19 +31,6 @@ RUN ./bin/task build || go build -trimpath -ldflags="-s -w" -o dist/sproxy .
 
 RUN upx --best --lzma dist/sproxy
 
-FROM gcr.io/distroless/base-debian12  AS distroless
-
-WORKDIR /app
-
-COPY --from=builder /app/dist/sproxy /app/sproxy
-COPY --from=builder /usr/bin/dumb-init /usr/bin/dumb-init
-
-USER nonroot:nonroot
-
-ENTRYPOINT ["/usr/bin/dumb-init", "--"]
-
-CMD ["sh", "-c", "/app/sproxy"]
-
 FROM alpine:latest AS alpine
 RUN adduser -D -g '' appuser
 
