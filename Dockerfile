@@ -5,6 +5,8 @@ FROM golang:bookworm AS builder
 ENV GO111MODULE=on \
     CGO_ENABLED=0
 
+USER root
+
 WORKDIR /app
 
 ARG UPX_VERSION=5.0.1
@@ -48,9 +50,11 @@ RUN adduser -D -g '' appuser
 WORKDIR /app
 COPY --from=builder /app/dist/sproxy /app/sproxy
 
-USER appuser
+USER root
 
 RUN apk add --no-cache dumb-init
+
+USER appuser
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 
