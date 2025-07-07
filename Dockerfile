@@ -8,7 +8,7 @@ ENV GO111MODULE=on \
 WORKDIR /app
 
 # 安装 Taskfile
-RUN apt install curl upx-ucl && \
+RUN apt update && apt install curl upx-ucl && \
     sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d
 
 COPY . .
