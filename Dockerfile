@@ -23,7 +23,7 @@ FROM gcr.io/distroless/base-debian12  AS distroless
 WORKDIR /app
 
 COPY --from=builder /app/dist/sproxy /app/sproxy
-COPY --from=build /usr/bin/dumb-init /usr/bin/dumb-init
+COPY --from=builder /usr/bin/dumb-init /usr/bin/dumb-init
 
 USER nonroot:nonroot
 
@@ -49,7 +49,7 @@ FROM debian:stable-slim AS debian
 
 WORKDIR /app
 
-COPY --from=build /usr/bin/dumb-init /usr/bin/dumb-init
+COPY --from=builder /usr/bin/dumb-init /usr/bin/dumb-init
 
 COPY --from=builder /app/dist/sproxy /app/sproxy
 
