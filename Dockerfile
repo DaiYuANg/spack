@@ -26,18 +26,18 @@ COPY --from=builder /app/dist/sproxy /app/sproxy
 
 USER nonroot:nonroot
 
-CMD ["/app/sproxy"]
+CMD ["sh", "-c", "/app/sproxy"]
 
 FROM alpine:latest AS alpine
 RUN adduser -D -g '' appuser
 WORKDIR /app
 COPY --from=builder /app/dist/sproxy /app/sproxy
 USER appuser
-CMD ["/app/sproxy"]
+CMD ["sh", "-c", "/app/sproxy"]
 
 FROM debian:stable-slim AS debian
 WORKDIR /app
 COPY --from=builder /app/dist/sproxy /app/sproxy
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 RUN chmod +x /app/sproxy
-CMD ["/app/sproxy"]
+CMD ["sh", "-c", "/app/sproxy"]
