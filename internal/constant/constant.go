@@ -2,7 +2,7 @@ package constant
 
 const (
 	PROXY     = "proxy"
-	EnvPrefix = "SPROXY_"
+	EnvPrefix = "SPACK_"
 	HTML      = ".html"
 )
 

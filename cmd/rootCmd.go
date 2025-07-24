@@ -8,7 +8,7 @@ import (
 var runtime *fx.App
 
 var rootCmd = &cobra.Command{
-	Use: "sproxy",
+	Use: "spack",
 	PreRun: func(cmd *cobra.Command, args []string) {
 		runtime = container()
 	},

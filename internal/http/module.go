@@ -26,7 +26,7 @@ func newTemplateEngine() *html.Engine {
 
 func newServer(engine *html.Engine, cfg *config.Config) *fiber.App {
 	info, ok := debug.ReadBuildInfo()
-	header := lo.Ternary(ok, "X-Sproxy-"+info.Main.Version, "X-Sproxy")
+	header := lo.Ternary(ok, "X-Spack-"+info.Main.Version, "X-Spack")
 	app := fiber.New(
 		fiber.Config{
 			Views:             engine,

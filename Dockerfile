@@ -27,15 +27,15 @@ RUN apt update && apt install -y curl xz-utils ca-certificates dumb-init \
 COPY . .
 
 # 使用 task 或者 go build 构建静态二进制
-RUN ./bin/task build || go build -trimpath -ldflags="-s -w" -o dist/sproxy .
+RUN ./bin/task build || go build -trimpath -ldflags="-s -w" -o dist/spack .
 
-RUN upx --best --lzma dist/sproxy
+RUN upx --best --lzma dist/spack
 
 FROM alpine:latest AS alpine
 RUN adduser -D -g '' appuser
 
 WORKDIR /app
-COPY --from=builder /app/dist/sproxy /app/sproxy
+COPY --from=builder /app/dist/spack /app/spack
 
 USER root
 
@@ -45,7 +45,7 @@ USER appuser
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 
-CMD ["sh", "-c", "/app/sproxy"]
+CMD ["sh", "-c", "/app/spack"]
 
 FROM debian:stable-slim AS debian
 
@@ -53,12 +53,12 @@ WORKDIR /app
 
 COPY --from=builder /usr/bin/dumb-init /usr/bin/dumb-init
 
-COPY --from=builder /app/dist/sproxy /app/sproxy
+COPY --from=builder /app/dist/spack /app/spack
 
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 
-RUN chmod +x /app/sproxy
+RUN chmod +x /app/spack
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 
-CMD ["sh", "-c", "/app/sproxy"]
+CMD ["sh", "-c", "/app/spack"]

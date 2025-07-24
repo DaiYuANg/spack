@@ -33,7 +33,7 @@ func httpLifecycle(dep LifecycleDependency) {
 					},
 				)
 				if err != nil {
-					log.Errorf("sproxy start fail: %v", err) // 打印原始错误
+					log.Errorf("spack start fail: %v", err) // 打印原始错误
 					panic(err)
 				}
 			}()
