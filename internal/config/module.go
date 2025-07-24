@@ -1,12 +1,12 @@
 package config
 
 import (
+	"github.com/daiyuang/spack/internal/constant"
 	"github.com/knadh/koanf/providers/env"
 	"github.com/knadh/koanf/providers/structs"
 	"github.com/knadh/koanf/v2"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"sproxy/internal/constant"
 	"strings"
 )
 

@@ -1,10 +1,10 @@
 package http
 
 import (
+	"github.com/daiyuang/spack/internal/config"
 	"github.com/gofiber/fiber/v3"
 	"github.com/prometheus/client_golang/prometheus"
 	"path/filepath"
-	"sproxy/internal/config"
 	"strings"
 )
 

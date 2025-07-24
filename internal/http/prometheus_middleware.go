@@ -1,10 +1,10 @@
 package http
 
 import (
+	p "github.com/daiyuang/spack/internal/prometheus"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/adaptor"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	p "sproxy/internal/prometheus"
 	"strconv"
 	"time"
 )
@@ -12,10 +12,7 @@ import (
 func prometheusMiddleware(dep p.IndicatorDependency) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		start := time.Now()
-
-		// Process the request
 		err := c.Next()
-
 		duration := time.Since(start).Seconds()
 		dep.HttpRequestDurationSeconds.WithLabelValues(c.Method(), c.Path()).Observe(duration)
 		dep.HttpRequestsTotal.WithLabelValues(c.Method(), c.Path(), strconv.Itoa(c.Response().StatusCode())).Inc()

@@ -1,6 +1,9 @@
 package http
 
 import (
+	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/constant"
+	"github.com/daiyuang/spack/pkg"
 	"github.com/gofiber/fiber/v3"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/samber/lo"
@@ -8,9 +11,6 @@ import (
 	"go.uber.org/zap"
 	"os"
 	"path/filepath"
-	"sproxy/internal/config"
-	"sproxy/internal/constant"
-	"sproxy/pkg"
 	"strings"
 )
 
@@ -119,7 +119,7 @@ func tryServeStatic(c fiber.Ctx, fullPath string, log *zap.SugaredLogger) (bool,
 	ext := filepath.Ext(fullPath)
 	cacheControl := lo.Ternary(ext != constant.HTML, "public, max-age=31536000, immutable", "no-cache")
 
-	log.Debugf("Serving static file: %s", fullPath)
+	log.Debugf("Serving preprocessor file: %s", fullPath)
 
 	c.Type(ext)
 	c.Set(fiber.HeaderCacheControl, cacheControl)

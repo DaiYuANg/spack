@@ -3,11 +3,12 @@ package http
 import (
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
+	"github.com/daiyuang/spack/internal/config"
 	"github.com/gofiber/fiber/v3"
+	"github.com/samber/lo"
 	"go.uber.org/zap"
 	"os"
 	"path/filepath"
-	"sproxy/internal/config"
 	"strings"
 )
 
@@ -17,10 +18,7 @@ func parsePreloadLinksFromHTML(htmlPath string, logger *zap.SugaredLogger) (map[
 		return nil, err
 	}
 	defer func(file *os.File) {
-		err := file.Close()
-		if err != nil {
-			panic(err)
-		}
+		lo.Must0(file.Close(), err.Error())
 	}(file)
 
 	doc, err := goquery.NewDocumentFromReader(file)
@@ -84,6 +82,9 @@ func preloadMiddleware(preloadMap map[string]string, logger *zap.SugaredLogger) 
 }
 
 func setupPreload(app *fiber.App, config *config.Config, logger *zap.SugaredLogger) {
+	if !config.Spa.Preload {
+		return
+	}
 	htmlPath := filepath.Join(config.Spa.Static, "index.html")
 	preloads, err := parsePreloadLinksFromHTML(htmlPath, logger)
 	if err != nil {

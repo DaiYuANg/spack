@@ -26,7 +26,6 @@ type Cache struct {
 
 type Http struct {
 	Port      int  `koanf:"port"`
-	Prefork   bool `koanf:"prefork"`
 	LowMemory bool `koanf:"low_memory"`
 }
 
@@ -36,10 +35,11 @@ func (h Http) GetPort() string {
 
 type Spa struct {
 	Path string `koanf:"path"`
-	//Serve static spa config
-	Static string `koanf:"static"`
+	//Serve preprocessor spa config
+	Static string `koanf:"preprocessor"`
 	//default load file config like nginx try file
 	Fallback string `koanf:"fallback"`
+	Preload  bool   `koanf:"preload"`
 }
 
 type Prometheus struct {
@@ -63,6 +63,9 @@ type Limit struct {
 	Enable bool `koanf:"enable"`
 }
 
+type Preprocessor struct {
+}
+
 func (p Proxy) Enabled() bool {
 	return lo.IsNotEmpty(p.Path) && lo.IsNotEmpty(p.Target)
 }
@@ -71,12 +74,12 @@ func defaultConfig() Config {
 	return Config{
 		Http: Http{
 			Port:      80,
-			Prefork:   false,
 			LowMemory: true,
 		},
 		Spa: Spa{
 			Path:     "/",
 			Fallback: "index.html",
+			Preload:  false,
 		},
 	}
 }

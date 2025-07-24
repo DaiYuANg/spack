@@ -1,11 +1,11 @@
 package http
 
 import (
+	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/constant"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/proxy"
 	"go.uber.org/zap"
-	"sproxy/internal/config"
-	"sproxy/internal/constant"
 )
 
 func proxyMiddleware(app *fiber.App, config *config.Config, log *zap.SugaredLogger) {

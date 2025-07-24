@@ -1,6 +1,7 @@
 package http
 
 import (
+	"github.com/daiyuang/spack/internal/config"
 	"github.com/gofiber/contrib/monitor"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/cache"
@@ -21,7 +22,6 @@ import (
 	"github.com/samber/lo"
 	"go.uber.org/fx"
 	"runtime/debug"
-	"sproxy/internal/config"
 	"time"
 )
 
@@ -113,7 +113,7 @@ func recoverMiddleware(app *fiber.App) {
 }
 
 func healthcheckMiddleware(app *fiber.App) {
-	app.Get(healthcheck.DefaultLivenessEndpoint, healthcheck.NewHealthChecker())
+	app.Get(healthcheck.LivenessEndpoint, healthcheck.New())
 }
 
 func corsMiddleware(app *fiber.App) {
