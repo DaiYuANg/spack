@@ -30,7 +30,7 @@ RUN ./bin/task build || go build -trimpath -ldflags="-s -w" -o dist/spack .
 
 RUN upx --best --lzma dist/spack
 
-FROM alpine:latest AS alpine
+FROM frolvlad/alpine-glibc AS alpine
 RUN adduser -D -g '' appuser
 
 WORKDIR /app
