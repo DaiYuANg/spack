@@ -3,7 +3,7 @@ FROM golang:bookworm AS builder
 
 # 启用 Go module，关闭 CGO
 ENV GO111MODULE=on \
-    CGO_ENABLED=0
+    CGO_ENABLED=1
 
 USER root
 
@@ -11,7 +11,7 @@ WORKDIR /app
 
 ARG UPX_VERSION=5.0.1
 
-RUN apt update && apt install -y curl xz-utils ca-certificates dumb-init libwebp-dev \
+RUN apt update && apt install -y curl xz-utils ca-certificates dumb-init libwebp-dev   \
     && ARCH=$(dpkg --print-architecture) && \
     case "$ARCH" in \
         amd64)   UPX_ARCH=amd64 ;; \
@@ -22,7 +22,6 @@ RUN apt update && apt install -y curl xz-utils ca-certificates dumb-init libwebp
     | tar -xJ && mv upx-${UPX_VERSION}-${UPX_ARCH}_linux/upx /usr/local/bin/ \
     && rm -rf upx-${UPX_VERSION}-${UPX_ARCH}_linux* \
     && curl -sSfL https://taskfile.dev/install.sh | sh -s -- -d
-
 
 COPY . .
 
@@ -39,7 +38,7 @@ COPY --from=builder /app/dist/spack /app/spack
 
 USER root
 
-RUN apk add --no-cache dumb-init libwebp-dev
+RUN apk add --no-cache dumb-init libwebp
 
 USER appuser
 
@@ -55,7 +54,7 @@ COPY --from=builder /usr/bin/dumb-init /usr/bin/dumb-init
 
 COPY --from=builder /app/dist/spack /app/spack
 
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y ca-certificates libwebp7 && rm -rf /var/lib/apt/lists/*
 
 RUN chmod +x /app/spack
 
