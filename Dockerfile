@@ -39,7 +39,7 @@ COPY --from=builder /app/dist/spack /app/spack
 
 USER root
 
-RUN apk add --no-cache dumb-init
+RUN apk add --no-cache dumb-init libwebp-dev
 
 USER appuser
 
