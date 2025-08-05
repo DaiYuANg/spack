@@ -4,7 +4,6 @@ import (
 	"github.com/chai2010/webp"
 	"github.com/daiyuang/spack/internal/constant"
 	"github.com/daiyuang/spack/pkg"
-	"github.com/gabriel-vasile/mimetype"
 	"github.com/samber/lo"
 	"go.uber.org/zap"
 	"image"
@@ -24,17 +23,13 @@ func (w *webpPreprocessor) Name() string {
 	return "webp"
 }
 
-func (w *webpPreprocessor) CanProcess(path string, mime *mimetype.MIME) bool {
-	if mime == nil {
-		return false
-	}
-
+func (w *webpPreprocessor) CanProcess(path string, mimetype string) bool {
 	ok := lo.ContainsBy(w.supportMime, func(mt constant.MimeType) bool {
-		return mime.Is(string(mt))
+		return string(mt) == mimetype
 	})
 
 	if ok {
-		w.logger.Debugf("webp: matched mime=%s for path=%s", mime.String(), path)
+		w.logger.Debugf("webp: matched mime=%s for path=%s", mimetype, path)
 	}
 
 	return ok
@@ -115,7 +110,7 @@ func (w *webpPreprocessor) Process(path string) error {
 		return err
 	}
 
-	w.logger.Infof("webp: generated %s", targetPath)
+	w.logger.Debugf("webp: generated %s", targetPath)
 	return nil
 }
 

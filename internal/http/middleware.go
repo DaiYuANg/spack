@@ -133,9 +133,9 @@ func envvarMiddleware(app *fiber.App) {
 		"version":  info.Main.Version,
 		"mod_time": info.Main.Sum, // 这里没有编译时间，只有版本信息等
 	}
-	for _, setting := range info.Settings {
-		resp[setting.Key] = setting.Value
-	}
+	lo.ForEach(info.Settings, func(item debug.BuildSetting, index int) {
+		resp[item.Key] = item.Value
+	})
 	app.Use("/expose/envvars", envvar.New(
 		envvar.Config{
 			ExportVars: resp,
