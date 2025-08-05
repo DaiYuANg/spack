@@ -8,6 +8,9 @@ import (
 	"github.com/samber/lo"
 	"go.uber.org/zap"
 	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
 	"os"
 	"path/filepath"
 )

@@ -6,11 +6,11 @@ import (
 	lop "github.com/samber/lo/parallel"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	_ "image/gif"
-	_ "image/jpeg"
-	_ "image/png"
+
 	"io/fs"
+	"mime"
 	"path/filepath"
+	"strings"
 )
 
 var Module = fx.Module("preprocessor",
@@ -43,7 +43,10 @@ func process(param LifecycleParameter) error {
 			return nil
 		}
 
-		mtype, err := mimetype.DetectFile(path)
+		mtype, err := DetectMIME(path)
+		if err != nil {
+			return err
+		}
 		logger.Debugf("mimetype %s", mtype)
 		lop.ForEach(preprocessors, func(p Preprocessor, index int) {
 			if p.CanProcess(path, mtype) {
@@ -56,4 +59,27 @@ func process(param LifecycleParameter) error {
 		})
 		return nil
 	})
+}
+
+func DetectMIME(path string) (*mimetype.MIME, error) {
+	mtype, err := mimetype.DetectFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// fallback: if mimetype is too generic (e.g., text/plain), check extension
+	if mtype.Is("text/plain") || mtype.Is("application/octet-stream") {
+		ext := strings.ToLower(filepath.Ext(path))
+		if ext != "" {
+			if extMime := mime.TypeByExtension(ext); extMime != "" {
+				// 去除 charset 参数
+				if idx := strings.Index(extMime, ";"); idx != -1 {
+					extMime = extMime[:idx]
+				}
+				return mimetype.Lookup(extMime), nil
+			}
+		}
+	}
+
+	return mtype, nil
 }

@@ -7,7 +7,7 @@ import (
 
 type Config struct {
 	Http       Http       `koanf:"http"`
-	Cache      Cache      `koanf:"cache"`
+	Cache      Cache      `koanf:"registry"`
 	Spa        Spa        `koanf:"spa"`
 	Proxy      Proxy      `koanf:"proxy"`
 	Debug      Debug      `koanf:"debug"`

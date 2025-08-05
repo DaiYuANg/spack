@@ -117,7 +117,7 @@ func tryServeStatic(c fiber.Ctx, fullPath string, log *zap.SugaredLogger) (bool,
 	}
 
 	ext := filepath.Ext(fullPath)
-	cacheControl := lo.Ternary(ext != constant.HTML, "public, max-age=31536000, immutable", "no-cache")
+	cacheControl := lo.Ternary(ext != constant.HTML, "public, max-age=31536000, immutable", "no-registry")
 
 	log.Debugf("Serving preprocessor file: %s", fullPath)
 
@@ -137,7 +137,7 @@ func tryServeFallback(c fiber.Ctx, cfg *config.Config, log *zap.SugaredLogger) (
 	}
 
 	log.Debug("into fallback")
-	c.Set(fiber.HeaderCacheControl, "no-cache")
+	c.Set(fiber.HeaderCacheControl, "no-registry")
 	err := c.SendFile(fallbackPath)
 
 	return err == nil, err

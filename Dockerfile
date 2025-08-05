@@ -38,7 +38,7 @@ COPY --from=builder /app/dist/spack /app/spack
 
 USER root
 
-RUN apk add --no-cache dumb-init libwebp
+RUN apk add --no-registry dumb-init libwebp
 
 USER appuser
 
