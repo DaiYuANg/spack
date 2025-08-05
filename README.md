@@ -49,36 +49,20 @@
 
 ## 👾 Features
 
-<code>❯ REPLACE-ME</code>
+- ZERO Config For Spa
 
 ---
 
-## 📁 Project Structure
+---
 
-```sh
-└── spack/
-    ├── .github
-    │   └── workflows
-    ├── Dockerfile
-    ├── Taskfile.yml
-    ├── cmd
-    │   ├── container.go
-    │   └── rootCmd.go
-    ├── go.mod
-    ├── go.sum
-    ├── internal
-    │   ├── config
-    │   ├── constant
-    │   ├── http
-    │   ├── logger
-    │   └── prometheus
-    ├── main.go
-    ├── pkg
-    │   └── io.go
-    └── view
-        ├── 404.html
-        ├── 500.html
-        └── embed.go
+## Usage
+```dockerfile
+FROM daiyuang/spack:latest
+
+COPY /build/dist /APP
+
+ENV SPACK_SPA_STATIC=/APP
+ENV SPACK_SPA_PATH=/
 ```
 
 

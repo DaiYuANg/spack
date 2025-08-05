@@ -5,6 +5,7 @@ import (
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/http"
 	"github.com/daiyuang/spack/internal/logger"
+	"github.com/daiyuang/spack/internal/metrics"
 	"github.com/daiyuang/spack/internal/preprocessor"
 	"github.com/daiyuang/spack/internal/prometheus"
 	"go.uber.org/fx"
@@ -18,6 +19,7 @@ func container() *fx.App {
 		config.Module,
 		logger.Module,
 		cache.Module,
+		metrics.Module,
 		prometheus.Module,
 		http.Module,
 		preprocessor.Module,

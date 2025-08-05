@@ -36,7 +36,7 @@ func (h Http) GetPort() string {
 type Spa struct {
 	Path string `koanf:"path"`
 	//Serve preprocessor spa config
-	Static string `koanf:"preprocessor"`
+	Static string `koanf:"static"`
 	//default load file config like nginx try file
 	Fallback string `koanf:"fallback"`
 	Preload  bool   `koanf:"preload"`
