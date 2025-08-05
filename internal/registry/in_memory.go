@@ -2,17 +2,20 @@ package registry
 
 import (
 	"fmt"
+	"github.com/eko/gocache/lib/v4/cache"
 	"sync"
 )
 
 type InMemoryRegistry struct {
 	mu   sync.RWMutex
 	data map[string]*Entry
+	cm   *cache.Cache[string]
 }
 
-func NewInMemoryRegistry() *InMemoryRegistry {
+func NewInMemoryRegistry(cm *cache.Cache[string]) *InMemoryRegistry {
 	return &InMemoryRegistry{
 		data: make(map[string]*Entry),
+		cm:   cm,
 	}
 }
 

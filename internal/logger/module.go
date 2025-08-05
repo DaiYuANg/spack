@@ -19,7 +19,7 @@ func newLogger() *zap.Logger {
 	core := zapcore.NewCore(
 		zapcore.NewConsoleEncoder(encoderCfg),
 		zapcore.AddSync(os.Stdout),
-		zapcore.DebugLevel,
+		zapcore.InfoLevel,
 	)
 
 	logger := zap.New(core)

@@ -1,7 +1,6 @@
 package registry
 
 import (
-	"context"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/pkg"
 	"go.uber.org/fx"
@@ -10,16 +9,17 @@ import (
 	"path/filepath"
 )
 
-var Module = fx.Module("registry", fx.Provide(
-	fx.Annotate(
-		NewInMemoryRegistry,
-		fx.As(new(Registry)),
+var Module = fx.Module("registry",
+	fx.Provide(
+		fx.Annotate(
+			NewInMemoryRegistry,
+			fx.As(new(Registry)),
+		),
 	),
-	newContext), fx.Invoke(collect))
-
-func newContext() context.Context {
-	return context.Background()
-}
+	fx.Invoke(
+		collect,
+	),
+)
 
 func collect(config *config.Config, registry Registry, logger *zap.SugaredLogger) error {
 	root := config.Spa.Static

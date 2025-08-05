@@ -1,7 +1,7 @@
 package http
 
 import (
-	p "github.com/daiyuang/spack/internal/prometheus"
+	p "github.com/daiyuang/spack/internal/metrics"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/adaptor"
 	"github.com/prometheus/client_golang/prometheus/promhttp"

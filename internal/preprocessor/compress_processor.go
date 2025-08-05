@@ -10,6 +10,7 @@ import (
 	"github.com/samber/lo"
 	"go.uber.org/zap"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 )
@@ -22,6 +23,10 @@ type compressPreprocessor struct {
 
 func (c *compressPreprocessor) Name() string {
 	return "compress"
+}
+
+func (c *compressPreprocessor) Order() int {
+	return math.MaxInt
 }
 
 func (c *compressPreprocessor) CanProcess(path string, mimetype string) bool {
@@ -37,7 +42,7 @@ func (c *compressPreprocessor) CanProcess(path string, mimetype string) bool {
 }
 
 func (c *compressPreprocessor) Process(path string) error {
-	c.logger.Debugf("compress process %s", path)
+	c.logger.Debugf("compress preprocess %s", path)
 	version := pkg.GetVersionFromBuildInfo()
 	hash, err := pkg.FileHash(path)
 	if err != nil {

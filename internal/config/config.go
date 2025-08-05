@@ -7,7 +7,7 @@ import (
 
 type Config struct {
 	Http       Http       `koanf:"http"`
-	Cache      Cache      `koanf:"registry"`
+	Cache      Cache      `koanf:"cache"`
 	Spa        Spa        `koanf:"spa"`
 	Proxy      Proxy      `koanf:"proxy"`
 	Debug      Debug      `koanf:"debug"`
@@ -21,7 +21,8 @@ type Logger struct {
 }
 
 type Cache struct {
-	Max int64 `koanf:"max"`
+	Max  int64  `koanf:"max"`
+	Type string `koanf:"type"`
 }
 
 type Http struct {

@@ -23,6 +23,10 @@ func (w *webpPreprocessor) Name() string {
 	return "webp"
 }
 
+func (w *webpPreprocessor) Order() int {
+	return 0
+}
+
 func (w *webpPreprocessor) CanProcess(path string, mimetype string) bool {
 	ok := lo.ContainsBy(w.supportMime, func(mt constant.MimeType) bool {
 		return string(mt) == mimetype
