@@ -24,7 +24,7 @@ func (l *Logger) Printf(format string, args ...any) {
 func newAnts(logger *zap.SugaredLogger) (*ants.Pool, error) {
 	cpuNum := runtime.NumCPU()
 
-	const ioFactor = 20
+	const ioFactor = 200
 
 	poolSize := cpuNum * ioFactor
 
@@ -36,7 +36,6 @@ func newAnts(logger *zap.SugaredLogger) (*ants.Pool, error) {
 		poolSize,
 		ants.WithExpiryDuration(10*time.Second), // 空闲worker 10s回收，减少资源占用
 		ants.WithNonblocking(false),             // 任务提交满时阻塞
-		ants.WithNonblocking(true),
 		ants.WithLogger(antsLogger),
 	)
 }
