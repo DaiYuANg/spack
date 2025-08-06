@@ -2,6 +2,8 @@ package cache
 
 import (
 	"context"
+	"time"
+
 	"github.com/allegro/bigcache/v3"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/dgraph-io/ristretto"
@@ -13,7 +15,6 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/samber/lo"
 	"go.uber.org/fx"
-	"time"
 )
 
 var Module = fx.Module("cache",

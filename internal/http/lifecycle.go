@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/daiyuang/spack/internal/config"
-	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
@@ -25,13 +25,7 @@ func httpLifecycle(dep LifecycleDependency) {
 				localAddress := "http://127.0.0.1:" + cfg.Http.GetPort()
 				log.Infof("Http Listening on %s", localAddress)
 				err := app.Listen(
-					":"+cfg.Http.GetPort(),
-					fiber.ListenConfig{
-						DisableStartupMessage: true,
-						EnablePrintRoutes:     false,
-						EnablePrefork:         false,
-						ShutdownTimeout:       1000,
-					},
+					":" + cfg.Http.GetPort(),
 				)
 				if err != nil {
 					log.Errorf("spack start fail: %v", err) // 打印原始错误

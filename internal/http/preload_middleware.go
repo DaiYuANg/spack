@@ -8,7 +8,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/daiyuang/spack/internal/config"
-	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v2"
 	"github.com/samber/lo"
 	"go.uber.org/zap"
 )
@@ -60,7 +60,7 @@ func parsePreloadLinksFromHTML(htmlPath string, logger *zap.SugaredLogger) (map[
 }
 
 func preloadMiddleware(preloadMap map[string]string, logger *zap.SugaredLogger) fiber.Handler {
-	return func(c fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
 		err := c.Next()
 
 		// 只针对 HTML 响应添加 Link

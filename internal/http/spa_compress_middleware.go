@@ -1,16 +1,17 @@
 package http
 
 import (
-	"github.com/daiyuang/spack/pkg"
-	"github.com/gofiber/fiber/v3"
-	"github.com/samber/lo"
-	"go.uber.org/zap"
 	"path/filepath"
 	"strings"
+
+	"github.com/daiyuang/spack/pkg"
+	"github.com/gofiber/fiber/v2"
+	"github.com/samber/lo"
+	"go.uber.org/zap"
 )
 
 func spaCompressMiddleware(log *zap.SugaredLogger) fiber.Handler {
-	return func(c fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
 		fullPath := c.Locals("spa:fullPath").(string)
 		acceptEncoding := c.Get(fiber.HeaderAcceptEncoding)
 		encodings := lo.Map(strings.Split(acceptEncoding, ","), func(e string, _ int) string {

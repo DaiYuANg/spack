@@ -1,16 +1,17 @@
 package http
 
 import (
-	p "github.com/daiyuang/spack/internal/metrics"
-	"github.com/gofiber/fiber/v3"
-	"github.com/gofiber/fiber/v3/middleware/adaptor"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"strconv"
 	"time"
+
+	p "github.com/daiyuang/spack/internal/metrics"
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/adaptor"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func prometheusMiddleware(dep p.IndicatorDependency) fiber.Handler {
-	return func(c fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
 		start := time.Now()
 		err := c.Next()
 		duration := time.Since(start).Seconds()

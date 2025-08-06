@@ -1,17 +1,18 @@
 package http
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/constant"
 	"github.com/daiyuang/spack/pkg"
-	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/samber/lo"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 type SpaMiddlewareDependency struct {
@@ -37,7 +38,7 @@ func spaMiddleware(dep SpaMiddlewareDependency) {
 	app, cfg, log, total := dep.App, dep.Config, dep.Log, dep.HttpRequestsTotal
 
 	servePath := strings.TrimSpace(cfg.Spa.Path) + "*"
-	app.Use(servePath, func(c fiber.Ctx) error {
+	app.Use(servePath, func(c *fiber.Ctx) error {
 		incr := func(label string) {
 			total.WithLabelValues(c.Method(), c.Path(), label).Inc()
 		}
@@ -65,7 +66,7 @@ func spaMiddleware(dep SpaMiddlewareDependency) {
 	})
 }
 
-func tryServeCompressed(c fiber.Ctx, fullPath string, log *zap.SugaredLogger) (bool, error) {
+func tryServeCompressed(c *fiber.Ctx, fullPath string, log *zap.SugaredLogger) (bool, error) {
 	acceptEncoding := c.Get(fiber.HeaderAcceptEncoding)
 	encodings := lo.Map(strings.Split(acceptEncoding, ","), func(e string, _ int) string {
 		return strings.TrimSpace(e)
@@ -106,7 +107,7 @@ func tryServeCompressed(c fiber.Ctx, fullPath string, log *zap.SugaredLogger) (b
 	return true, nil
 }
 
-func tryServeStatic(c fiber.Ctx, fullPath string, log *zap.SugaredLogger) (bool, error) {
+func tryServeStatic(c *fiber.Ctx, fullPath string, log *zap.SugaredLogger) (bool, error) {
 	if !pkg.FileExists(fullPath) {
 		return false, nil
 	}
@@ -130,7 +131,7 @@ func tryServeStatic(c fiber.Ctx, fullPath string, log *zap.SugaredLogger) (bool,
 	return true, nil
 }
 
-func tryServeFallback(c fiber.Ctx, cfg *config.Config, log *zap.SugaredLogger) (bool, error) {
+func tryServeFallback(c *fiber.Ctx, cfg *config.Config, log *zap.SugaredLogger) (bool, error) {
 	fallbackPath := filepath.Join(cfg.Spa.Static, cfg.Spa.Fallback)
 	if !pkg.FileExists(fallbackPath) {
 		return false, nil

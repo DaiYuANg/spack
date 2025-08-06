@@ -3,10 +3,10 @@ package http
 import (
 	"errors"
 
-	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v2"
 )
 
-func errorHandler(ctx fiber.Ctx, err error) error {
+func errorHandler(ctx *fiber.Ctx, err error) error {
 	code := fiber.StatusInternalServerError
 
 	var e *fiber.Error
