@@ -1,19 +1,21 @@
 package config
 
 import (
-	"github.com/samber/lo"
 	"strconv"
+
+	"github.com/samber/lo"
 )
 
 type Config struct {
-	Http       Http       `koanf:"http"`
-	Cache      Cache      `koanf:"cache"`
-	Spa        Spa        `koanf:"spa"`
-	Proxy      Proxy      `koanf:"proxy"`
-	Debug      Debug      `koanf:"debug"`
-	Limit      Limit      `koanf:"limit"`
-	Prometheus Prometheus `koanf:"prometheus"`
-	Logger     Logger     `koanf:"logger"`
+	Http         Http         `koanf:"http"`
+	Cache        Cache        `koanf:"cache"`
+	Spa          Spa          `koanf:"spa"`
+	Proxy        Proxy        `koanf:"proxy"`
+	Debug        Debug        `koanf:"debug"`
+	Limit        Limit        `koanf:"limit"`
+	Prometheus   Prometheus   `koanf:"prometheus"`
+	Logger       Logger       `koanf:"logger"`
+	Preprocessor Preprocessor `koanf:"preprocessor"`
 }
 
 type Logger struct {
@@ -65,6 +67,7 @@ type Limit struct {
 }
 
 type Preprocessor struct {
+	Enable bool `koanf:"enable"`
 }
 
 func (p Proxy) Enabled() bool {
@@ -81,6 +84,9 @@ func defaultConfig() Config {
 			Path:     "/",
 			Fallback: "index.html",
 			Preload:  false,
+		},
+		Preprocessor: Preprocessor{
+			Enable: false,
 		},
 	}
 }

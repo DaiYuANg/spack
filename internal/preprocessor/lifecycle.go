@@ -24,6 +24,10 @@ type LifecycleParameter struct {
 }
 
 func preprocess(param LifecycleParameter) error {
+	preprocessorConfig := param.Config.Preprocessor
+	if !preprocessorConfig.Enable {
+		return nil
+	}
 	static := param.Config.Spa.Static
 	logger := param.Logger
 	preprocessors := param.Preprocessors
