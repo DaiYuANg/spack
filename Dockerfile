@@ -33,31 +33,33 @@ RUN upx --best --lzma dist/spack
 FROM frolvlad/alpine-glibc AS alpine
 RUN adduser -D -g '' appuser
 
-WORKDIR /app
-COPY --from=builder /app/dist/spack /app/spack
+WORKDIR /opt
+COPY --from=builder /app/dist/spack /opt/spack
 
 USER root
 
 RUN apk add --no-cache dumb-init libwebp
 
+RUN chmod +x /opt/spack
+
 USER appuser
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 
-CMD ["sh", "-c", "/app/spack"]
+CMD ["sh", "-c", "/opt/spack"]
 
 FROM debian:stable-slim AS debian
 
-WORKDIR /app
+WORKDIR /opt
 
 COPY --from=builder /usr/bin/dumb-init /usr/bin/dumb-init
 
-COPY --from=builder /app/dist/spack /app/spack
+COPY --from=builder /app/dist/spack /opt/spack
 
 RUN apt-get update && apt-get install -y ca-certificates libwebp7 && rm -rf /var/lib/apt/lists/*
 
-RUN chmod +x /app/spack
+RUN chmod +x /opt/spack
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 
-CMD ["sh", "-c", "/app/spack"]
+CMD ["sh", "-c", "/opt/spack"]
