@@ -37,7 +37,7 @@ func collect(dependency CollectDependency) error {
 			return nil
 		}
 		err = pool.Submit(func() {
-			hash, err := pkg.FileHash(path)
+			hash, err := pkg.FileHashOnly(path)
 			if err != nil {
 				logger.Errorf("hash err%e", err)
 			}

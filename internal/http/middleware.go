@@ -21,6 +21,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/pprof"
 	recoverer "github.com/gofiber/fiber/v3/middleware/recover"
 	"github.com/gofiber/fiber/v3/middleware/requestid"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/samber/lo"
 	"go.uber.org/fx"
 )
@@ -28,6 +29,7 @@ import (
 var middlewareModule = fx.Module(
 	"middleware",
 	fx.Invoke(
+		requestMetaMiddleware,
 		earlydataMiddleware,
 		corsMiddleware,
 		compressMiddleware,
@@ -83,11 +85,11 @@ func faviconMiddleware(app *fiber.App) {
 }
 
 func debugMiddleware(app *fiber.App, config *config.Config) {
-	if lo.IsEmpty(config.Debug.Prefix) {
+	if !config.Debug.Enable {
 		return
 	}
 	app.Use(expvarmw.New())
-	app.Use(pprof.New(pprof.Config{Prefix: config.Debug.Prefix}))
+	app.Use(pprof.New(pprof.Config{Prefix: config.Debug.PprofPrefix}))
 }
 
 func monitorMiddleware(app *fiber.App) {
@@ -133,4 +135,8 @@ func envvarMiddleware(app *fiber.App) {
 			ExportVars: resp,
 		},
 	))
+}
+
+func requestMetaMiddleware(app *fiber.App, cfg *config.Config, httpRequestsTotal *prometheus.CounterVec) {
+	app.Use(requestMeta(cfg, httpRequestsTotal))
 }

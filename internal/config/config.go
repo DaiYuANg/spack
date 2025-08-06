@@ -55,7 +55,9 @@ type Proxy struct {
 }
 
 type Debug struct {
-	Prefix string `koanf:"prefix"`
+	Enable      bool   `koanf:"enable"`
+	PprofPrefix string `koanf:"pprof_prefix"`
+	LivePort    int    `koanf:"live_port"`
 }
 
 type Monitor struct {
@@ -87,6 +89,11 @@ func defaultConfig() Config {
 		},
 		Preprocessor: Preprocessor{
 			Enable: false,
+		},
+		Debug: Debug{
+			Enable:      false,
+			PprofPrefix: "/pprof",
+			LivePort:    8080,
 		},
 	}
 }

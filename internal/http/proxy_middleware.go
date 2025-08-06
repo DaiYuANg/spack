@@ -13,9 +13,12 @@ func proxyMiddleware(app *fiber.App, config *config.Config, log *zap.SugaredLogg
 		return
 	}
 
-	app.Use(config.Proxy.Path+"*", func(ctx fiber.Ctx) error {
-		log.Debugf("into proxy %s", ctx.OriginalURL())
-		ctx.Set(constant.PROXY, ctx.OriginalURL())
-		return proxy.Do(ctx, config.Proxy.Target)
-	})
+	app.Use(
+		config.Proxy.Path+"*",
+		func(ctx fiber.Ctx) error {
+			log.Debugf("into proxy %s", ctx.OriginalURL())
+			ctx.Set(constant.PROXY, ctx.OriginalURL())
+			return proxy.Do(ctx, config.Proxy.Target)
+		},
+	)
 }

@@ -56,12 +56,13 @@ func preprocess(param LifecycleParameter) error {
 		// ✅ 每个文件作为一个任务提交到协程池
 		err = pool.Submit(func() {
 			for _, p := range preprocessors {
-				if p.CanProcess(path, mtype) {
-					logger.Debugf("run preprocessor %s on %s", p.Name(), path)
-					if err := p.Process(path); err != nil {
-						logger.Warnf("preprocessor %s error: %v", p.Name(), err)
-						continue
-					}
+				if !p.CanProcess(path, mtype) {
+					continue
+				}
+				logger.Debugf("run preprocessor %s on %s", p.Name(), path)
+				if err := p.Process(path); err != nil {
+					logger.Warnf("preprocessor %s error: %v", p.Name(), err)
+					continue
 				}
 			}
 		})

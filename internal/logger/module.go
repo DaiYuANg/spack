@@ -12,7 +12,13 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-var Module = fx.Module("logger_module", fx.Provide(newLogger, sugaredLogger), fx.Invoke(deferLogger))
+var Module = fx.Module("logger_module",
+	fx.Provide(
+		newLogger,
+		sugaredLogger,
+	),
+	fx.Invoke(deferLogger),
+)
 
 func newLogger(cfg *config.Config) *zap.Logger {
 	loggerConfig := cfg.Logger
@@ -38,7 +44,8 @@ func newLogger(cfg *config.Config) *zap.Logger {
 		level,
 	)
 
-	logger := zap.New(core,
+	logger := zap.New(
+		core,
 		zap.AddCaller(),                       // 显示文件名和行号
 		zap.AddStacktrace(zapcore.ErrorLevel), // 错误及以上打印堆栈
 	)

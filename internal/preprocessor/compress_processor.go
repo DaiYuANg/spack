@@ -40,12 +40,17 @@ func (c *compressPreprocessor) CanProcess(path string, mimetype string) bool {
 
 func (c *compressPreprocessor) Process(path string) error {
 	c.logger.Debugf("compress preprocess %s", path)
-	version := pkg.GetVersionFromBuildInfo()
-	hash, err := pkg.FileHash(path)
+
+	ext := filepath.Ext(path) // 如 .html
+
+	// 包含扩展名内容的 hash，可避免 .html 和 .js 相同内容冲突
+	hash, err := pkg.FileHashWithExt(path)
 	if err != nil {
 		c.logger.Errorf("hash failed for %s: %v", path, err)
 		return err
 	}
+
+	version := pkg.GetVersionFromBuildInfo()
 	base := filepath.Join(os.TempDir(), version)
 	if err := os.MkdirAll(base, 0o755); err != nil {
 		return err
@@ -62,12 +67,13 @@ func (c *compressPreprocessor) Process(path string) error {
 
 	for _, proto := range protos {
 		job := proto
+
 		if err := c.pool.Submit(func() {
-			// 原始路径同目录下的压缩文件路径
+			// index.html.gz
 			siblingCompressed := path + job.ext
 
-			// 临时目录中的压缩路径
-			out := filepath.Join(base, hash+job.ext)
+			// hash.html.gz
+			out := filepath.Join(base, hash+ext+job.ext)
 
 			// 如果同目录下已有压缩文件，则跳过
 			if _, err := os.Stat(siblingCompressed); err == nil {
@@ -75,7 +81,6 @@ func (c *compressPreprocessor) Process(path string) error {
 				return
 			}
 
-			// 如果临时目录中已存在，也跳过
 			if _, err := os.Stat(out); os.IsNotExist(err) {
 				if err := job.compress(path, out); err != nil {
 					c.logger.Warnf("%s compress error: %v", job.ext, err)
@@ -99,6 +104,9 @@ func newCompressPreprocessor(logger *zap.SugaredLogger, pool *ants.Pool) *compre
 			constant.Css,
 			constant.TextJavascript,
 			constant.ApplicationJavascript,
+			constant.Html,
+			constant.Json,
+			constant.Svg,
 		},
 	}
 }

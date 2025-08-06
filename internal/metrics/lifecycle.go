@@ -10,6 +10,9 @@ import (
 )
 
 func start(lc fx.Lifecycle, mux *http.ServeMux, cfg *config.Config, logger *zap.SugaredLogger) error {
+	if !cfg.Debug.Enable {
+		return nil
+	}
 	err := statsviz.Register(mux)
 	if err != nil {
 		return err

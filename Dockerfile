@@ -1,7 +1,5 @@
-# 构建阶段（使用 Go 官方 slim 版本）
 FROM golang:bookworm AS builder
 
-# 启用 Go module，关闭 CGO
 ENV GO111MODULE=on \
     CGO_ENABLED=1
 
@@ -25,7 +23,6 @@ RUN apt update && apt install -y curl xz-utils ca-certificates dumb-init libwebp
 
 COPY . .
 
-# 使用 task 或者 go build 构建静态二进制
 RUN ./bin/task build || go build -trimpath -ldflags="-s -w" -o dist/spack .
 
 RUN upx --best --lzma dist/spack
@@ -46,6 +43,9 @@ USER appuser
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 
+EXPOSE 80
+EXPOSE 8080
+
 CMD ["sh", "-c", "/opt/spack"]
 
 FROM debian:stable-slim AS debian
@@ -61,5 +61,8 @@ RUN apt-get update && apt-get install -y ca-certificates libwebp7 && rm -rf /var
 RUN chmod +x /opt/spack
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+
+EXPOSE 80
+EXPOSE 8080
 
 CMD ["sh", "-c", "/opt/spack"]

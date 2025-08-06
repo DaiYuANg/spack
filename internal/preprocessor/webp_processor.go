@@ -1,17 +1,18 @@
 package preprocessor
 
 import (
-	"github.com/chai2010/webp"
-	"github.com/daiyuang/spack/internal/constant"
-	"github.com/daiyuang/spack/pkg"
-	"github.com/samber/lo"
-	"go.uber.org/zap"
 	"image"
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
 	"os"
 	"path/filepath"
+
+	"github.com/chai2010/webp"
+	"github.com/daiyuang/spack/internal/constant"
+	"github.com/daiyuang/spack/pkg"
+	"github.com/samber/lo"
+	"go.uber.org/zap"
 )
 
 type webpPreprocessor struct {
@@ -48,7 +49,7 @@ func (w *webpPreprocessor) getCacheDir() (string, error) {
 }
 
 func (w *webpPreprocessor) generateTargetPath(originalPath string) (string, error) {
-	hash, err := pkg.FileHash(originalPath)
+	hash, err := pkg.FileHashOnly(originalPath)
 	if err != nil {
 		return "", err
 	}

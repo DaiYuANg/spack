@@ -1,14 +1,15 @@
 package http
 
 import (
+	"net/http"
+	"runtime/debug"
+
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/view"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/template/html/v2"
 	"github.com/samber/lo"
 	"go.uber.org/fx"
-	"net/http"
-	"runtime/debug"
 )
 
 var Module = fx.Module("http",
