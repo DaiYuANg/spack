@@ -2,14 +2,15 @@ package http
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/PuerkitoBio/goquery"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/gofiber/fiber/v3"
 	"github.com/samber/lo"
 	"go.uber.org/zap"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 func parsePreloadLinksFromHTML(htmlPath string, logger *zap.SugaredLogger) (map[string]string, error) {

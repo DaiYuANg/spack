@@ -10,12 +10,12 @@ import (
 	"go.uber.org/fx"
 )
 
-var runtime *fx.App
+var container *fx.App
 
 var rootCmd = &cobra.Command{
 	Use: "spack",
 	PreRun: func(cmd *cobra.Command, args []string) {
-		runtime = createContainer(
+		container = createContainer(
 			cache.Module,
 			registry.Module,
 			preprocessor.Module,
@@ -24,7 +24,7 @@ var rootCmd = &cobra.Command{
 		)
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		runtime.Run()
+		container.Run()
 	},
 }
 

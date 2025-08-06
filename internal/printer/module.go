@@ -1,11 +1,12 @@
 package printer
 
 import (
+	"os"
+	"strings"
+
 	"github.com/daiyuang/spack/internal/registry"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"go.uber.org/fx"
-	"os"
-	"strings"
 )
 
 var Module = fx.Module("printer", fx.Invoke(printer))

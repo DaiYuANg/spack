@@ -1,13 +1,13 @@
 package config
 
 import (
+	"strings"
+
 	"github.com/daiyuang/spack/internal/constant"
 	"github.com/knadh/koanf/providers/env"
 	"github.com/knadh/koanf/providers/structs"
 	"github.com/knadh/koanf/v2"
 	"go.uber.org/fx"
-	"go.uber.org/zap"
-	"strings"
 )
 
 var Module = fx.Module("config", fx.Provide(
@@ -19,7 +19,7 @@ func newKoanf() *koanf.Koanf {
 	return koanf.New(".")
 }
 
-func loadConfig(k *koanf.Koanf, logger *zap.SugaredLogger) (*Config, error) {
+func loadConfig(k *koanf.Koanf) (*Config, error) {
 	def := defaultConfig()
 
 	// 加载默认配置
@@ -35,13 +35,9 @@ func loadConfig(k *koanf.Koanf, logger *zap.SugaredLogger) (*Config, error) {
 		return nil, err
 	}
 
-	allKeys := k.All()
-	logger.Debugf("all key: %v", allKeys)
-
 	if err := k.Unmarshal("", &def); err != nil {
 		return nil, err
 	}
 
-	logger.Infof("loaded config: %+v", def)
 	return &def, nil
 }

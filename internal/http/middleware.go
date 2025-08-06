@@ -1,6 +1,9 @@
 package http
 
 import (
+	"runtime/debug"
+	"time"
+
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/gofiber/contrib/monitor"
 	"github.com/gofiber/fiber/v3"
@@ -15,17 +18,15 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/healthcheck"
 	"github.com/gofiber/fiber/v3/middleware/helmet"
 	"github.com/gofiber/fiber/v3/middleware/limiter"
-	"github.com/gofiber/fiber/v3/middleware/logger"
 	"github.com/gofiber/fiber/v3/middleware/pprof"
 	recoverer "github.com/gofiber/fiber/v3/middleware/recover"
 	"github.com/gofiber/fiber/v3/middleware/requestid"
 	"github.com/samber/lo"
 	"go.uber.org/fx"
-	"runtime/debug"
-	"time"
 )
 
-var middlewareModule = fx.Module("middleware",
+var middlewareModule = fx.Module(
+	"middleware",
 	fx.Invoke(
 		earlydataMiddleware,
 		corsMiddleware,
@@ -57,15 +58,6 @@ func compressMiddleware(app *fiber.App) {
 
 func etagMiddleware(app *fiber.App) {
 	app.Use(etag.New())
-}
-
-func loggerMiddleware(app *fiber.App) {
-	app.Use(
-		logger.New(
-			logger.Config{
-				Format: "\"${ip} - - [${time}] \"${method} ${url} ${protocol}\" ${status} ${bytesSent} \"${referer}\" \"${ua}\"\\n\"\n",
-			}),
-	)
 }
 
 func requestIdMiddleware(app *fiber.App) {
@@ -131,7 +123,7 @@ func envvarMiddleware(app *fiber.App) {
 	resp := map[string]string{
 		"main":     info.Main.Path,
 		"version":  info.Main.Version,
-		"mod_time": info.Main.Sum, // 这里没有编译时间，只有版本信息等
+		"mod_time": info.Main.Sum,
 	}
 	lo.ForEach(info.Settings, func(item debug.BuildSetting, index int) {
 		resp[item.Key] = item.Value

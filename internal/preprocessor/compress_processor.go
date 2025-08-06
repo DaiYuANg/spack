@@ -1,18 +1,15 @@
 package preprocessor
 
 import (
-	"compress/gzip"
-	"github.com/andybalholm/brotli"
-	"github.com/daiyuang/spack/internal/constant"
-	"github.com/daiyuang/spack/pkg"
-	"github.com/klauspost/compress/zstd"
-	"github.com/panjf2000/ants/v2"
-	"github.com/samber/lo"
-	"go.uber.org/zap"
-	"io"
 	"math"
 	"os"
 	"path/filepath"
+
+	"github.com/daiyuang/spack/internal/constant"
+	"github.com/daiyuang/spack/pkg"
+	"github.com/panjf2000/ants/v2"
+	"github.com/samber/lo"
+	"go.uber.org/zap"
 )
 
 type compressPreprocessor struct {
@@ -65,8 +62,20 @@ func (c *compressPreprocessor) Process(path string) error {
 
 	for _, proto := range protos {
 		job := proto
-		err := c.pool.Submit(func() {
+		if err := c.pool.Submit(func() {
+			// 原始路径同目录下的压缩文件路径
+			siblingCompressed := path + job.ext
+
+			// 临时目录中的压缩路径
 			out := filepath.Join(base, hash+job.ext)
+
+			// 如果同目录下已有压缩文件，则跳过
+			if _, err := os.Stat(siblingCompressed); err == nil {
+				c.logger.Debugf("%s exists in source dir, skip compression", siblingCompressed)
+				return
+			}
+
+			// 如果临时目录中已存在，也跳过
 			if _, err := os.Stat(out); os.IsNotExist(err) {
 				if err := job.compress(path, out); err != nil {
 					c.logger.Warnf("%s compress error: %v", job.ext, err)
@@ -74,86 +83,12 @@ func (c *compressPreprocessor) Process(path string) error {
 					c.logger.Debugf("%s created %s", job.ext, out)
 				}
 			}
-		})
-		if err != nil {
+		}); err != nil {
 			return err
 		}
 	}
 
 	return nil
-}
-
-func compressZstd(src, dst string, level int) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer func(in *os.File) {
-		_ = in.Close()
-	}(in)
-
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer func(out *os.File) {
-		_ = out.Close()
-	}(out)
-
-	enc, err := zstd.NewWriter(out, zstd.WithEncoderLevel(zstd.EncoderLevelFromZstd(level)))
-	if err != nil {
-		return err
-	}
-	defer func(enc *zstd.Encoder) {
-		_ = enc.Close()
-	}(enc)
-
-	_, err = io.Copy(enc, in)
-	return err
-}
-
-func compressGzip(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	gw, err := gzip.NewWriterLevel(out, gzip.BestCompression)
-	defer gw.Close()
-
-	if err != nil {
-		return err
-	}
-
-	_, err = io.Copy(gw, in)
-	return err
-}
-
-func compressBrotli(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	bw := brotli.NewWriterLevel(out, brotli.BestCompression)
-	defer bw.Close()
-
-	_, err = io.Copy(bw, in)
-	return err
 }
 
 func newCompressPreprocessor(logger *zap.SugaredLogger, pool *ants.Pool) *compressPreprocessor {

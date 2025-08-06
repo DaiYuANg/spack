@@ -1,12 +1,10 @@
 package metrics
 
 import (
-	"github.com/arl/statsviz"
-	"github.com/daiyuang/spack/internal/config"
+	"net/http"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/fx"
-	"go.uber.org/zap"
-	"net/http"
 )
 
 var Module = fx.Module("metrics",
@@ -63,21 +61,4 @@ func register(dep IndicatorDependency) {
 		dep.HttpRequestDurationSeconds,
 		dep.ActiveRequests,
 	)
-}
-
-func start(lc fx.Lifecycle, mux *http.ServeMux, cfg *config.Config, logger *zap.SugaredLogger) error {
-	err := statsviz.Register(mux)
-	if err != nil {
-		return err
-	}
-	lc.Append(fx.StartStopHook(
-		func() {
-			go func() {
-				logger.Debugf("metrics server start:%s", "http://localhost:8080/debug/statsviz")
-				_ = http.ListenAndServe("localhost:8080", mux)
-			}()
-		},
-		func() {},
-	))
-	return nil
 }

@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/gofiber/fiber/v3"
 	"go.uber.org/fx"
@@ -22,7 +23,7 @@ func httpLifecycle(dep LifecycleDependency) {
 		func() {
 			go func() {
 				localAddress := "http://127.0.0.1:" + cfg.Http.GetPort()
-				log.Debugf("Http Listening on %s", localAddress)
+				log.Infof("Http Listening on %s", localAddress)
 				err := app.Listen(
 					":"+cfg.Http.GetPort(),
 					fiber.ListenConfig{

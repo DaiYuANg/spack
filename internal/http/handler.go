@@ -2,6 +2,7 @@ package http
 
 import (
 	"errors"
+
 	"github.com/gofiber/fiber/v3"
 )
 
