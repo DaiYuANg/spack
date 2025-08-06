@@ -19,12 +19,8 @@ type CollectDependency struct {
 	Pool     *ants.Pool
 }
 
-func (d CollectDependency) SpaConfig() *config.Spa {
-	return &d.Cfg.Spa
-}
-
 func collect(dependency CollectDependency) error {
-	root := dependency.SpaConfig().Static
+	root := dependency.Cfg.Spa.Static
 	logger := dependency.Logger
 	registry := dependency.Registry
 	pool := dependency.Pool
