@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Registry</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="bg-gray-100">
+<div class="p-5 mx-auto">
+  <h1 class="text-3xl font-bold mb-6">📂 文件注册表</h1>
+
+  <!-- Tabs -->
+  <div class="mb-4 border-b border-gray-300">
+    <nav class="flex space-x-4" id="tabs">
+      <button class="tab active-tab px-4 py-2 text-sm font-medium text-blue-600 border-b-2 border-blue-600">
+        原始文件
+      </button>
+      <button class="tab px-4 py-2 text-sm font-medium text-gray-600 hover:text-blue-600">
+        变体文件
+      </button>
+    </nav>
+  </div>
+
+  <!-- 单位选择器 -->
+  <div class="flex justify-end mb-4">
+    <label for="unit-select" class="mr-2 font-medium">大小单位：</label>
+    <select id="unit-select" class="border rounded px-2 py-1 text-sm">
+      <option value="B">Bytes</option>
+      <option value="KB">KB</option>
+      <option value="MB">MB</option>
+    </select>
+  </div>
+
+  <!-- 原始文件表格 -->
+  <div class="tab-panel block" id="originals-panel">
+    <table class="min-w-full bg-white shadow rounded-lg">
+      <thead>
+      <tr class="bg-gray-200 text-left text-sm">
+        <th class="p-3">路径</th>
+        <th class="p-3">大小</th>
+        <th class="p-3">Hash</th>
+        <th class="p-3">扩展名</th>
+      </tr>
+      </thead>
+      <tbody>
+      {{ range .Originals }}
+      <tr class="border-t hover:bg-gray-50 text-sm">
+        <td class="px-6 py-4 text-blue-600 underline">
+          <a href="file:///{{ .Path }}" target="_blank">{{ .Path }}</a>
+        </td>
+        <td class="p-3 size-cell" data-size="{{ .Size }}"></td>
+        <td class="p-3 font-mono">{{ .Hash }}</td>
+        <td class="p-3 font-mono">{{ .Ext }}</td>
+      </tr>
+      {{ end }}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 变体文件表格 -->
+  <div class="tab-panel hidden" id="variants-panel">
+    <table class="min-w-full bg-white shadow rounded-lg">
+      <thead>
+      <tr class="bg-gray-200 text-left text-sm">
+        <th class="p-3">原始文件</th>
+        <th class="p-3">变体路径</th>
+        <th class="p-3">类型</th>
+        <th class="p-3">大小</th>
+        <th class="p-3">扩展名</th>
+      </tr>
+      </thead>
+      <tbody>
+      {{ range .Variants }}
+      <tr class="border-t hover:bg-gray-50 text-sm">
+        <td class="p-3 font-mono">{{ .OriginalPath }}</td>
+        <td class="px-6 py-4 text-blue-600 underline">
+          <a href="file:///{{ .Path }}" target="_blank">{{ .Path }}</a>
+        </td>
+        <td class="p-3">{{ .VariantType }}</td>
+        <td class="p-3 size-cell" data-size="{{ .Size }}"></td>
+        <td class="p-3 font-mono">{{ .Ext }}</td>
+      </tr>
+      {{ end }}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 脚本：单位换算 + Tab 切换 -->
+<script>
+  const unitSelect = document.getElementById("unit-select");
+  const sizeCells = document.querySelectorAll(".size-cell");
+
+  const formatSize = (bytes, unit) => {
+    let size = Number(bytes);
+    switch (unit) {
+      case "KB": return (size / 1024).toFixed(2) + " KB";
+      case "MB": return (size / (1024 * 1024)).toFixed(2) + " MB";
+      default: return size + " B";
+    }
+  };
+
+  const updateSizes = () => {
+    const unit = unitSelect.value;
+    sizeCells.forEach(cell => {
+      const raw = cell.getAttribute("data-size");
+      cell.textContent = formatSize(raw, unit);
+    });
+  };
+
+  unitSelect.addEventListener("change", updateSizes);
+  window.addEventListener("DOMContentLoaded", updateSizes);
+
+  // Tab 切换
+  const tabs = document.querySelectorAll(".tab");
+  const panels = document.querySelectorAll(".tab-panel");
+
+  tabs.forEach((tab, i) => {
+    tab.addEventListener("click", () => {
+      tabs.forEach(t => t.classList.remove("active-tab", "text-blue-600", "border-blue-600"));
+      panels.forEach(p => p.classList.add("hidden"));
+
+      tab.classList.add("active-tab", "text-blue-600", "border-blue-600");
+      panels[i].classList.remove("hidden");
+    });
+  });
+</script>
+</body>
+</html>

@@ -1,12 +1,15 @@
-package preprocessor
+package lifecycle
 
 import (
 	"fmt"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"sort"
 
 	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/preprocessor"
+	"github.com/daiyuang/spack/internal/registry"
 	"github.com/daiyuang/spack/pkg"
 	"github.com/panjf2000/ants/v2"
 	"github.com/samber/lo"
@@ -14,16 +17,17 @@ import (
 	"go.uber.org/zap"
 )
 
-type LifecycleParameter struct {
+type Parameter struct {
 	fx.In
 	Config        *config.Config
 	Logger        *zap.SugaredLogger
-	Preprocessors []Preprocessor `group:"preprocessor"`
+	Preprocessors []preprocessor.Preprocessor `group:"preprocessor"`
 	Lifecycle     fx.Lifecycle
 	Pool          *ants.Pool
+	Registry      registry.Registry
 }
 
-func preprocess(param LifecycleParameter) error {
+func startup(param Parameter) error {
 	preprocessorConfig := param.Config.Preprocessor
 	if !preprocessorConfig.Enable {
 		return nil
@@ -32,12 +36,12 @@ func preprocess(param LifecycleParameter) error {
 	logger := param.Logger
 	preprocessors := param.Preprocessors
 	pool := param.Pool
-	// ✅ 按照 Order 排序（从小到大）
+	r := param.Registry
 	sort.SliceStable(preprocessors, func(i, j int) bool {
 		return preprocessors[i].Order() < preprocessors[j].Order()
 	})
 
-	logger.Debugf("Preprocessors order: %v", lo.Map(preprocessors, func(p Preprocessor, _ int) string {
+	logger.Debugf("Preprocessors order: %v", lo.Map(preprocessors, func(p preprocessor.Preprocessor, _ int) string {
 		return fmt.Sprintf("%s(%d)", p.Name(), p.Order())
 	}))
 
@@ -51,16 +55,23 @@ func preprocess(param LifecycleParameter) error {
 			return nil
 		}
 
-		mtype := pkg.DetectMIME(path)
-		logger.Debugf("mimetype %s", mtype)
-		// ✅ 每个文件作为一个任务提交到协程池
+		originalInfo, err := generateOriginalInfo(path)
+		if err != nil {
+			return err
+		}
+		err = r.RegisterOriginal(originalInfo)
+		if err != nil {
+			return err
+		}
+		//logger.Debugf("mimetype %s", mtype)
+		//// ✅ 每个文件作为一个任务提交到协程池
 		err = pool.Submit(func() {
 			for _, p := range preprocessors {
-				if !p.CanProcess(path, mtype) {
+				if !p.CanProcess(originalInfo) {
 					continue
 				}
 				logger.Debugf("run preprocessor %s on %s", p.Name(), path)
-				if err := p.Process(path); err != nil {
+				if err := p.Process(originalInfo); err != nil {
 					logger.Warnf("preprocessor %s error: %v", p.Name(), err)
 					continue
 				}
@@ -72,4 +83,26 @@ func preprocess(param LifecycleParameter) error {
 
 		return nil
 	})
+}
+
+func generateOriginalInfo(path string) (*registry.OriginalFileInfo, error) {
+	mtype := pkg.DetectMIME(path)
+	hash, err := pkg.FileHashWithExt(path)
+	if err != nil {
+		return nil, err
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	ext := filepath.Ext(path)
+	originalFileInfo := &registry.OriginalFileInfo{
+		Path:     path,
+		Size:     info.Size(),
+		Hash:     hash,
+		Ext:      ext,
+		Mimetype: mtype,
+	}
+
+	return originalFileInfo, nil
 }

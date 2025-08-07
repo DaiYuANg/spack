@@ -11,7 +11,4 @@ var Module = fx.Module("Registry",
 			fx.As(new(Registry)),
 		),
 	),
-	fx.Invoke(
-		collect,
-	),
 )

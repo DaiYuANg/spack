@@ -10,6 +10,7 @@ import (
 
 	"github.com/chai2010/webp"
 	"github.com/daiyuang/spack/internal/constant"
+	"github.com/daiyuang/spack/internal/registry"
 	"github.com/daiyuang/spack/pkg"
 	"github.com/samber/lo"
 	"go.uber.org/zap"
@@ -18,6 +19,7 @@ import (
 type webpPreprocessor struct {
 	logger      *zap.SugaredLogger
 	supportMime []constant.MimeType
+	registry    registry.Registry
 }
 
 func (w *webpPreprocessor) Name() string {
@@ -28,13 +30,13 @@ func (w *webpPreprocessor) Order() int {
 	return 0
 }
 
-func (w *webpPreprocessor) CanProcess(path string, mimetype string) bool {
+func (w *webpPreprocessor) CanProcess(info *registry.OriginalFileInfo) bool {
 	ok := lo.ContainsBy(w.supportMime, func(mt constant.MimeType) bool {
-		return string(mt) == mimetype
+		return string(mt) == info.Mimetype
 	})
 
 	if ok {
-		w.logger.Debugf("webp: matched mime=%s for path=%s", mimetype, path)
+		w.logger.Debugf("webp: matched mime=%s for path=%s", info.Mimetype, info.Path)
 	}
 
 	return ok
@@ -48,18 +50,13 @@ func (w *webpPreprocessor) getCacheDir() (string, error) {
 	return basePath, nil
 }
 
-func (w *webpPreprocessor) generateTargetPath(originalPath string) (string, error) {
-	hash, err := pkg.FileHashOnly(originalPath)
-	if err != nil {
-		return "", err
-	}
-
+func (w *webpPreprocessor) generateTargetPath(info *registry.OriginalFileInfo) (string, error) {
 	cacheDir, err := w.getCacheDir()
 	if err != nil {
 		return "", err
 	}
 
-	return filepath.Join(cacheDir, hash+".webp"), nil
+	return filepath.Join(cacheDir, info.Hash+".webp"), nil
 }
 
 func (w *webpPreprocessor) cacheExists(targetPath string) bool {
@@ -92,15 +89,29 @@ func (w *webpPreprocessor) encodeWebp(img image.Image, targetPath string) error 
 	return webp.Encode(outFile, img, &webp.Options{Lossless: true, Quality: 80})
 }
 
-func (w *webpPreprocessor) Process(path string) error {
-	targetPath, err := w.generateTargetPath(path)
+func (w *webpPreprocessor) Process(info *registry.OriginalFileInfo) error {
+	path := info.Path
+	targetPath, err := w.generateTargetPath(info)
 	if err != nil {
 		w.logger.Errorf("failed to generate target path for %s: %v", path, err)
 		return err
 	}
 
 	if w.cacheExists(targetPath) {
-		w.logger.Debugf("webp: cached file exists %s, skip conversion", targetPath)
+		w.logger.Debugf("webp: cached file exists %s, register variant", targetPath)
+
+		stat, err := os.Stat(targetPath)
+		if err != nil {
+			return err
+		}
+
+		vinfo := &registry.VariantFileInfo{
+			Path:        targetPath,
+			VariantType: constant.VariantWebP,
+			Size:        stat.Size(),
+			Ext:         ".webp",
+		}
+		w.registry.AddVariant(info.Path, vinfo)
 		return nil
 	}
 
@@ -115,13 +126,27 @@ func (w *webpPreprocessor) Process(path string) error {
 		return err
 	}
 
-	w.logger.Debugf("webp: generated %s", targetPath)
+	stat, err := os.Stat(targetPath)
+	if err != nil {
+		return err
+	}
+
+	vinfo := &registry.VariantFileInfo{
+		Path:        targetPath,
+		VariantType: constant.VariantWebP,
+		Size:        stat.Size(),
+		Ext:         ".webp",
+	}
+	w.registry.AddVariant(info.Path, vinfo)
+
+	w.logger.Debugf("webp: generated and registered %s", targetPath)
 	return nil
 }
 
-func newWebpPreprocessor(logger *zap.SugaredLogger) *webpPreprocessor {
+func newWebpPreprocessor(logger *zap.SugaredLogger, r registry.Registry) *webpPreprocessor {
 	return &webpPreprocessor{
 		logger:      logger,
 		supportMime: []constant.MimeType{constant.Png, constant.Jpg, constant.Jpeg},
+		registry:    r,
 	}
 }

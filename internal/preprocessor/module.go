@@ -9,5 +9,4 @@ var Module = fx.Module("preprocessor",
 		processorAnnotation(newWebpPreprocessor),
 		processorAnnotation(newCompressPreprocessor),
 	),
-	fx.Invoke(preprocess),
 )

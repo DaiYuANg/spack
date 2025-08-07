@@ -2,7 +2,6 @@ package printer
 
 import (
 	"os"
-	"strings"
 
 	"github.com/daiyuang/spack/internal/registry"
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -16,15 +15,14 @@ func printer(registry registry.Registry) {
 	t.SetOutputMirror(os.Stdout)
 	t.SetStyle(table.StyleRounded)
 
-	t.AppendHeader(table.Row{"Request Path", "Actual Path", "MIME Type", "Preprocessors", "Version"})
+	t.AppendHeader(table.Row{"Request Path", "MIME Type", "Size", "Hash"})
 
-	for _, e := range registry.List() {
+	for _, e := range registry.ListOriginal() {
 		t.AppendRow(table.Row{
-			e.RequestPath,
-			e.ActualPath,
-			e.MimeType,
-			strings.Join(e.Preprocessors, ", "),
-			e.Version,
+			e.Path,
+			e.Mimetype,
+			e.Size,
+			e.Hash,
 		})
 	}
 

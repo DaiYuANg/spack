@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/daiyuang/spack/internal/constant"
+	"github.com/daiyuang/spack/internal/registry"
 	"github.com/daiyuang/spack/pkg"
 	"github.com/panjf2000/ants/v2"
 	"github.com/samber/lo"
@@ -16,6 +17,7 @@ type compressPreprocessor struct {
 	logger      *zap.SugaredLogger
 	supportMime []constant.MimeType
 	pool        *ants.Pool
+	registry    registry.Registry
 }
 
 func (c *compressPreprocessor) Name() string {
@@ -26,19 +28,20 @@ func (c *compressPreprocessor) Order() int {
 	return math.MaxInt
 }
 
-func (c *compressPreprocessor) CanProcess(path string, mimetype string) bool {
+func (c *compressPreprocessor) CanProcess(info *registry.OriginalFileInfo) bool {
 	ok := lo.ContainsBy(c.supportMime, func(mt constant.MimeType) bool {
-		return string(mt) == mimetype
+		return string(mt) == info.Mimetype
 	})
 
 	if ok {
-		c.logger.Debugf("webp: matched mime=%s for path=%s", mimetype, path)
+		c.logger.Debugf("webp: matched mime=%s for path=%s", info.Mimetype, info.Path)
 	}
 
 	return ok
 }
 
-func (c *compressPreprocessor) Process(path string) error {
+func (c *compressPreprocessor) Process(info *registry.OriginalFileInfo) error {
+	path := info.Path
 	c.logger.Debugf("compress preprocess %s", path)
 
 	ext := filepath.Ext(path) // 如 .html
@@ -96,10 +99,11 @@ func (c *compressPreprocessor) Process(path string) error {
 	return nil
 }
 
-func newCompressPreprocessor(logger *zap.SugaredLogger, pool *ants.Pool) *compressPreprocessor {
+func newCompressPreprocessor(logger *zap.SugaredLogger, pool *ants.Pool, r registry.Registry) *compressPreprocessor {
 	return &compressPreprocessor{
-		logger: logger,
-		pool:   pool,
+		logger:   logger,
+		pool:     pool,
+		registry: r,
 		supportMime: []constant.MimeType{
 			constant.Css,
 			constant.TextJavascript,

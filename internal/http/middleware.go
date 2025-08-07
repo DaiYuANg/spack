@@ -47,6 +47,7 @@ var middlewareModule = fx.Module(
 		proxyMiddleware,
 		debugMiddleware,
 		setupPreload,
+		registryViewMiddleware,
 		spaMiddleware,
 		recoverMiddleware,
 	),

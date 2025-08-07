@@ -1,8 +1,10 @@
 package preprocessor
 
+import "github.com/daiyuang/spack/internal/registry"
+
 type Preprocessor interface {
 	Name() string
 	Order() int
-	CanProcess(path string, mime string) bool
-	Process(path string) error
+	CanProcess(info *registry.OriginalFileInfo) bool
+	Process(info *registry.OriginalFileInfo) error
 }
