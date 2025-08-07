@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"path/filepath"
 	"sync"
 
 	cmap "github.com/orcaman/concurrent-map/v2"
@@ -140,6 +141,15 @@ func (r *InMemoryRegistry) ViewData() *ViewData {
 				VariantFileInfo: v,
 			})
 		}
+	})
+
+	lo.ForEach(originals, func(info *OriginalFileInfo, _ int) {
+		info.Path = filepath.Base(info.Path)
+	})
+
+	lo.ForEach(variants, func(item *VariantView, index int) {
+		item.Path = filepath.Base(item.Path)
+		item.OriginalPath = filepath.Base(item.OriginalPath)
 	})
 
 	return &ViewData{

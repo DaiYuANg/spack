@@ -13,30 +13,38 @@
   <!-- Tabs -->
   <div class="mb-4 border-b border-gray-300">
     <nav class="flex space-x-4" id="tabs">
-      <button class="tab active-tab px-4 py-2 text-sm font-medium text-blue-600 border-b-2 border-blue-600">
-        原始文件
-      </button>
-      <button class="tab px-4 py-2 text-sm font-medium text-gray-600 hover:text-blue-600">
-        变体文件
-      </button>
+      <button class="tab active-tab px-4 py-2 text-sm font-medium text-blue-600 border-b-2 border-blue-600" data-tab="originals-panel">原始文件</button>
+      <button class="tab px-4 py-2 text-sm font-medium text-gray-600 hover:text-blue-600" data-tab="variants-panel">变体文件</button>
     </nav>
   </div>
 
-  <!-- 单位选择器 -->
-  <div class="flex justify-end mb-4">
-    <label for="unit-select" class="mr-2 font-medium">大小单位：</label>
-    <select id="unit-select" class="border rounded px-2 py-1 text-sm">
-      <option value="B">Bytes</option>
-      <option value="KB">KB</option>
-      <option value="MB">MB</option>
-    </select>
+  <!-- 搜索与单位控制 -->
+  <div class="flex flex-wrap justify-between items-center mb-4 space-y-2 gap-4">
+    <!-- 搜索栏 -->
+    <div class="flex gap-2 items-center">
+      <input id="search-name" type="text" placeholder="🔍 文件路径包含..." class="border rounded px-2 py-1 text-sm w-60" />
+      <input id="search-min-size" type="number" placeholder="最小大小(B)" class="border rounded px-2 py-1 text-sm w-32" />
+      <input id="search-max-size" type="number" placeholder="最大大小(B)" class="border rounded px-2 py-1 text-sm w-32" />
+      <button id="search-btn" class="bg-blue-500 hover:bg-blue-600 text-white text-sm px-3 py-1 rounded">筛选</button>
+      <button id="reset-btn" class="ml-2 text-sm text-gray-600 hover:underline">重置</button>
+    </div>
+
+    <!-- 单位选择 -->
+    <div class="flex items-center">
+      <label for="unit-select" class="mr-2 font-medium text-sm">显示单位：</label>
+      <select id="unit-select" class="border rounded px-2 py-1 text-sm">
+        <option value="B">Bytes</option>
+        <option value="KB">KB</option>
+        <option value="MB">MB</option>
+      </select>
+    </div>
   </div>
 
-  <!-- 原始文件表格 -->
+  <!-- 原始文件 -->
   <div class="tab-panel block" id="originals-panel">
-    <table class="min-w-full bg-white shadow rounded-lg">
+    <table class="min-w-full bg-white shadow rounded-lg text-sm">
       <thead>
-      <tr class="bg-gray-200 text-left text-sm">
+      <tr class="bg-gray-200 text-left">
         <th class="p-3">路径</th>
         <th class="p-3">大小</th>
         <th class="p-3">Hash</th>
@@ -45,10 +53,8 @@
       </thead>
       <tbody>
       {{ range .Originals }}
-      <tr class="border-t hover:bg-gray-50 text-sm">
-        <td class="px-6 py-4 text-blue-600 underline">
-          <a href="file:///{{ .Path }}" target="_blank">{{ .Path }}</a>
-        </td>
+      <tr class="data-row border-t hover:bg-gray-50" data-path="{{ .Path }}" data-size="{{ .Size }}">
+        <td class="px-6 py-4 text-blue-600 underline"><a href="file:///{{ .Path }}" target="_blank">{{ .Path }}</a></td>
         <td class="p-3 size-cell" data-size="{{ .Size }}"></td>
         <td class="p-3 font-mono">{{ .Hash }}</td>
         <td class="p-3 font-mono">{{ .Ext }}</td>
@@ -58,11 +64,11 @@
     </table>
   </div>
 
-  <!-- 变体文件表格 -->
+  <!-- 变体文件 -->
   <div class="tab-panel hidden" id="variants-panel">
-    <table class="min-w-full bg-white shadow rounded-lg">
+    <table class="min-w-full bg-white shadow rounded-lg text-sm">
       <thead>
-      <tr class="bg-gray-200 text-left text-sm">
+      <tr class="bg-gray-200 text-left">
         <th class="p-3">原始文件</th>
         <th class="p-3">变体路径</th>
         <th class="p-3">类型</th>
@@ -72,11 +78,9 @@
       </thead>
       <tbody>
       {{ range .Variants }}
-      <tr class="border-t hover:bg-gray-50 text-sm">
+      <tr class="data-row border-t hover:bg-gray-50" data-path="{{ .Path }}" data-size="{{ .Size }}">
         <td class="p-3 font-mono">{{ .OriginalPath }}</td>
-        <td class="px-6 py-4 text-blue-600 underline">
-          <a href="file:///{{ .Path }}" target="_blank">{{ .Path }}</a>
-        </td>
+        <td class="px-6 py-4 text-blue-600 underline"><a href="file:///{{ .Path }}" target="_blank">{{ .Path }}</a></td>
         <td class="p-3">{{ .VariantType }}</td>
         <td class="p-3 size-cell" data-size="{{ .Size }}"></td>
         <td class="p-3 font-mono">{{ .Ext }}</td>
@@ -87,11 +91,13 @@
   </div>
 </div>
 
-<!-- 脚本：单位换算 + Tab 切换 -->
+<!-- 脚本 -->
 <script>
   const unitSelect = document.getElementById("unit-select");
-  const sizeCells = document.querySelectorAll(".size-cell");
+  const tabs = document.querySelectorAll(".tab");
+  const panels = document.querySelectorAll(".tab-panel");
 
+  // 切换单位显示
   const formatSize = (bytes, unit) => {
     let size = Number(bytes);
     switch (unit) {
@@ -101,29 +107,53 @@
     }
   };
 
-  const updateSizes = () => {
+  function updateSizes() {
     const unit = unitSelect.value;
-    sizeCells.forEach(cell => {
-      const raw = cell.getAttribute("data-size");
-      cell.textContent = formatSize(raw, unit);
+    document.querySelectorAll(".size-cell").forEach(cell => {
+      const bytes = cell.dataset.size;
+      cell.textContent = formatSize(bytes, unit);
     });
-  };
+  }
 
   unitSelect.addEventListener("change", updateSizes);
   window.addEventListener("DOMContentLoaded", updateSizes);
 
   // Tab 切换
-  const tabs = document.querySelectorAll(".tab");
-  const panels = document.querySelectorAll(".tab-panel");
-
-  tabs.forEach((tab, i) => {
+  tabs.forEach(tab => {
     tab.addEventListener("click", () => {
+      const target = tab.dataset.tab;
+
       tabs.forEach(t => t.classList.remove("active-tab", "text-blue-600", "border-blue-600"));
       panels.forEach(p => p.classList.add("hidden"));
 
       tab.classList.add("active-tab", "text-blue-600", "border-blue-600");
-      panels[i].classList.remove("hidden");
+      document.getElementById(target).classList.remove("hidden");
     });
+  });
+
+  // 搜索筛选
+  document.getElementById("search-btn").addEventListener("click", () => {
+    const name = document.getElementById("search-name").value.toLowerCase();
+    const min = parseInt(document.getElementById("search-min-size").value) || 0;
+    const max = parseInt(document.getElementById("search-max-size").value) || Infinity;
+
+    document.querySelectorAll(".tab-panel:not(.hidden) .data-row").forEach(row => {
+      const path = row.dataset.path.toLowerCase();
+      const size = parseInt(row.dataset.size);
+
+      if (path.includes(name) && size >= min && size <= max) {
+        row.style.display = "";
+      } else {
+        row.style.display = "none";
+      }
+    });
+  });
+
+  document.getElementById("reset-btn").addEventListener("click", () => {
+    document.getElementById("search-name").value = "";
+    document.getElementById("search-min-size").value = "";
+    document.getElementById("search-max-size").value = "";
+    document.querySelectorAll(".data-row").forEach(row => row.style.display = "");
   });
 </script>
 </body>
