@@ -78,6 +78,11 @@ func (c *compressPreprocessor) Process(info *registry.OriginalFileInfo) error {
 			// hash.html.gz
 			out := filepath.Join(base, hash+ext+job.ext)
 
+			c.registry.AddVariant(path, &registry.VariantFileInfo{
+				Path:        siblingCompressed,
+				VariantType: constant.Compress,
+				Ext:         proto.ext,
+			})
 			// 如果同目录下已有压缩文件，则跳过
 			if _, err := os.Stat(siblingCompressed); err == nil {
 				c.logger.Debugf("%s exists in source dir, skip compression", siblingCompressed)

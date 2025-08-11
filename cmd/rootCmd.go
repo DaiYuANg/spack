@@ -6,6 +6,7 @@ import (
 	"github.com/daiyuang/spack/internal/metrics"
 	"github.com/daiyuang/spack/internal/preprocessor"
 	"github.com/daiyuang/spack/internal/registry"
+	"github.com/daiyuang/spack/internal/spa"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -19,8 +20,9 @@ var rootCmd = &cobra.Command{
 			cache.Module,
 			registry.Module,
 			preprocessor.Module,
-			http.Module,
 			metrics.Module,
+			spa.Module,
+			http.Module,
 		)
 	},
 	Run: func(cmd *cobra.Command, args []string) {

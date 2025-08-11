@@ -29,9 +29,7 @@ type Parameter struct {
 
 func startup(param Parameter) error {
 	preprocessorConfig := param.Config.Preprocessor
-	if !preprocessorConfig.Enable {
-		return nil
-	}
+
 	static := param.Config.Spa.Static
 	logger := param.Logger
 	preprocessors := param.Preprocessors
@@ -63,8 +61,10 @@ func startup(param Parameter) error {
 		if err != nil {
 			return err
 		}
-		//logger.Debugf("mimetype %s", mtype)
-		//// ✅ 每个文件作为一个任务提交到协程池
+		if !preprocessorConfig.Enable {
+			return nil
+		}
+		// ✅ 每个文件作为一个任务提交到协程池
 		err = pool.Submit(func() {
 			for _, p := range preprocessors {
 				if !p.CanProcess(originalInfo) {
