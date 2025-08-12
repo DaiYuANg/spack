@@ -28,61 +28,75 @@ type Parameter struct {
 }
 
 func startup(param Parameter) error {
-	preprocessorConfig := param.Config.Preprocessor
-
-	static := param.Config.Spa.Static
+	cfg := param.Config
 	logger := param.Logger
-	preprocessors := param.Preprocessors
-	pool := param.Pool
-	r := param.Registry
-	sort.SliceStable(preprocessors, func(i, j int) bool {
-		return preprocessors[i].Order() < preprocessors[j].Order()
-	})
 
-	logger.Debugf("Preprocessors order: %v", lo.Map(preprocessors, func(p preprocessor.Preprocessor, _ int) string {
-		return fmt.Sprintf("%s(%d)", p.Name(), p.Order())
-	}))
+	preprocessors := sortPreprocessors(param.Preprocessors)
+	logPreprocessorOrder(logger, preprocessors)
 
-	return filepath.Walk(static, func(path string, info fs.FileInfo, err error) error {
-		logger.Debugf("walk at %s", path)
-
+	return filepath.Walk(cfg.Spa.Static, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 		if info.IsDir() {
 			return nil
 		}
-
-		originalInfo, err := generateOriginalInfo(path)
-		if err != nil {
-			return err
-		}
-		err = r.RegisterOriginal(originalInfo)
-		if err != nil {
-			return err
-		}
-		if !preprocessorConfig.Enable {
-			return nil
-		}
-		// ✅ 每个文件作为一个任务提交到协程池
-		err = pool.Submit(func() {
-			for _, p := range preprocessors {
-				if !p.CanProcess(originalInfo) {
-					continue
-				}
-				logger.Debugf("run preprocessor %s on %s", p.Name(), path)
-				if err := p.Process(originalInfo); err != nil {
-					logger.Warnf("preprocessor %s error: %v", p.Name(), err)
-					continue
-				}
-			}
-		})
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return handleFile(path, cfg.Preprocessor, preprocessors, param)
 	})
+}
+
+// 排序预处理器
+func sortPreprocessors(pp []preprocessor.Preprocessor) []preprocessor.Preprocessor {
+	sort.SliceStable(pp, func(i, j int) bool {
+		return pp[i].Order() < pp[j].Order()
+	})
+	return pp
+}
+
+// 打印预处理器顺序
+func logPreprocessorOrder(logger *zap.SugaredLogger, pp []preprocessor.Preprocessor) {
+	logger.Debugf("Preprocessors order: %v", lo.Map(pp, func(p preprocessor.Preprocessor, _ int) string {
+		return fmt.Sprintf("%s(%d)", p.Name(), p.Order())
+	}))
+}
+
+// 处理单个文件
+func handleFile(path string, cfg config.Preprocessor, pp []preprocessor.Preprocessor, param Parameter) error {
+	logger := param.Logger
+	r := param.Registry
+	pool := param.Pool
+
+	originalInfo, err := generateOriginalInfo(path)
+	if err != nil {
+		return err
+	}
+
+	if err := r.RegisterOriginal(originalInfo); err != nil {
+		return err
+	}
+
+	if !cfg.Enable {
+		return nil
+	}
+
+	return pool.Submit(func() {
+		runPreprocessors(pp, originalInfo, path, logger)
+	})
+}
+
+// 执行可处理的预处理器
+func runPreprocessors(pp []preprocessor.Preprocessor, info *registry.OriginalFileInfo, path string, logger *zap.SugaredLogger) {
+	lo.ForEach(
+		lo.Filter(pp, func(p preprocessor.Preprocessor, _ int) bool {
+			return p.CanProcess(info)
+		}),
+		func(p preprocessor.Preprocessor, _ int) {
+			logger.Debugf("run preprocessor %s on %s", p.Name(), path)
+			if err := p.Process(info); err != nil {
+				logger.Warnf("preprocessor %s error: %v", p.Name(), err)
+			}
+		},
+	)
 }
 
 func generateOriginalInfo(path string) (*registry.OriginalFileInfo, error) {

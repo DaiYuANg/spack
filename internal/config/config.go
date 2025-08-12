@@ -60,10 +60,6 @@ type Debug struct {
 	LivePort    int    `koanf:"live_port"`
 }
 
-type Monitor struct {
-	Prefix string `koanf:"prefix"`
-}
-
 type Limit struct {
 	Enable bool `koanf:"enable"`
 }

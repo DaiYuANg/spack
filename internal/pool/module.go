@@ -34,8 +34,8 @@ func newAnts(logger *zap.SugaredLogger) (*ants.Pool, error) {
 
 	return ants.NewPool(
 		poolSize,
-		ants.WithExpiryDuration(10*time.Second), // 空闲worker 10s回收，减少资源占用
-		ants.WithNonblocking(false),             // 任务提交满时阻塞
+		ants.WithExpiryDuration(10*time.Second),
+		ants.WithNonblocking(false),
 		ants.WithLogger(antsLogger),
 	)
 }
