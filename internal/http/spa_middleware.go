@@ -120,7 +120,7 @@ func tryServeStatic(c *fiber.Ctx, fullPath string, log *zap.SugaredLogger) (bool
 	ext := filepath.Ext(fullPath)
 	cacheControl := lo.Ternary(ext != constant.HTML, "public, max-age=31536000, immutable", "no-registry")
 
-	log.Debugf("Serving preprocessor file: %s", fullPath)
+	log.Debugf("Serving scanner file: %s", fullPath)
 
 	c.Type(ext)
 	c.Set(fiber.HeaderCacheControl, cacheControl)

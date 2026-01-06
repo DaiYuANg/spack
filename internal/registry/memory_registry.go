@@ -1,159 +1,175 @@
 package registry
 
 import (
-	"path/filepath"
+	"fmt"
+	"sort"
 	"sync"
 
-	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/samber/lo"
-	"go.uber.org/zap"
+	"github.com/samber/oops"
 )
 
-type InMemoryRegistry struct {
-	muOrig    sync.RWMutex
-	originals cmap.ConcurrentMap[string, *OriginalFileInfo]
+type memoryRegistry struct {
+	// 构建期间可写的原始数据结构
+	mu        sync.Mutex
+	originals map[string]*OriginalFileInfo
+	variants  map[string][]*VariantFileInfo
 
-	muVar    sync.RWMutex
-	variants cmap.ConcurrentMap[string, []*VariantFileInfo]
-	logger   *zap.SugaredLogger
+	// 冻结标记（构建期写、运行期读）
+	frozen bool
+
+	// 冻结之后的快照
+	snapshot ViewData
 }
 
-func NewInMemoryRegistry(logger *zap.SugaredLogger) (*InMemoryRegistry, error) {
-	originals := cmap.New[*OriginalFileInfo]()
-	variants := cmap.New[[]*VariantFileInfo]()
-	return &InMemoryRegistry{
-		variants:  variants,
-		logger:    logger,
-		originals: originals,
-	}, nil
+func NewInMemoryRegistry() Registry {
+	return &memoryRegistry{
+		originals: make(map[string]*OriginalFileInfo),
+		variants:  make(map[string][]*VariantFileInfo),
+	}
 }
 
-func (r *InMemoryRegistry) RegisterOriginal(info *OriginalFileInfo) error {
-	r.muOrig.Lock()
-	defer r.muOrig.Unlock()
-	r.originals.Set(info.Path, info)
-	return nil
-}
-func (r *InMemoryRegistry) GetOriginal(path string) (*OriginalFileInfo, error) {
-	r.muOrig.RLock()
-	defer r.muOrig.RUnlock()
-	info, ok := r.originals.Get(path)
+// GetOriginal 在运行时读取原始文件信息
+func (r *memoryRegistry) GetOriginal(path string) (*OriginalFileInfo, error) {
+	if !r.frozen {
+		return nil, oops.
+			In("Registry.GetOriginal").
+			With("path", path).
+			Wrap(fmt.Errorf("registry not frozen"))
+	}
+
+	info, ok := lo.Find(r.snapshot.Originals, func(o *OriginalFileInfo) bool {
+		return o.Path == path
+	})
 	if !ok {
-		return nil, ErrNotFound
+		return nil, oops.
+			In("Registry.GetOriginal").
+			With("path", path).
+			Wrap(ErrNotFound)
 	}
 	return info, nil
 }
 
-// AddVariant 增加一个变体文件
-func (r *InMemoryRegistry) AddVariant(originalPath string, variant *VariantFileInfo) {
-	r.muVar.Lock()
-	defer r.muVar.Unlock()
-	oldSlice, exists := r.variants.Get(originalPath)
-	if !exists {
-		oldSlice = []*VariantFileInfo{}
+// GetVariants 在运行时读取变体列表
+func (r *memoryRegistry) GetVariants(path string) ([]*VariantFileInfo, error) {
+	if !r.frozen {
+		return nil, oops.
+			In("Registry.GetVariants").
+			With("path", path).
+			Wrap(fmt.Errorf("registry not frozen"))
 	}
 
-	newSlice := append(oldSlice, variant)
-	r.variants.Set(originalPath, newSlice)
-}
-func (r *InMemoryRegistry) GetVariants(originalPath string) ([]*VariantFileInfo, error) {
-	val, exists := r.variants.Get(originalPath)
-	if !exists {
-		return []*VariantFileInfo{}, nil
+	// filter snapshot
+	var out []*VariantFileInfo
+	for _, v := range r.snapshot.Variants {
+		if v.OriginalPath == path {
+			out = append(out, v.VariantFileInfo)
+		}
 	}
-	return val, nil
+	if len(out) == 0 {
+		return nil, oops.
+			In("Registry.GetVariants").
+			With("path", path).
+			Wrap(ErrNotFound)
+	}
+	return out, nil
 }
 
-func (r *InMemoryRegistry) HasVariants(originalPath string) bool {
-	val, exists := r.variants.Get(originalPath)
-	if !exists {
+func (r *memoryRegistry) HasVariants(path string) bool {
+	if !r.frozen {
 		return false
 	}
-	return len(val) > 0
-}
-
-func (r *InMemoryRegistry) ExistsOriginal(path string) bool {
-	_, exists := r.originals.Get(path)
-	return exists
-}
-
-func (r *InMemoryRegistry) ListOriginals() []string {
-	r.muOrig.RLock()
-	defer r.muOrig.RUnlock()
-
-	var keys []string
-	r.originals.IterCb(func(key string, _ *OriginalFileInfo) {
-		keys = append(keys, key)
-	})
-	return keys
-}
-
-// CountOriginals 返回当前注册的原始文件数量
-func (r *InMemoryRegistry) CountOriginals() int {
-	r.muOrig.RLock()
-	defer r.muOrig.RUnlock()
-	return r.originals.Count()
-}
-
-// CountVariants 返回某个原始文件的变体数量
-func (r *InMemoryRegistry) CountVariants(originalPath string) int {
-	val, exists := r.variants.Get(originalPath)
-	// 用 lo.Optional 封装存在性判断，返回长度或 0
-	return lo.Ternary(exists, len(val), 0)
-}
-
-// BatchAddVariants 批量添加多个变体，减少锁竞争
-func (r *InMemoryRegistry) BatchAddVariants(originalPath string, variants []*VariantFileInfo) {
-	r.muVar.Lock()
-	defer r.muVar.Unlock()
-
-	oldSlice, exists := r.variants.Get(originalPath)
-	if !exists {
-		oldSlice = []*VariantFileInfo{}
-	}
-	newSlice := append(oldSlice, variants...)
-	r.variants.Set(originalPath, newSlice)
-}
-
-func (r *InMemoryRegistry) ListOriginal() []*OriginalFileInfo {
-	r.muOrig.RLock()
-	defer r.muOrig.RUnlock()
-
-	var infos []*OriginalFileInfo
-	r.originals.IterCb(func(_ string, info *OriginalFileInfo) {
-		infos = append(infos, info)
-	})
-	return infos
-}
-
-func (r *InMemoryRegistry) ViewData() *ViewData {
-	// 获取所有原始文件
-	originals := r.ListOriginal()
-
-	// 整理变体
-	var variants []*VariantView
-	r.muVar.RLock()
-	defer r.muVar.RUnlock()
-	r.variants.IterCb(func(orig string, vs []*VariantFileInfo) {
-		for _, v := range vs {
-			variants = append(variants, &VariantView{
-				OriginalPath:    orig,
-				VariantFileInfo: v,
-			})
+	for _, v := range r.snapshot.Variants {
+		if v.OriginalPath == path {
+			return true
 		}
-	})
-
-	lo.ForEach(originals, func(info *OriginalFileInfo, _ int) {
-		info.Path = filepath.Base(info.Path)
-	})
-
-	lo.ForEach(variants, func(item *VariantView, index int) {
-		item.Path = filepath.Base(item.Path)
-		item.OriginalPath = filepath.Base(item.OriginalPath)
-	})
-
-	return &ViewData{
-		Originals: originals,
-		Variants:  variants,
 	}
+	return false
+}
+
+func (r *memoryRegistry) CountOriginals() int {
+	if !r.frozen {
+		return 0
+	}
+	return len(r.snapshot.Originals)
+}
+
+func (r *memoryRegistry) CountVariants(path string) int {
+	if !r.frozen {
+		return 0
+	}
+	return countVariantsOf(r.snapshot.Variants, path)
+}
+func (r *memoryRegistry) ListOriginals() []*OriginalFileInfo {
+	if !r.frozen {
+		return nil
+	}
+	return r.snapshot.Originals
+}
+func (r *memoryRegistry) ViewData() *ViewData {
+	if !r.frozen {
+		return nil
+	}
+	return &r.snapshot
+}
+
+// Freeze builds a read-only snapshot and disables further writes.
+func (r *memoryRegistry) Freeze() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.frozen {
+		return ErrFrozen
+	}
+
+	// collect all originals
+	origList := lo.Values(r.originals)
+
+	// sort for stable order
+	sort.Slice(origList, func(i, j int) bool {
+		return origList[i].Path < origList[j].Path
+	})
+
+	// flatten variants into snapshot view
+	flatVariants := lo.FlatMap(origList, func(o *OriginalFileInfo, _ int) []*VariantView {
+		return lo.Map(r.variants[o.Path], func(v *VariantFileInfo, _ int) *VariantView {
+			return &VariantView{
+				OriginalPath:    o.Path,
+				VariantFileInfo: v,
+			}
+		})
+	})
+
+	// sort flat variants for stable output
+	sort.Slice(flatVariants, func(i, j int) bool {
+		return flatVariants[i].OriginalPath < flatVariants[j].OriginalPath
+	})
+
+	// write snapshot
+	r.snapshot = ViewData{
+		Originals: origList,
+		Variants:  flatVariants,
+	}
+
+	// clear original maps (enforce read-only)
+	r.originals = nil
+	r.variants = nil
+	r.frozen = true
+
+	return nil
+}
+
+func (r *memoryRegistry) IsFrozen() bool {
+	return r.frozen
+}
+
+// Writer 返回构建期写入接口
+func (r *memoryRegistry) Writer() Writer {
+	return &memoryWriter{r}
+}
+
+func countVariantsOf(snapshot []*VariantView, path string) int {
+	return len(lo.Filter(snapshot, func(v *VariantView, _ int) bool {
+		return v.OriginalPath == path
+	}))
 }

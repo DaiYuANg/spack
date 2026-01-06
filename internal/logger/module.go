@@ -3,10 +3,12 @@ package logger
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"syscall"
 
 	"github.com/daiyuang/spack/internal/config"
+	slogzap "github.com/samber/slog-zap/v2"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -16,6 +18,7 @@ var Module = fx.Module("logger_module",
 	fx.Provide(
 		newLogger,
 		sugaredLogger,
+		slogger,
 	),
 	fx.Invoke(deferLogger),
 )
@@ -55,6 +58,10 @@ func newLogger(cfg *config.Config) *zap.Logger {
 
 func sugaredLogger(log *zap.Logger) *zap.SugaredLogger {
 	return log.Sugar()
+}
+
+func slogger(zapLogger *zap.Logger) *slog.Logger {
+	return slog.New(slogzap.Option{Level: slog.LevelDebug, Logger: zapLogger}.NewZapHandler())
 }
 
 func deferLogger(lc fx.Lifecycle, logger *zap.Logger) {

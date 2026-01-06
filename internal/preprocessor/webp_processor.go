@@ -5,6 +5,7 @@ import (
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -13,11 +14,10 @@ import (
 	"github.com/daiyuang/spack/internal/registry"
 	"github.com/daiyuang/spack/pkg"
 	"github.com/samber/lo"
-	"go.uber.org/zap"
 )
 
 type webpPreprocessor struct {
-	logger      *zap.SugaredLogger
+	logger      *slog.Logger
 	supportMime []constant.MimeType
 	registry    registry.Registry
 }
@@ -36,7 +36,7 @@ func (w *webpPreprocessor) CanProcess(info *registry.OriginalFileInfo) bool {
 	})
 
 	if ok {
-		w.logger.Debugf("webp: matched mime=%s for path=%s", info.Mimetype, info.Path)
+		w.logger.Debug("webp: matched mime=%s for path=%s", info.Mimetype, info.Path)
 	}
 
 	return ok
@@ -93,12 +93,12 @@ func (w *webpPreprocessor) Process(info *registry.OriginalFileInfo) error {
 	path := info.Path
 	targetPath, err := w.generateTargetPath(info)
 	if err != nil {
-		w.logger.Errorf("failed to generate target path for %s: %v", path, err)
+		w.logger.Error("failed to generate target path for %s: %v", path, err)
 		return err
 	}
 
 	if w.cacheExists(targetPath) {
-		w.logger.Debugf("webp: cached file exists %s, register variant", targetPath)
+		w.logger.Debug("webp: cached file exists %s, register variant", targetPath)
 
 		stat, err := os.Stat(targetPath)
 		if err != nil {
@@ -111,11 +111,11 @@ func (w *webpPreprocessor) Process(info *registry.OriginalFileInfo) error {
 			Size:        stat.Size(),
 			Ext:         ".webp",
 		}
-		w.registry.AddVariant(info.Path, vinfo)
+		w.registry.Writer().AddVariant(info.Path, vinfo)
 		return nil
 	}
 
-	w.logger.Debugf("webp: converting %s to %s", path, targetPath)
+	w.logger.Debug("webp: converting %s to %s", path, targetPath)
 
 	img, err := w.loadImage(path)
 	if err != nil {
@@ -137,13 +137,13 @@ func (w *webpPreprocessor) Process(info *registry.OriginalFileInfo) error {
 		Size:        stat.Size(),
 		Ext:         ".webp",
 	}
-	w.registry.AddVariant(info.Path, vinfo)
+	w.registry.Writer().AddVariant(info.Path, vinfo)
 
-	w.logger.Debugf("webp: generated and registered %s", targetPath)
+	w.logger.Debug("webp: generated and registered %s", targetPath)
 	return nil
 }
 
-func newWebpPreprocessor(logger *zap.SugaredLogger, r registry.Registry) *webpPreprocessor {
+func newWebpPreprocessor(logger *slog.Logger, r registry.Registry) *webpPreprocessor {
 	return &webpPreprocessor{
 		logger:      logger,
 		supportMime: []constant.MimeType{constant.Png, constant.Jpg, constant.Jpeg},

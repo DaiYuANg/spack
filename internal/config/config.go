@@ -15,7 +15,8 @@ type Config struct {
 	Limit        Limit        `koanf:"limit"`
 	Prometheus   Prometheus   `koanf:"prometheus"`
 	Logger       Logger       `koanf:"logger"`
-	Preprocessor Preprocessor `koanf:"preprocessor"`
+	Preprocessor Preprocessor `koanf:"scanner"`
+	Printer      Printer      `koanf:"printer"`
 }
 
 type Logger struct {
@@ -38,7 +39,7 @@ func (h Http) GetPort() string {
 
 type Spa struct {
 	Path string `koanf:"path"`
-	//Serve preprocessor spa config
+	//Serve scanner spa config
 	Static string `koanf:"static"`
 	//default load file config like nginx try file
 	Fallback string `koanf:"fallback"`
@@ -64,8 +65,20 @@ type Limit struct {
 	Enable bool `koanf:"enable"`
 }
 
+type PrinterMode string
+
+const (
+	ModeTable PrinterMode = "table"
+	ModeJSON  PrinterMode = "json"
+)
+
 type Preprocessor struct {
 	Enable bool `koanf:"enable"`
+}
+
+type Printer struct {
+	Enable bool        `koanf:"enable"`
+	Mode   PrinterMode `koanf:"mode"`
 }
 
 func (p Proxy) Enabled() bool {
@@ -90,6 +103,10 @@ func defaultConfig() Config {
 			Enable:      false,
 			PprofPrefix: "/pprof",
 			LivePort:    8080,
+		},
+		Printer: Printer{
+			Enable: false,
+			Mode:   ModeTable,
 		},
 	}
 }

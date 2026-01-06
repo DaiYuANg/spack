@@ -4,8 +4,9 @@ import (
 	"github.com/daiyuang/spack/internal/cache"
 	"github.com/daiyuang/spack/internal/http"
 	"github.com/daiyuang/spack/internal/metrics"
-	"github.com/daiyuang/spack/internal/preprocessor"
+	"github.com/daiyuang/spack/internal/printer"
 	"github.com/daiyuang/spack/internal/registry"
+	"github.com/daiyuang/spack/internal/scanner"
 	"github.com/daiyuang/spack/internal/spa"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -19,19 +20,16 @@ var rootCmd = &cobra.Command{
 		container = createContainer(
 			cache.Module,
 			registry.Module,
-			preprocessor.Module,
+			scanner.Module,
 			metrics.Module,
 			spa.Module,
+			printer.Module,
 			http.Module,
 		)
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		container.Run()
 	},
-}
-
-func init() {
-	rootCmd.AddCommand(printCmd)
 }
 
 func Execute() error {

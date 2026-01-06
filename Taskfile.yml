@@ -11,6 +11,12 @@ vars:
   DOCKERHUB_REPO: daiyuang/{{.BIN_NAME}}
   CONTAINER_PLATFORM: linux/amd64,linux/arm64
 tasks:
+  dev:
+    desc: development
+    cmds:
+      - cd test && pnpm build
+      - go run .
+
   clean:
     cmds:
       - rm -rf {{.DIST_DIR}}

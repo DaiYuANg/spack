@@ -1,31 +1,70 @@
 package printer
 
 import (
-	"os"
+	"context"
+	"log/slog"
+	"time"
 
+	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/registry"
-	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/samber/lo"
 	"go.uber.org/fx"
 )
 
-var Module = fx.Module("printer", fx.Invoke(printer))
+var Module = fx.Module(
+	"printer",
+	fx.Invoke(run),
+)
 
-func printer(r registry.Registry) {
-	t := table.NewWriter()
-	t.SetOutputMirror(os.Stdout)
-	t.SetStyle(table.StyleRounded)
+func run(
+	r registry.Registry,
+	cfg *config.Config,
+	logger *slog.Logger,
+	lifecycle fx.Lifecycle,
+) {
+	if !cfg.Printer.Enable {
+		logger.Debug("printer disabled by config")
+		return
+	}
 
-	t.AppendHeader(table.Row{"Request Path", "MIME Type", "Size", "Hash"})
-
-	lo.ForEach(r.ListOriginal(), func(e *registry.OriginalFileInfo, index int) {
-		t.AppendRow(table.Row{
-			e.Path,
-			e.Mimetype,
-			e.Size,
-			e.Hash,
-		})
+	// 通过上下文取消控制轮询协程
+	ctx, cancel := context.WithCancel(context.Background())
+	lifecycle.Append(fx.Hook{
+		OnStop: func(_ context.Context) error {
+			cancel() // 应用退出时取消轮询
+			return nil
+		},
 	})
 
-	t.Render()
+	go waitForFreezeAndPrint(ctx, r, cfg, logger)
+}
+
+func waitForFreezeAndPrint(
+	ctx context.Context,
+	r registry.Registry,
+	cfg *config.Config,
+	logger *slog.Logger,
+) {
+	const pollInterval = 100 * time.Millisecond
+
+	for {
+		select {
+		case <-ctx.Done():
+			return // 应用退出 -> 停止轮询
+		default:
+			// 检查 frozen
+			if r.IsFrozen() {
+				logger.Info("registry frozen — running printer")
+
+				// 执行打印并退出循环
+				switch cfg.Printer.Mode {
+				case config.ModeJSON:
+					PrintJSON(r, logger)
+				default:
+					PrintTable(r, logger)
+				}
+				return
+			}
+			time.Sleep(pollInterval)
+		}
+	}
 }

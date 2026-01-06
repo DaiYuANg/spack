@@ -2,17 +2,20 @@ package registry
 
 import (
 	"errors"
+	"sync/atomic"
 
 	"github.com/daiyuang/spack/internal/constant"
 )
 
+var ErrFrozen = errors.New("registry is frozen")
+
 type OriginalFileInfo struct {
-	Path        string
-	Size        int64
-	Hash        string
-	Ext         string
-	Mimetype    string
-	AccessCount int64
+	Path     string
+	Size     int64
+	Hash     string
+	Ext      string
+	Mimetype string
+	Metrics  *Metrics
 }
 
 type VariantFileInfo struct {
@@ -20,7 +23,7 @@ type VariantFileInfo struct {
 	Ext         string
 	VariantType constant.VariantType
 	Size        int64
-	AccessCount int64
+	Metrics     *Metrics
 }
 
 var (
@@ -38,31 +41,28 @@ type VariantView struct {
 }
 
 type Registry interface {
-	// RegisterOriginal 注册一个原始文件
-	RegisterOriginal(info *OriginalFileInfo) error
+	Writer() Writer
 
-	// GetOriginal 查询原始文件信息
+	//READ ONLY
 	GetOriginal(path string) (*OriginalFileInfo, error)
-
-	// AddVariant 增加一个变体文件
-	AddVariant(originalPath string, variant *VariantFileInfo)
-
-	// BatchAddVariants 批量添加多个变体文件
-	BatchAddVariants(originalPath string, variants []*VariantFileInfo)
-
-	// GetVariants 获取某个原始文件的所有变体
 	GetVariants(originalPath string) ([]*VariantFileInfo, error)
-
-	// HasVariants 判断原始文件是否存在变体
 	HasVariants(originalPath string) bool
 
-	// CountOriginals 获取注册的原始文件数量
 	CountOriginals() int
-
-	// CountVariants 获取某个原始文件变体数量
 	CountVariants(originalPath string) int
-
-	ListOriginal() []*OriginalFileInfo
+	ListOriginals() []*OriginalFileInfo
 
 	ViewData() *ViewData
+
+	Freeze() error
+	IsFrozen() bool
+}
+
+type Writer interface {
+	RegisterOriginal(info *OriginalFileInfo) error
+	AddVariant(path string, v *VariantFileInfo) error
+}
+type Metrics struct {
+	AccessCount atomic.Int64
+	BytesSent   atomic.Int64
 }

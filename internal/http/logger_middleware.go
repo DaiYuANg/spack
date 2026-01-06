@@ -1,21 +1,17 @@
 package http
 
 import (
-	"github.com/gofiber/contrib/fiberzap/v2"
+	"log/slog"
+
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/logger"
-	"go.uber.org/zap"
+	slogfiber "github.com/samber/slog-fiber"
 )
 
-func loggerMiddleware(app *fiber.App, zapLogger *zap.Logger) {
-	app.Use(fiberzap.New(fiberzap.Config{
-		Logger: zapLogger,
-	}))
-	app.Use(
-		logger.New(
-			logger.Config{
-				Format:        "\"${ip} - ${locals:requestid} - [${time}] \"${method} ${url} ${protocol}\" ${status} ${bytesSent} \"${referer}\" \"${ua}\"\"\n",
-				DisableColors: false,
-			}),
-	)
+func loggerMiddleware(app *fiber.App, slogger *slog.Logger) {
+	config := slogfiber.Config{
+		WithSpanID:  true,
+		WithTraceID: true,
+	}
+
+	app.Use(slogfiber.NewWithConfig(slogger, config))
 }

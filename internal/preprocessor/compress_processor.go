@@ -78,7 +78,7 @@ func (c *compressPreprocessor) Process(info *registry.OriginalFileInfo) error {
 			// hash.html.gz
 			out := filepath.Join(base, hash+ext+job.ext)
 
-			c.registry.AddVariant(path, &registry.VariantFileInfo{
+			c.registry.Writer().AddVariant(path, &registry.VariantFileInfo{
 				Path:        siblingCompressed,
 				VariantType: constant.Compress,
 				Ext:         proto.ext,
