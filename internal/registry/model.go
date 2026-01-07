@@ -1,4 +1,4 @@
-package printer
+package registry
 
 type jsonOriginal struct {
 	Path     string         `json:"path"`

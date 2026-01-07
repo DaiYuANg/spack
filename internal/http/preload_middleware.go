@@ -2,6 +2,7 @@ package http
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,10 +11,9 @@ import (
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/gofiber/fiber/v2"
 	"github.com/samber/lo"
-	"go.uber.org/zap"
 )
 
-func parsePreloadLinksFromHTML(htmlPath string, logger *zap.SugaredLogger) (map[string]string, error) {
+func parsePreloadLinksFromHTML(htmlPath string, logger *slog.Logger) (map[string]string, error) {
 	file, err := os.Open(htmlPath)
 	if err != nil {
 		return nil, err
@@ -54,18 +54,18 @@ func parsePreloadLinksFromHTML(htmlPath string, logger *zap.SugaredLogger) (map[
 		}
 	})
 
-	logger.Debugf("preload links: %v", links)
+	logger.Debug("preload links: %v", links)
 
 	return links, nil
 }
 
-func preloadMiddleware(preloadMap map[string]string, logger *zap.SugaredLogger) fiber.Handler {
+func preloadMiddleware(preloadMap map[string]string, logger *slog.Logger) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		err := c.Next()
 
 		// 只针对 HTML 响应添加 Link
 		if strings.HasPrefix(c.Get("Content-Type"), "text/html") {
-			logger.Debugf("into preload%s", c.OriginalURL())
+			logger.Debug("into preload%s", c.OriginalURL())
 			var headers []string
 			for href, asType := range preloadMap {
 				// 可加更多 type 判断，如字体
@@ -82,14 +82,14 @@ func preloadMiddleware(preloadMap map[string]string, logger *zap.SugaredLogger) 
 	}
 }
 
-func setupPreload(app *fiber.App, config *config.Config, logger *zap.SugaredLogger) {
+func setupPreload(app *fiber.App, config *config.Config, logger *slog.Logger) {
 	if !config.Spa.Preload {
 		return
 	}
 	htmlPath := filepath.Join(config.Spa.Static, "index.html")
 	preloads, err := parsePreloadLinksFromHTML(htmlPath, logger)
 	if err != nil {
-		logger.Fatalf("Failed to parse preload links: %v", err)
+		logger.Error("Failed to parse preload links: %v", err)
 	}
 	app.Use(preloadMiddleware(preloads, logger))
 }

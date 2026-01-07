@@ -2,21 +2,27 @@ package pkg
 
 import (
 	"mime"
-	"path/filepath"
-	"strings"
+	"os"
+	"path"
+
+	"github.com/gabriel-vasile/mimetype"
 )
 
-func DetectMIME(path string) string {
-	ext := strings.ToLower(filepath.Ext(path))
-	mimeType := mime.TypeByExtension(ext)
-	if mimeType == "" {
+func DetectMIME(filePath string) string {
+	// 尝试通过内容检测
+	f, err := os.Open(filePath)
+	if err == nil {
+		defer f.Close()
+		mtype, _ := mimetype.DetectReader(f)
+		if mtype != nil && mtype.String() != "" {
+			return mtype.String()
+		}
+	}
+
+	// fallback 到扩展名
+	mtype := mime.TypeByExtension(path.Ext(filePath))
+	if mtype == "" {
 		return "application/octet-stream"
 	}
-
-	// 去除 charset 参数
-	if idx := strings.Index(mimeType, ";"); idx != -1 {
-		mimeType = mimeType[:idx]
-	}
-
-	return mimeType
+	return mtype
 }

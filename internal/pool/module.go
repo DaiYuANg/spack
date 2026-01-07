@@ -1,12 +1,12 @@
 package pool
 
 import (
+	"log/slog"
 	"runtime"
 	"time"
 
 	"github.com/panjf2000/ants/v2"
 	"go.uber.org/fx"
-	"go.uber.org/zap"
 )
 
 var Module = fx.Module("pool", fx.Provide(
@@ -14,14 +14,14 @@ var Module = fx.Module("pool", fx.Provide(
 ))
 
 type Logger struct {
-	logger *zap.SugaredLogger
+	logger *slog.Logger
 }
 
 func (l *Logger) Printf(format string, args ...any) {
-	l.logger.Debugf(format, args...)
+	l.logger.Debug(format, args...)
 }
 
-func newAnts(logger *zap.SugaredLogger) (*ants.Pool, error) {
+func newAnts(logger *slog.Logger) (*ants.Pool, error) {
 	cpuNum := runtime.NumCPU()
 
 	const ioFactor = 200

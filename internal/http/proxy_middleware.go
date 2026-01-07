@@ -1,14 +1,15 @@
 package http
 
 import (
+	"log/slog"
+
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/constant"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/proxy"
-	"go.uber.org/zap"
 )
 
-func proxyMiddleware(app *fiber.App, config *config.Config, log *zap.SugaredLogger) {
+func proxyMiddleware(app *fiber.App, config *config.Config, log *slog.Logger) {
 	if !config.Proxy.Enabled() {
 		return
 	}
@@ -16,7 +17,7 @@ func proxyMiddleware(app *fiber.App, config *config.Config, log *zap.SugaredLogg
 	app.Use(
 		config.Proxy.Path+"*",
 		func(ctx *fiber.Ctx) error {
-			log.Debugf("into proxy %s", ctx.OriginalURL())
+			log.Debug("into proxy %s", ctx.OriginalURL())
 			ctx.Set(constant.PROXY, ctx.OriginalURL())
 			return proxy.Do(ctx, config.Proxy.Target)
 		},

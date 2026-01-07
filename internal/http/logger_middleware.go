@@ -12,6 +12,5 @@ func loggerMiddleware(app *fiber.App, slogger *slog.Logger) {
 		WithSpanID:  true,
 		WithTraceID: true,
 	}
-
 	app.Use(slogfiber.NewWithConfig(slogger, config))
 }

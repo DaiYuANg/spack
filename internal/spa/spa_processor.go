@@ -1,6 +1,7 @@
 package spa
 
 import (
+	"log/slog"
 	"path/filepath"
 	"strings"
 
@@ -9,12 +10,11 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/fx"
-	"go.uber.org/zap"
 )
 
 type Processor struct {
 	registry          registry.Registry
-	logger            *zap.SugaredLogger
+	logger            *slog.Logger
 	httpRequestsTotal *prometheus.CounterVec
 	config            *config.Config
 }
@@ -22,7 +22,7 @@ type Processor struct {
 type ProcessorDependency struct {
 	fx.In
 	Config            *config.Config
-	Log               *zap.SugaredLogger
+	Log               *slog.Logger
 	HttpRequestsTotal *prometheus.CounterVec
 	Registry          registry.Registry
 }

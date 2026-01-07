@@ -56,6 +56,8 @@ type Registry interface {
 
 	Freeze() error
 	IsFrozen() bool
+
+	Json() (string, error)
 }
 
 type Writer interface {

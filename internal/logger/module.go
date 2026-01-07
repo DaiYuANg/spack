@@ -1,85 +1,123 @@
 package logger
 
 import (
-	"errors"
-	"fmt"
+	"context"
+	"io"
 	"log/slog"
 	"os"
-	"syscall"
 
 	"github.com/daiyuang/spack/internal/config"
+	slogzerolog "github.com/samber/slog-zerolog/v2"
+
+	"github.com/rs/zerolog"
+	zlog "github.com/rs/zerolog/log"
+
+	oopszerolog "github.com/samber/oops/loggers/zerolog"
+
 	"go.uber.org/fx"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 var Module = fx.Module("logger_module",
 	fx.Provide(
-		newLogger,
-		sugaredLogger,
-		slogger,
+		newZerolog,
+		newSlog,
 	),
-	fx.Invoke(deferLogger),
+	//fx.Invoke(deferLogger),
 )
 
-func newLogger(cfg *config.Config) *zap.Logger {
-	loggerConfig := cfg.Logger
-	encoderCfg := zap.NewProductionEncoderConfig()
-	encoderCfg.EncodeCaller = zapcore.FullCallerEncoder
-	// 时间格式化，精确到毫秒
-	encoderCfg.EncodeTime = zapcore.TimeEncoderOfLayout("2006-01-02 15:04:05.000")
-	encoderCfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
+func newZerolog(
+	lc fx.Lifecycle,
+	cfg *config.Config,
+) zerolog.Logger {
+	var writers []io.Writer
+	var closers []io.Closer
 
-	var level zapcore.Level
-	switch loggerConfig.Level {
-	case "info":
-		level = zapcore.InfoLevel
-	case "debug":
-		level = zapcore.DebugLevel
-	default:
-		level = zapcore.InfoLevel
+	// Console
+	if cfg.Logger.Console.Enabled {
+		writers = append(writers, zerolog.ConsoleWriter{
+			Out:        os.Stdout,
+			TimeFormat: "2006-01-02 15:04:05",
+		})
 	}
 
-	core := zapcore.NewCore(
-		zapcore.NewConsoleEncoder(encoderCfg),
-		zapcore.AddSync(os.Stdout),
-		level,
-	)
+	// File
+	if cfg.Logger.File.Enabled {
+		lj := &lumberjack.Logger{
+			Filename:   cfg.Logger.File.Path,
+			MaxSize:    cfg.Logger.File.MaxSize,
+			MaxAge:     cfg.Logger.File.MaxAge,
+			MaxBackups: cfg.Logger.File.MaxFiles,
+		}
+		writers = append(writers, lj)
+		closers = append(closers, lj)
+	}
 
-	logger := zap.New(
-		core,
-		zap.AddCaller(),                       // 显示文件名和行号
-		zap.AddStacktrace(zapcore.ErrorLevel), // 错误及以上打印堆栈
-	)
+	if len(writers) == 0 {
+		writers = append(writers, os.Stdout)
+	}
+
+	level, err := zerolog.ParseLevel(cfg.Logger.Level)
+	if err != nil {
+		level = zerolog.InfoLevel
+	}
+
+	mw := io.MultiWriter(writers...)
+
+	logger := zerolog.New(mw).
+		Level(level).
+		With().
+		Timestamp().
+		Logger()
+
+	zerolog.ErrorStackMarshaler = oopszerolog.OopsStackMarshaller
+	zerolog.ErrorMarshalFunc = oopszerolog.OopsMarshalFunc
+
+	// 设置全局 logger（给不走 DI 的地方用）
+	zlog.Logger = logger
+
+	// lifecycle
+	if len(closers) > 0 {
+		lc.Append(fx.Hook{
+			OnStop: func(ctx context.Context) error {
+				for _, c := range closers {
+					_ = c.Close()
+				}
+				return nil
+			},
+		})
+	}
 
 	return logger
 }
 
-func sugaredLogger(log *zap.Logger) *zap.SugaredLogger {
-	return log.Sugar()
-}
+/*
+slog facade
+*/
 
-func slogger(cfg *config.Config) *slog.Logger {
-	level := slog.LevelInfo
-	if cfg.Logger.Level == "debug" {
-		level = slog.LevelDebug
-	}
-
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level:     level,
+func newSlog(zlogger zerolog.Logger) *slog.Logger {
+	// 使用官方 slog-zerolog adapter
+	handler := slogzerolog.Option{
+		Level:     slog.LevelDebug,
+		Logger:    &zlogger,
 		AddSource: true,
-	})
+	}.NewZerologHandler()
 
-	return slog.New(handler)
+	logger := slog.New(handler)
+
+	// 设置为全局 slog
+	slog.SetDefault(logger)
+
+	return logger
 }
 
-func deferLogger(lc fx.Lifecycle, logger *zap.Logger) {
-	lc.Append(
-		fx.StopHook(func() error {
-			if err := logger.Sync(); err != nil && !errors.Is(err, syscall.EINVAL) {
-				return fmt.Errorf("logger sync failed: %v", err)
-			}
-			return nil
-		}),
-	)
-}
+//func deferLogger(lc fx.Lifecycle, logger *zap.Logger) {
+//  lc.Append(
+//    fx.StopHook(func() error {
+//      if err := logger.Sync(); err != nil && !errors.Is(err, syscall.EINVAL) {
+//        return fmt.Errorf("logger sync failed: %v", err)
+//      }
+//      return nil
+//    }),
+//  )
+//}

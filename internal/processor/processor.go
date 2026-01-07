@@ -1,7 +1,6 @@
-package preprocessor
+package processor
 
 import (
-	"context"
 	"io"
 
 	"github.com/daiyuang/spack/internal/constant"
@@ -15,21 +14,25 @@ type VariantPlan struct {
 	Params      map[string]string
 }
 
+type Context struct {
+	Obj  *scanner.ObjectInfo
+	Hash string
+
+	Registry registry.Writer
+
+	Open func() (io.ReadCloser, error)
+
+	EmitVariant func(v *registry.VariantFileInfo) error
+}
+
 type Processor interface {
 	Name() string
 
 	// 是否处理该 original
-	Match(o *registry.OriginalFileInfo) bool
-
-	// 仅声明，不做 IO
-	Plan(o *registry.OriginalFileInfo) []VariantPlan
+	Match(o *scanner.ObjectInfo) bool
 
 	// 真正执行
 	Run(
-		ctx context.Context,
-		obj *scanner.ObjectInfo,
-		original *registry.OriginalFileInfo,
-		plan VariantPlan,
-		w io.Writer,
+		ctx Context,
 	) (size int64, err error)
 }

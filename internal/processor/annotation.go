@@ -1,4 +1,4 @@
-package preprocessor
+package processor
 
 import (
 	"go.uber.org/fx"
@@ -7,7 +7,7 @@ import (
 func processorAnnotation(t any) interface{} {
 	return fx.Annotate(
 		t,
-		fx.ResultTags(`group:"preprocessor"`),
-		fx.As(new(Preprocessor)),
+		fx.ResultTags(`group:"processor"`),
+		fx.As(new(Processor)),
 	)
 }

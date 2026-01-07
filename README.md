@@ -56,6 +56,7 @@
 ---
 
 ## Usage
+
 ```dockerfile
 FROM daiyuang/spack:latest
 
@@ -66,8 +67,8 @@ ENV SPACK_SPA_PATH=/
 ENV SPACK_SPA_LOGGER_LEVEL=info
 ```
 
-
 ### 📂 Project Index
+
 <details open>
 	<summary><b><code>spack/</code></b></summary>
 	<details> <!-- __root__ Submodule -->
@@ -257,6 +258,7 @@ ENV SPACK_SPA_LOGGER_LEVEL=info
 </details>
 
 ---
+
 ## 🚀 Getting Started
 
 ### ☑️ Prerequisites
@@ -267,7 +269,6 @@ Before getting started with spack, ensure your runtime environment meets the fol
 - **Package Manager:** Go modules
 - **Container Runtime:** Docker
 
-
 ### ⚙️ Installation
 
 Install spack using one of the following methods:
@@ -275,60 +276,115 @@ Install spack using one of the following methods:
 **Build from source:**
 
 1. Clone the spack repository:
+
 ```sh
 ❯ git clone https://github.com/DaiYuANg/spack
 ```
 
 2. Navigate to the project directory:
+
 ```sh
 ❯ cd spack
 ```
 
 3. Install the project dependencies:
 
-
-**Using `go modules`** &nbsp; [<img align="center" src="https://img.shields.io/badge/Go-00ADD8.svg?style={badge_style}&logo=go&logoColor=white" />](https://golang.org/)
+**Using `go modules`**
+&nbsp; [<img align="center" src="https://img.shields.io/badge/Go-00ADD8.svg?style={badge_style}&logo=go&logoColor=white" />](https://golang.org/)
 
 ```sh
 ❯ go build
 ```
 
-
-**Using `docker`** &nbsp; [<img align="center" src="https://img.shields.io/badge/Docker-2CA5E0.svg?style={badge_style}&logo=docker&logoColor=white" />](https://www.docker.com/)
+**Using `docker`**
+&nbsp; [<img align="center" src="https://img.shields.io/badge/Docker-2CA5E0.svg?style={badge_style}&logo=docker&logoColor=white" />](https://www.docker.com/)
 
 ```sh
 ❯ docker build -t DaiYuANg/spack .
 ```
 
+```mermaid
+flowchart TD
+  %% Scanner 扫描文件系统
+  Scanner[Scanner<br/>Walk FS / Detect MIME] -->|ObjectInfo| DAG[DAG Processor Scheduler]
 
+  %% DAG Processor
+  subgraph Processor
+    Origin[OriginProcessor]
+    WebP[WebPProcessor]
+    Gzip[GzipProcessor]
+    Zstd[ZstdProcessor]
+    Brotli[BrotliProcessor]
+  end
 
+  %% DAG 依赖关系
+  Origin --> WebP
+  Origin --> Gzip
+  Origin --> Zstd
+  Origin --> Brotli
+  WebP --> Gzip
+  WebP --> Zstd
+  WebP --> Brotli
+
+  %% Variant Storage
+  DAG -->|VariantFileInfo| VariantStorage[VariantStorage Layer<br/>Save / Open / Exists / Delete]
+
+  %% Registry
+  VariantStorage --> Registry[Registry<br/>Meta Info Management]
+  DAG -->|Variant meta| Registry
+
+  %% HTTP 层
+  Registry --> HTTPRegistry[/registry<br/>JSON]
+  VariantStorage --> HTTPFiles[/files/:path<br/>Serve Variant]
+
+  %% 浏览器
+  Browser -->|GET /registry| HTTPRegistry
+  Browser -->|GET /files/:path| HTTPFiles
+```
+
+### TodoList
+
+- [] 定义 VariantStorage 接口（SaveVariant / Exists / Open / Delete / Stats）
+
+- [] 实现本地文件存储 LocalVariantStorage
+
+- [] 支持缓存路径生成（hash + processor type）
+
+- [] 将现有 Processor 改造为依赖 VariantStorage 保存 Variant
+
+- [] 支持多后端实现（可选：S3、MinIO、内存）
+
+- [] 添加 Storage Metrics / 使用统计
 
 ### 🤖 Usage
+
 Run spack using the following command:
-**Using `go modules`** &nbsp; [<img align="center" src="https://img.shields.io/badge/Go-00ADD8.svg?style={badge_style}&logo=go&logoColor=white" />](https://golang.org/)
+**Using `go modules`**
+&nbsp; [<img align="center" src="https://img.shields.io/badge/Go-00ADD8.svg?style={badge_style}&logo=go&logoColor=white" />](https://golang.org/)
 
 ```sh
 ❯ go run {entrypoint}
 ```
 
-
-**Using `docker`** &nbsp; [<img align="center" src="https://img.shields.io/badge/Docker-2CA5E0.svg?style={badge_style}&logo=docker&logoColor=white" />](https://www.docker.com/)
+**Using `docker`**
+&nbsp; [<img align="center" src="https://img.shields.io/badge/Docker-2CA5E0.svg?style={badge_style}&logo=docker&logoColor=white" />](https://www.docker.com/)
 
 ```sh
 ❯ docker run -it {image_name}
 ```
 
-
 ### 🧪 Testing
+
 Run the test suite using the following command:
-**Using `go modules`** &nbsp; [<img align="center" src="https://img.shields.io/badge/Go-00ADD8.svg?style={badge_style}&logo=go&logoColor=white" />](https://golang.org/)
+**Using `go modules`**
+&nbsp; [<img align="center" src="https://img.shields.io/badge/Go-00ADD8.svg?style={badge_style}&logo=go&logoColor=white" />](https://golang.org/)
 
 ```sh
 ❯ go test ./...
 ```
 
-
 ---
+
 ## 📌 Project Roadmap
 
 - [X] **`Task 1`**: <strike>Implement feature one.</strike>
@@ -339,9 +395,12 @@ Run the test suite using the following command:
 
 ## 🔰 Contributing
 
-- **💬 [Join the Discussions](https://github.com/DaiYuANg/spack/discussions)**: Share your insights, provide feedback, or ask questions.
-- **🐛 [Report Issues](https://github.com/DaiYuANg/spack/issues)**: Submit bugs found or log feature requests for the `spack` project.
-- **💡 [Submit Pull Requests](https://github.com/DaiYuANg/spack/blob/main/CONTRIBUTING.md)**: Review open PRs, and submit your own PRs.
+- **💬 [Join the Discussions](https://github.com/DaiYuANg/spack/discussions)**: Share your insights, provide feedback, or
+  ask questions.
+- **🐛 [Report Issues](https://github.com/DaiYuANg/spack/issues)**: Submit bugs found or log feature requests for the
+  `spack` project.
+- **💡 [Submit Pull Requests](https://github.com/DaiYuANg/spack/blob/main/CONTRIBUTING.md)**: Review open PRs, and submit
+  your own PRs.
 
 <details closed>
 <summary>Contributing Guidelines</summary>
@@ -364,8 +423,11 @@ Run the test suite using the following command:
    ```sh
    git push origin new-feature-x
    ```
-7. **Submit a Pull Request**: Create a PR against the original project repository. Clearly describe the changes and their motivations.
-8. **Review**: Once your PR is reviewed and approved, it will be merged into the main branch. Congratulations on your contribution!
+7. **Submit a Pull Request**: Create a PR against the original project repository. Clearly describe the changes and
+   their motivations.
+8. **Review**: Once your PR is reviewed and approved, it will be merged into the main branch. Congratulations on your
+   contribution!
+
 </details>
 
 <details closed>
@@ -382,7 +444,8 @@ Run the test suite using the following command:
 
 ## 🎗 License
 
-This project is protected under the [SELECT-A-LICENSE](https://choosealicense.com/licenses) License. For more details, refer to the [LICENSE](https://choosealicense.com/licenses/) file.
+This project is protected under the [SELECT-A-LICENSE](https://choosealicense.com/licenses) License. For more details,
+refer to the [LICENSE](https://choosealicense.com/licenses/) file.
 
 ---
 

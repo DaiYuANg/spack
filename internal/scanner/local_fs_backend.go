@@ -1,7 +1,6 @@
 package scanner
 
 import (
-	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -26,26 +25,10 @@ func (b *localFSBackend) Walk(walkFn func(obj *ObjectInfo) error) error {
 		if err != nil {
 			return oops.Wrap(err)
 		}
-
-		rel, err := filepath.Rel(b.root, path)
+		obj, err := newObjectInfo(b.root, path, info)
 		if err != nil {
-			return oops.Wrap(err)
+			return err
 		}
-		// 标准化分隔符
-		key := filepath.ToSlash(rel)
-
-		obj := &ObjectInfo{
-			Key:   key,
-			Size:  info.Size(),
-			IsDir: info.IsDir(),
-			Reader: func() (io.ReadCloser, error) {
-				if info.IsDir() {
-					return nil, nil
-				}
-				return os.Open(path)
-			},
-		}
-
 		return walkFn(obj)
 	})
 }
@@ -56,16 +39,5 @@ func (b *localFSBackend) Stat(key string) (*ObjectInfo, error) {
 	if err != nil {
 		return nil, oops.Wrap(err)
 	}
-
-	return &ObjectInfo{
-		Key:   key,
-		Size:  info.Size(),
-		IsDir: info.IsDir(),
-		Reader: func() (io.ReadCloser, error) {
-			if info.IsDir() {
-				return nil, nil
-			}
-			return os.Open(full)
-		},
-	}, nil
+	return newObjectInfo(b.root, full, info)
 }

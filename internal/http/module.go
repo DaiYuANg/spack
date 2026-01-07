@@ -18,7 +18,6 @@ var Module = fx.Module("http",
 		newServer,
 	),
 	middlewareModule,
-	fx.Invoke(httpLifecycle),
 )
 
 func newTemplateEngine() *html.Engine {

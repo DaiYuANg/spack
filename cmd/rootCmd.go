@@ -4,7 +4,6 @@ import (
 	"github.com/daiyuang/spack/internal/cache"
 	"github.com/daiyuang/spack/internal/http"
 	"github.com/daiyuang/spack/internal/metrics"
-	"github.com/daiyuang/spack/internal/printer"
 	"github.com/daiyuang/spack/internal/registry"
 	"github.com/daiyuang/spack/internal/scanner"
 	"github.com/daiyuang/spack/internal/spa"
@@ -23,7 +22,6 @@ var rootCmd = &cobra.Command{
 			scanner.Module,
 			metrics.Module,
 			spa.Module,
-			printer.Module,
 			http.Module,
 		)
 	},

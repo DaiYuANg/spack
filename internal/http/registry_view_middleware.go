@@ -5,12 +5,13 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-func registryViewMiddleware(app *fiber.App, registry registry.Registry) {
+func registryViewMiddleware(app *fiber.App, reg registry.Registry) {
 	app.Get("/registry", func(ctx *fiber.Ctx) error {
-		view := registry.ViewData()
-		return ctx.Render("registry", fiber.Map{
-			"Originals": view.Originals,
-			"Variants":  view.Variants,
-		})
+		jsonStr, err := reg.Json()
+		if err != nil {
+			return ctx.Status(500).SendString(err.Error())
+		}
+		ctx.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSONCharsetUTF8)
+		return ctx.SendString(jsonStr)
 	})
 }

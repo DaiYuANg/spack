@@ -22,7 +22,6 @@ require (
 	github.com/gabriel-vasile/mimetype v1.4.12
 	github.com/gofiber/fiber/v2 v2.52.10
 	github.com/gofiber/template/html/v2 v2.1.3
-	github.com/jedib0t/go-pretty/v6 v6.7.8
 	github.com/joho/godotenv v1.5.1
 	github.com/klauspost/compress v1.18.2
 	github.com/knadh/koanf/providers/env v1.1.0
@@ -30,13 +29,15 @@ require (
 	github.com/knadh/koanf/v2 v2.3.0
 	github.com/panjf2000/ants/v2 v2.11.4
 	github.com/prometheus/client_golang v1.23.2
+	github.com/rs/zerolog v1.34.0
 	github.com/samber/lo v1.52.0
 	github.com/samber/oops v1.20.0
+	github.com/samber/oops/loggers/zerolog v0.0.0-20260101195714-ee59589fe6d3
 	github.com/samber/slog-fiber v1.20.1
-	github.com/samber/slog-zap/v2 v2.6.2
+	github.com/samber/slog-zerolog/v2 v2.9.0
 	github.com/spf13/cobra v1.10.2
 	go.uber.org/fx v1.24.0
-	go.uber.org/zap v1.27.1
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
 require (
@@ -284,6 +285,7 @@ require (
 	go.uber.org/automaxprocs v1.6.0 // indirect
 	go.uber.org/dig v1.19.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
+	go.uber.org/zap v1.27.1 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	golang.org/x/crypto v0.46.0 // indirect
 	golang.org/x/exp v0.0.0-20251219203646-944ab1f22d93 // indirect

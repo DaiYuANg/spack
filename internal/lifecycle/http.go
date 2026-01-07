@@ -1,4 +1,4 @@
-package http
+package lifecycle
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"go.uber.org/fx"
 )
 
-type LifecycleDependency struct {
+type Dependency struct {
 	fx.In
 	Lc     fx.Lifecycle
 	App    *fiber.App
@@ -17,13 +17,14 @@ type LifecycleDependency struct {
 	Logger *slog.Logger
 }
 
-func httpLifecycle(dep LifecycleDependency) {
+func httpLifecycle(dep Dependency) {
 	lc, app, cfg, log := dep.Lc, dep.App, dep.Config, dep.Logger
 	lc.Append(fx.StartStopHook(
 		func() {
 			go func() {
 				localAddress := "http://127.0.0.1:" + cfg.Http.GetPort()
 				log.Info("Http Listening on %s", localAddress)
+				log.Info("Registry data on %s", localAddress+"/registry")
 				err := app.Listen(
 					":" + cfg.Http.GetPort(),
 				)

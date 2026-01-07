@@ -1,6 +1,7 @@
 package http
 
 import (
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,14 +13,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/samber/lo"
 	"go.uber.org/fx"
-	"go.uber.org/zap"
 )
 
 type SpaMiddlewareDependency struct {
 	fx.In
 	App               *fiber.App
 	Config            *config.Config
-	Log               *zap.SugaredLogger
+	Log               *slog.Logger
 	HttpRequestsTotal *prometheus.CounterVec
 }
 
@@ -66,7 +66,7 @@ func spaMiddleware(dep SpaMiddlewareDependency) {
 	})
 }
 
-func tryServeCompressed(c *fiber.Ctx, fullPath string, log *zap.SugaredLogger) (bool, error) {
+func tryServeCompressed(c *fiber.Ctx, fullPath string, log *slog.Logger) (bool, error) {
 	acceptEncoding := c.Get(fiber.HeaderAcceptEncoding)
 	encodings := lo.Map(strings.Split(acceptEncoding, ","), func(e string, _ int) string {
 		return strings.TrimSpace(e)
@@ -94,7 +94,7 @@ func tryServeCompressed(c *fiber.Ctx, fullPath string, log *zap.SugaredLogger) (
 
 	cacheControl := "public, max-age=31536000, immutable"
 	contentEncoding := enc
-	log.Debugf("Serving compressed file: %s", compressedPath)
+	log.Debug("Serving compressed file: %s", compressedPath)
 
 	c.Set(fiber.HeaderContentEncoding, contentEncoding)
 	c.Set(fiber.HeaderVary, fiber.HeaderAcceptEncoding)
@@ -107,7 +107,7 @@ func tryServeCompressed(c *fiber.Ctx, fullPath string, log *zap.SugaredLogger) (
 	return true, nil
 }
 
-func tryServeStatic(c *fiber.Ctx, fullPath string, log *zap.SugaredLogger) (bool, error) {
+func tryServeStatic(c *fiber.Ctx, fullPath string, log *slog.Logger) (bool, error) {
 	if !pkg.FileExists(fullPath) {
 		return false, nil
 	}
@@ -120,7 +120,7 @@ func tryServeStatic(c *fiber.Ctx, fullPath string, log *zap.SugaredLogger) (bool
 	ext := filepath.Ext(fullPath)
 	cacheControl := lo.Ternary(ext != constant.HTML, "public, max-age=31536000, immutable", "no-registry")
 
-	log.Debugf("Serving scanner file: %s", fullPath)
+	log.Debug("Serving scanner file: %s", fullPath)
 
 	c.Type(ext)
 	c.Set(fiber.HeaderCacheControl, cacheControl)
@@ -131,7 +131,7 @@ func tryServeStatic(c *fiber.Ctx, fullPath string, log *zap.SugaredLogger) (bool
 	return true, nil
 }
 
-func tryServeFallback(c *fiber.Ctx, cfg *config.Config, log *zap.SugaredLogger) (bool, error) {
+func tryServeFallback(c *fiber.Ctx, cfg *config.Config, log *slog.Logger) (bool, error) {
 	fallbackPath := filepath.Join(cfg.Spa.Static, cfg.Spa.Fallback)
 	if !pkg.FileExists(fallbackPath) {
 		return false, nil
