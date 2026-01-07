@@ -4,13 +4,13 @@ import (
 	"strconv"
 	"time"
 
-	p "github.com/daiyuang/spack/internal/metrics"
+	"github.com/daiyuang/spack/internal/lifecycle"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-func prometheusMiddleware(dep p.IndicatorDependency) fiber.Handler {
+func prometheusMiddleware(dep lifecycle.IndicatorDependency) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		start := time.Now()
 		err := c.Next()
@@ -22,7 +22,7 @@ func prometheusMiddleware(dep p.IndicatorDependency) fiber.Handler {
 	}
 }
 
-func registerPrometheus(app *fiber.App, dep p.IndicatorDependency) {
+func registerPrometheus(app *fiber.App, dep lifecycle.IndicatorDependency) {
 	app.Get("/prometheus", adaptor.HTTPHandler(promhttp.Handler()))
 	app.Use(prometheusMiddleware(dep))
 }

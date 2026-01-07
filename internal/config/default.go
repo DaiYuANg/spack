@@ -22,7 +22,7 @@ func defaultConfig() Config {
 			Enable: false,
 		},
 		Debug: Debug{
-			Enable:      false,
+			Enable:      true,
 			PprofPrefix: "/pprof",
 			LivePort:    8080,
 		},

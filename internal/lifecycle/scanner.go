@@ -92,5 +92,7 @@ func scan(parameter ScanParameter) error {
 	if err != nil {
 		return oops.Wrap(err)
 	}
+
+	logger.Debug("storage idx", slog.AnyValue(st.IndexSnapshot()))
 	return nil
 }

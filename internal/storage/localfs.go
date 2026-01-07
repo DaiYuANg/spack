@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"io"
 	"log/slog"
-	"os"
 	"path/filepath"
 	"sync"
 
@@ -18,11 +17,15 @@ type LocalFS struct {
 	root   string
 	logger *slog.Logger
 
-	// 并发安全的 key index（Key -> struct{}）
-	idx sync.Map
+	mu  sync.RWMutex
+	idx map[Key]string // 可选 cache，加速 Exists / 列表
 }
 
-func NewLocalFS(fs afero.Fs, root string, logger *slog.Logger) (*LocalFS, error) {
+func NewLocalFS(
+	fs afero.Fs,
+	root string,
+	logger *slog.Logger,
+) (*LocalFS, error) {
 	if err := fs.MkdirAll(root, 0o755); err != nil {
 		return nil, oops.Wrap(err)
 	}
@@ -31,26 +34,39 @@ func NewLocalFS(fs afero.Fs, root string, logger *slog.Logger) (*LocalFS, error)
 		fs:     fs,
 		root:   root,
 		logger: logger,
+		idx:    make(map[Key]string),
 	}
 
-	// 启动时 preload 已有 blob
-	if err := l.preload(); err != nil {
-		return nil, oops.Wrap(err)
+	// 启动时构建 idx（可选，但推荐）
+	if err := l.buildIndex(); err != nil {
+		return nil, err
 	}
 
 	return l, nil
 }
 
-func (l *LocalFS) preload() error {
-	return afero.Walk(l.fs, l.root, func(p string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
-			return nil
-		}
+func (l *LocalFS) buildIndex() error {
+	entries, err := afero.ReadDir(l.fs, l.root)
+	if err != nil {
+		return oops.Wrap(err)
+	}
 
-		key := Key(filepath.Base(p))
-		l.idx.Store(key, struct{}{})
-		return nil
-	})
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		l.idx[Key(e.Name())] = ""
+	}
+
+	l.logger.Info(
+		"localfs index built",
+		"count", len(l.idx),
+	)
+
+	return nil
 }
 
 func (l *LocalFS) blobPath(key Key) string {
@@ -63,9 +79,24 @@ Exists
 - miss 再查 fs（防止 idx 不一致）
 */
 func (l *LocalFS) Exists(key Key) bool {
-	_, ok := l.idx.Load(key)
-	return ok
+	l.mu.RLock()
+	_, ok := l.idx[key]
+	l.mu.RUnlock()
+	if ok {
+		return true
+	}
+	path := l.blobPath(key)
+	_, err := l.fs.Stat(path)
+	if err == nil {
+		l.mu.Lock()
+		l.idx[key] = path
+		l.mu.Unlock()
+		return true
+	}
+
+	return false
 }
+
 func (l *LocalFS) Open(key Key) (io.ReadCloser, error) {
 	return l.fs.Open(l.blobPath(key))
 }
@@ -78,7 +109,6 @@ Put
 - 天然去重
 */
 func (l *LocalFS) Put(r io.Reader) (Key, int64, error) {
-	// 1. 写入临时文件并计算 hash
 	tmp, err := afero.TempFile(l.fs, l.root, ".tmp-*")
 	if err != nil {
 		return "", 0, oops.Wrap(err)
@@ -86,6 +116,7 @@ func (l *LocalFS) Put(r io.Reader) (Key, int64, error) {
 	defer tmp.Close()
 
 	hasher := sha256.New()
+
 	n, err := io.Copy(io.MultiWriter(tmp, hasher), r)
 	if err != nil {
 		_ = l.fs.Remove(tmp.Name())
@@ -95,20 +126,26 @@ func (l *LocalFS) Put(r io.Reader) (Key, int64, error) {
 	key := Key(hex.EncodeToString(hasher.Sum(nil)))
 	finalPath := l.blobPath(key)
 
-	// 2. CAS：原子检查 + 标记
-	if _, loaded := l.idx.LoadOrStore(key, struct{}{}); loaded {
-		// 已存在（可能是并发 Put 或 preload）
+	// fast-path: 已存在
+	if l.Exists(key) {
 		_ = l.fs.Remove(tmp.Name())
 		return key, n, nil
 	}
 
-	// 3. 落盘
+	// 原子提交
 	if err := l.fs.Rename(tmp.Name(), finalPath); err != nil {
-		// 回滚 idx（非常重要）
-		l.idx.Delete(key)
+		// 并发场景下，可能是另一个 writer 已经写入
+		if l.Exists(key) {
+			_ = l.fs.Remove(tmp.Name())
+			return key, n, nil
+		}
 		_ = l.fs.Remove(tmp.Name())
 		return "", n, oops.Wrap(err)
 	}
+
+	l.mu.Lock()
+	l.idx[key] = finalPath
+	l.mu.Unlock()
 
 	l.logger.Debug(
 		"blob stored",
@@ -117,4 +154,14 @@ func (l *LocalFS) Put(r io.Reader) (Key, int64, error) {
 	)
 
 	return key, n, nil
+}
+
+func (l *LocalFS) IndexSnapshot() map[Key]string {
+	out := make(map[Key]string)
+
+	for key := range l.idx {
+		out[key] = l.idx[key]
+	}
+
+	return out
 }

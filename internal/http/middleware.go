@@ -17,7 +17,6 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/healthcheck"
 	"github.com/gofiber/fiber/v2/middleware/helmet"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
-	"github.com/gofiber/fiber/v2/middleware/monitor"
 	"github.com/gofiber/fiber/v2/middleware/pprof"
 	recoverer "github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
@@ -40,13 +39,11 @@ var middlewareModule = fx.Module(
 		helmetMiddleware,
 		limiterMiddleware,
 		faviconMiddleware,
-		monitorMiddleware,
 		registerPrometheus,
 		healthcheckMiddleware,
 		cacheMiddleware,
 		proxyMiddleware,
 		debugMiddleware,
-		setupPreload,
 		registryViewMiddleware,
 		spaMiddleware,
 		recoverMiddleware,
@@ -64,7 +61,9 @@ func etagMiddleware(app *fiber.App) {
 }
 
 func requestIdMiddleware(app *fiber.App) {
-	app.Use(requestid.New())
+	cfg := requestid.ConfigDefault
+	cfg.Header = "Request-ID"
+	app.Use(requestid.New(cfg))
 }
 
 func helmetMiddleware(app *fiber.App) {
@@ -91,10 +90,6 @@ func debugMiddleware(app *fiber.App, config *config.Config) {
 	}
 	app.Use(expvarmw.New())
 	app.Use(pprof.New(pprof.Config{Prefix: config.Debug.PprofPrefix}))
-}
-
-func monitorMiddleware(app *fiber.App) {
-	app.Get("/monitor", monitor.New())
 }
 
 func cacheMiddleware(app *fiber.App) {

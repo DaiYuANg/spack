@@ -3,6 +3,7 @@ package storage
 import (
 	"log/slog"
 	"os"
+	"path"
 
 	"github.com/spf13/afero"
 	"go.uber.org/fx"
@@ -15,5 +16,6 @@ var Module = fx.Module("storage",
 )
 
 func newLocal(logger *slog.Logger) (*LocalFS, error) {
-	return NewLocalFS(afero.NewOsFs(), os.TempDir(), logger)
+	fullpath := path.Join(os.TempDir(), "spack")
+	return NewLocalFS(afero.NewOsFs(), fullpath, logger)
 }

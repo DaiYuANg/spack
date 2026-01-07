@@ -1,4 +1,4 @@
-package metrics
+package lifecycle
 
 import (
 	"log/slog"
@@ -6,8 +6,24 @@ import (
 
 	"github.com/arl/statsviz"
 	"github.com/daiyuang/spack/internal/config"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/fx"
 )
+
+type IndicatorDependency struct {
+	fx.In
+	HttpRequestsTotal          *prometheus.CounterVec
+	HttpRequestDurationSeconds *prometheus.HistogramVec
+	ActiveRequests             *prometheus.GaugeVec
+}
+
+func register(dep IndicatorDependency) {
+	prometheus.MustRegister(
+		dep.HttpRequestsTotal,
+		dep.HttpRequestDurationSeconds,
+		dep.ActiveRequests,
+	)
+}
 
 func start(lc fx.Lifecycle, mux *http.ServeMux, cfg *config.Config, logger *slog.Logger) error {
 	if !cfg.Debug.Enable {

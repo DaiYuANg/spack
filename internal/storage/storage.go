@@ -13,4 +13,6 @@ type Storage interface {
 
 	// Exists 判断 blob 是否存在
 	Exists(key Key) bool
+
+	IndexSnapshot() map[Key]string
 }

@@ -14,10 +14,6 @@ var Module = fx.Module("metrics",
 		newRequestDurationSeconds,
 		newActiveRequests,
 	),
-	fx.Invoke(
-		start,
-		register,
-	),
 )
 
 func newServeMux() *http.ServeMux {
@@ -52,13 +48,5 @@ func newActiveRequests() *prometheus.GaugeVec {
 			Help: "Number of active requests",
 		},
 		[]string{"method", "path"},
-	)
-}
-
-func register(dep IndicatorDependency) {
-	prometheus.MustRegister(
-		dep.HttpRequestsTotal,
-		dep.HttpRequestDurationSeconds,
-		dep.ActiveRequests,
 	)
 }
