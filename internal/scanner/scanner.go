@@ -31,7 +31,7 @@ func (s *Scanner) Scan(process FileProcessor) error {
 		// 计算 Hash（按需）
 		h, err := calcHash(obj)
 		if err != nil {
-			return err
+			return oops.Wrap(err)
 		}
 
 		return process(obj, h)

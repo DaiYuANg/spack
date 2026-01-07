@@ -8,7 +8,6 @@ import (
 	"syscall"
 
 	"github.com/daiyuang/spack/internal/config"
-	slogzap "github.com/samber/slog-zap/v2"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -26,7 +25,7 @@ var Module = fx.Module("logger_module",
 func newLogger(cfg *config.Config) *zap.Logger {
 	loggerConfig := cfg.Logger
 	encoderCfg := zap.NewProductionEncoderConfig()
-
+	encoderCfg.EncodeCaller = zapcore.FullCallerEncoder
 	// 时间格式化，精确到毫秒
 	encoderCfg.EncodeTime = zapcore.TimeEncoderOfLayout("2006-01-02 15:04:05.000")
 	encoderCfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
@@ -60,8 +59,18 @@ func sugaredLogger(log *zap.Logger) *zap.SugaredLogger {
 	return log.Sugar()
 }
 
-func slogger(zapLogger *zap.Logger) *slog.Logger {
-	return slog.New(slogzap.Option{Level: slog.LevelDebug, Logger: zapLogger}.NewZapHandler())
+func slogger(cfg *config.Config) *slog.Logger {
+	level := slog.LevelInfo
+	if cfg.Logger.Level == "debug" {
+		level = slog.LevelDebug
+	}
+
+	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level:     level,
+		AddSource: true,
+	})
+
+	return slog.New(handler)
 }
 
 func deferLogger(lc fx.Lifecycle, logger *zap.Logger) {

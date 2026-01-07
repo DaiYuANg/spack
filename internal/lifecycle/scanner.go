@@ -5,13 +5,24 @@ import (
 	"path"
 	"path/filepath"
 
+	"github.com/daiyuang/spack/internal/preprocessor"
 	"github.com/daiyuang/spack/internal/registry"
 	"github.com/daiyuang/spack/internal/scanner"
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/samber/oops"
+	"go.uber.org/fx"
 )
 
-func scan(scannerInstance *scanner.Scanner, reg registry.Registry) error {
+type ScanParameter struct {
+	fx.In
+	Scanner  *scanner.Scanner
+	Registry registry.Registry
+	Pps      []preprocessor.Preprocessor `group:"preprocessor"`
+}
+
+func scan(parameter ScanParameter) error {
+	scannerInstance := parameter.Scanner
+	reg := parameter.Registry
 	err := scannerInstance.Scan(func(obj *scanner.ObjectInfo, hash string) error {
 		// 注册 original
 		info := &registry.OriginalFileInfo{
