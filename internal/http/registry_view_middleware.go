@@ -5,7 +5,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-func registryViewMiddleware(app *fiber.App, reg registry.Registry) {
+func registryViewMiddleware(app *fiber.App, reg *registry.Metadata) {
 	app.Get("/registry", func(ctx *fiber.Ctx) error {
 		jsonStr, err := reg.Json()
 		if err != nil {

@@ -1,19 +1,17 @@
 package processor
 
 import (
+	"bytes"
 	"image"
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
 	"log/slog"
-	"os"
-	"path/filepath"
 
 	"github.com/chai2010/webp"
 	"github.com/daiyuang/spack/internal/constant"
 	"github.com/daiyuang/spack/internal/registry"
 	"github.com/daiyuang/spack/internal/scanner"
-	"github.com/daiyuang/spack/pkg"
 	"github.com/samber/lo"
 	"github.com/samber/oops"
 )
@@ -23,69 +21,43 @@ type WebPProcessor struct {
 	supportMime []constant.MimeType
 }
 
-// NewWebPProcessor 构造
 func NewWebPProcessor(logger *slog.Logger) *WebPProcessor {
 	return &WebPProcessor{
-		logger:      logger,
-		supportMime: []constant.MimeType{constant.Png, constant.Jpg, constant.Jpeg},
+		logger: logger,
+		supportMime: []constant.MimeType{
+			constant.Png,
+			constant.Jpg,
+			constant.Jpeg,
+		},
 	}
 }
 
-// Name 返回唯一标识
 func (p *WebPProcessor) Name() string {
 	return "WebPProcessor"
 }
 
-// Match 根据 MIME 判断是否需要处理
 func (p *WebPProcessor) Match(obj *scanner.ObjectInfo) bool {
-	mimeType := obj.Mimetype
-	p.logger.Debug("File mimetype detected",
-		slog.String("path", obj.Key),
-		slog.String("mimetype", mimeType),
-	)
 	ok := lo.ContainsBy(p.supportMime, func(mt constant.MimeType) bool {
-		return string(mt) == mimeType
+		return mt == obj.Mimetype
 	})
+
 	if ok {
-		p.logger.Debug("webp: matched mime=%s for path=%s", mimeType, obj.Key)
+		p.logger.Debug(
+			"webp matched",
+			"path", obj.Key,
+			"mime", obj.Mimetype,
+		)
 	}
 	return ok
 }
 
-// Run 执行 WebP 转换
+// Run 只做一件事：origin -> webp variant
 func (p *WebPProcessor) Run(ctx Context) (int64, error) {
 	if ctx.Open == nil || ctx.EmitVariant == nil {
 		return 0, oops.New("Context missing Open or EmitVariant")
 	}
 
-	// 生成缓存目录
-	cacheDir, err := getCacheDir()
-	if err != nil {
-		return 0, oops.Wrap(err)
-	}
-
-	targetPath := filepath.Join(cacheDir, ctx.Hash+".webp")
-
-	// 如果已存在缓存文件，直接注册
-	if _, err := os.Stat(targetPath); err == nil {
-		stat, err := os.Stat(targetPath)
-		if err != nil {
-			return 0, oops.Wrap(err)
-		}
-		vinfo := &registry.VariantFileInfo{
-			Path:        targetPath,
-			Ext:         ".webp",
-			VariantType: constant.VariantWebP,
-			Size:        stat.Size(),
-		}
-		if err := ctx.EmitVariant(vinfo); err != nil {
-			return 0, oops.Wrap(err)
-		}
-		p.logger.Debug("webp: cached variant registered %s", targetPath)
-		return stat.Size(), nil
-	}
-
-	// 打开原文件
+	// 打开 origin
 	r, err := ctx.Open()
 	if err != nil {
 		return 0, oops.Wrap(err)
@@ -97,41 +69,31 @@ func (p *WebPProcessor) Run(ctx Context) (int64, error) {
 		return 0, oops.Wrap(err)
 	}
 
-	outFile, err := os.Create(targetPath)
-	if err != nil {
-		return 0, oops.Wrap(err)
-	}
-	defer outFile.Close()
-
-	if err := webp.Encode(outFile, img, &webp.Options{Lossless: true, Quality: 80}); err != nil {
-		return 0, oops.Wrap(err)
-	}
-
-	stat, err := os.Stat(targetPath)
-	if err != nil {
+	// 编码为 webp 到内存 buffer
+	var buf bytes.Buffer
+	if err := webp.Encode(
+		&buf,
+		img,
+		&webp.Options{
+			Lossless: true,
+			Quality:  80,
+		},
+	); err != nil {
 		return 0, oops.Wrap(err)
 	}
 
-	vinfo := &registry.VariantFileInfo{
-		Path:        targetPath,
+	// 构造 variant（不涉及 storage）
+	variant := &registry.VariantFileInfo{
 		Ext:         ".webp",
 		VariantType: constant.VariantWebP,
-		Size:        stat.Size(),
-	}
-	if err := ctx.EmitVariant(vinfo); err != nil {
-		return stat.Size(), oops.Wrap(err)
+		Size:        int64(buf.Len()),
+		Reader:      bytes.NewReader(buf.Bytes()),
 	}
 
-	p.logger.Debug("webp: generated and registered %s", targetPath)
-	return stat.Size(), nil
-}
-
-// getCacheDir 返回临时缓存目录
-func getCacheDir() (string, error) {
-	version := pkg.GetVersionFromBuildInfo()
-	basePath := filepath.Join(os.TempDir(), version)
-	if err := os.MkdirAll(basePath, 0o755); err != nil {
-		return "", err
+	// 交给 lifecycle / context 决定如何持久化
+	if err := ctx.EmitVariant(variant); err != nil {
+		return variant.Size, oops.Wrap(err)
 	}
-	return basePath, nil
+
+	return variant.Size, nil
 }

@@ -2,9 +2,11 @@ package registry
 
 import (
 	"errors"
+	"io"
 	"sync/atomic"
 
 	"github.com/daiyuang/spack/internal/constant"
+	"github.com/daiyuang/spack/internal/storage"
 )
 
 var ErrFrozen = errors.New("registry is frozen")
@@ -14,13 +16,14 @@ type OriginalFileInfo struct {
 	Size     int64
 	Hash     string
 	Ext      string
-	Mimetype string
+	Mimetype constant.MimeType
 	Metrics  *Metrics
 }
 
 type VariantFileInfo struct {
-	Path        string
 	Ext         string
+	Reader      io.Reader
+	StorageKey  storage.Key
 	VariantType constant.VariantType
 	Size        int64
 	Metrics     *Metrics
@@ -56,8 +59,6 @@ type Registry interface {
 
 	Freeze() error
 	IsFrozen() bool
-
-	Json() (string, error)
 }
 
 type Writer interface {

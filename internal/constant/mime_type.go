@@ -3,13 +3,18 @@ package constant
 type MimeType string
 
 const (
-	Png                   MimeType = "image/png"
-	Jpeg                  MimeType = "image/jpeg"
-	Jpg                   MimeType = "image/jpg"
-	Html                  MimeType = "text/html"
-	Css                   MimeType = "text/css"
+	OctetStream MimeType = "application/octet-stream"
+
+	Png  MimeType = "image/png"
+	Jpeg MimeType = "image/jpeg"
+	Jpg  MimeType = "image/jpg"
+
+	Html MimeType = "text/html"
+	Css  MimeType = "text/css"
+	Json MimeType = "application/json"
+
 	ApplicationJavascript MimeType = "application/javascript"
 	TextJavascript        MimeType = "text/javascript"
-	Json                  MimeType = "application/json"
-	Svg                   MimeType = "image/svg+xml"
+
+	Svg MimeType = "image/svg+xml"
 )

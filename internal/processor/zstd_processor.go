@@ -51,10 +51,10 @@ func (p *ZstdVariantProcessor) Run(ctx Context) (int64, error) {
 	}
 
 	variant := &registry.VariantFileInfo{
-		Path:        ctx.Obj.Key + ".zst",
 		Ext:         ".zst",
 		VariantType: constant.VariantZstd,
 		Size:        int64(buf.Len()),
+		Reader:      r,
 	}
 
 	if err := ctx.EmitVariant(variant); err != nil {

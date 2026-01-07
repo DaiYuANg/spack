@@ -305,41 +305,52 @@ Install spack using one of the following methods:
 
 ```mermaid
 flowchart TD
-  %% Scanner 扫描文件系统
+%% Scanner 扫描文件系统
   Scanner[Scanner<br/>Walk FS / Detect MIME] -->|ObjectInfo| DAG[DAG Processor Scheduler]
 
-  %% DAG Processor
-  subgraph Processor
+%% DAG Processor 调度和处理
+  DAG -->|调度处理任务| Processor
+
+%% DAG Processor 子图 - 显示处理流程
+  subgraph Processor[DAG Processing Pipeline]
     Origin[OriginProcessor]
     WebP[WebPProcessor]
     Gzip[GzipProcessor]
     Zstd[ZstdProcessor]
     Brotli[BrotliProcessor]
-  end
 
   %% DAG 依赖关系
-  Origin --> WebP
-  Origin --> Gzip
-  Origin --> Zstd
-  Origin --> Brotli
-  WebP --> Gzip
-  WebP --> Zstd
-  WebP --> Brotli
+    Origin --> WebP
+    Origin --> Gzip
+    Origin --> Zstd
+    Origin --> Brotli
+    WebP --> Gzip
+    WebP --> Zstd
+    WebP --> Brotli
+  end
 
-  %% Variant Storage
-  DAG -->|VariantFileInfo| VariantStorage[VariantStorage Layer<br/>Save / Open / Exists / Delete]
+%% 处理结果存储
+  Processor -->|VariantFileInfo| VariantStorage[VariantStorage Layer<br/>Save / Open / Exists / Delete]
 
-  %% Registry
-  VariantStorage --> Registry[Registry<br/>Meta Info Management]
-  DAG -->|Variant meta| Registry
+%% Registry 元数据管理
+  Processor -->|Variant meta| Registry[Registry<br/>Meta Info Management]
+  VariantStorage -->|更新存储状态| Registry
 
-  %% HTTP 层
-  Registry --> HTTPRegistry[/registry<br/>JSON]
-  VariantStorage --> HTTPFiles[/files/:path<br/>Serve Variant]
+%% Registry 查询接口
+  Registry -->|提供元数据| DAG
+  VariantStorage -->|检查文件状态| DAG
 
-  %% 浏览器
-  Browser -->|GET /registry| HTTPRegistry
+%% HTTP 服务层
+  Registry --> HTTPRegistry["/registry<br/>JSON API"]
+  VariantStorage --> HTTPFiles["/files/:path<br/>Serve Variant Files"]
+
+%% 客户端请求
+  Browser[Browser/Client] -->|GET /registry| HTTPRegistry
   Browser -->|GET /files/:path| HTTPFiles
+
+%% HTTP层到业务层的连接
+  HTTPRegistry -->|查询请求| Registry
+  HTTPFiles -->|文件请求| VariantStorage
 ```
 
 ### TodoList

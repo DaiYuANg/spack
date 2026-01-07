@@ -5,16 +5,17 @@ import (
 	"errors"
 	"sort"
 
+	"github.com/daiyuang/spack/internal/constant"
 	"github.com/samber/lo"
 	"github.com/samber/oops"
 )
 
-func (r *memoryRegistry) Json() (string, error) {
-	originals := r.ListOriginals()
+func (r *Metadata) Json() (string, error) {
+	originals := r.registry.ListOriginals()
 
 	// 构造 JSON 对象
 	jsonOrig := lo.Map(originals, func(e *OriginalFileInfo, _ int) *jsonOriginal {
-		vars, _ := r.GetVariants(e.Path)
+		vars, _ := r.registry.GetVariants(e.Path)
 		return &jsonOriginal{
 			Path:     e.Path,
 			MIME:     e.Mimetype,
@@ -31,7 +32,7 @@ func (r *memoryRegistry) Json() (string, error) {
 	})
 
 	// 按 MIME 分类
-	byMime := lo.GroupBy(jsonOrig, func(o *jsonOriginal) string {
+	byMime := lo.GroupBy(jsonOrig, func(o *jsonOriginal) constant.MimeType {
 		return o.MIME
 	})
 
@@ -53,10 +54,10 @@ func (r *memoryRegistry) Json() (string, error) {
 func mapVariants(vars []*VariantFileInfo) []*jsonVariant {
 	return lo.Map(vars, func(v *VariantFileInfo, _ int) *jsonVariant {
 		return &jsonVariant{
-			Path:        v.Path,
 			Ext:         v.Ext,
 			VariantType: string(v.VariantType),
 			Size:        v.Size,
+			StorageKey:  v.StorageKey,
 		}
 	})
 }

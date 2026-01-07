@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/daiyuang/spack/internal/constant"
 	"github.com/daiyuang/spack/pkg"
 	"github.com/samber/oops"
 )
@@ -16,7 +17,7 @@ type ObjectInfo struct {
 	Reader   func() (io.ReadCloser, error) // 延迟打开 Reader
 	IsDir    bool
 	Metadata map[string]string // 可选字段（MIME、etag 等）
-	Mimetype string
+	Mimetype constant.MimeType
 }
 
 func newObjectInfo(root, fullPath string, info os.FileInfo) (*ObjectInfo, error) {

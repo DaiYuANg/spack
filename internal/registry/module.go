@@ -10,5 +10,6 @@ var Module = fx.Module("Registry",
 			NewInMemoryRegistry,
 			fx.As(new(Registry)),
 		),
+		NewMetadata,
 	),
 )

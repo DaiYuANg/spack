@@ -52,10 +52,11 @@ func (p *OriginProcessor) Run(ctx Context) (int64, error) {
 
 	// 构造 OriginalFileInfo（注意部分信息可以直接用 scanner 提供的 Context.Obj）
 	info := &registry.OriginalFileInfo{
-		Path: ctx.Obj.Key,
-		Size: ctx.Obj.Size, // 或者用 size
-		Hash: ctx.Hash,
-		Ext:  filepath.Ext(ctx.Obj.Key),
+		Mimetype: ctx.Obj.Mimetype,
+		Path:     ctx.Obj.Key,
+		Size:     ctx.Obj.Size, // 或者用 size
+		Hash:     ctx.Hash,
+		Ext:      filepath.Ext(ctx.Obj.Key),
 	}
 
 	// 写入 registry

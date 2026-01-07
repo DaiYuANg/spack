@@ -51,10 +51,10 @@ func (p *BrotliVariantProcessor) Run(ctx Context) (int64, error) {
 	}
 
 	variant := &registry.VariantFileInfo{
-		Path:        ctx.Obj.Key + ".br",
 		Ext:         ".br",
 		VariantType: constant.VariantBrotli,
 		Size:        int64(buf.Len()),
+		Reader:      bytes.NewReader(buf.Bytes()),
 	}
 
 	if err := ctx.EmitVariant(variant); err != nil {

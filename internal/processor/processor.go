@@ -28,10 +28,10 @@ type Context struct {
 type Processor interface {
 	Name() string
 
-	// 是否处理该 original
+	// Match 是否处理该 original
 	Match(o *scanner.ObjectInfo) bool
 
-	// 真正执行
+	// Run 真正执行
 	Run(
 		ctx Context,
 	) (size int64, err error)

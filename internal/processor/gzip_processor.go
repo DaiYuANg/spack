@@ -19,17 +19,16 @@ func NewGzipVariantProcessor() *GzipVariantProcessor {
 	return &GzipVariantProcessor{}
 }
 
-// Name 返回唯一标识
 func (p *GzipVariantProcessor) Name() string {
 	return "GzipVariantProcessor"
 }
 
-// Match 对所有文件都处理
+// 对所有文件生效
 func (p *GzipVariantProcessor) Match(_ *scanner.ObjectInfo) bool {
 	return true
 }
 
-// Run 读取原始文件，生成 gzip，并通过 EmitVariant 注册
+// Run 只负责：origin -> gzip variant
 func (p *GzipVariantProcessor) Run(ctx Context) (int64, error) {
 	if ctx.Open == nil || ctx.EmitVariant == nil {
 		return 0, oops.New("Context missing Open or EmitVariant")
@@ -44,28 +43,26 @@ func (p *GzipVariantProcessor) Run(ctx Context) (int64, error) {
 	var buf bytes.Buffer
 	gw := gzip.NewWriter(&buf)
 
-	// copy 原始文件到 gzip writer
-	size, err := io.Copy(gw, r)
-	if err != nil {
-		return size, oops.Wrap(err)
+	// gzip 压缩
+	if _, err := io.Copy(gw, r); err != nil {
+		return 0, oops.Wrap(err)
 	}
-
 	if err := gw.Close(); err != nil {
-		return size, oops.Wrap(err)
+		return 0, oops.Wrap(err)
 	}
 
-	// 构造 VariantFileInfo
+	// 构造 variant（不涉及 storage）
 	variant := &registry.VariantFileInfo{
-		Path:        ctx.Obj.Key + ".gz",  // 变体路径
-		Ext:         ".gz",                // 后缀
-		VariantType: constant.VariantGzip, // 类型
-		Size:        int64(buf.Len()),     // gzip 后大小
+		Ext:         ".gz",
+		VariantType: constant.VariantGzip,
+		Size:        int64(buf.Len()),
+		Reader:      bytes.NewReader(buf.Bytes()),
 	}
 
-	// 注册到 registry
+	// lifecycle/context 决定如何落 storage、如何分配 key
 	if err := ctx.EmitVariant(variant); err != nil {
-		return size, oops.Wrap(err)
+		return variant.Size, oops.Wrap(err)
 	}
 
-	return size, nil
+	return variant.Size, nil
 }

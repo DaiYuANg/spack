@@ -110,14 +110,3 @@ func newSlog(zlogger zerolog.Logger) *slog.Logger {
 
 	return logger
 }
-
-//func deferLogger(lc fx.Lifecycle, logger *zap.Logger) {
-//  lc.Append(
-//    fx.StopHook(func() error {
-//      if err := logger.Sync(); err != nil && !errors.Is(err, syscall.EINVAL) {
-//        return fmt.Errorf("logger sync failed: %v", err)
-//      }
-//      return nil
-//    }),
-//  )
-//}
