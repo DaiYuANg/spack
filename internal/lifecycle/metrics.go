@@ -36,7 +36,7 @@ func start(lc fx.Lifecycle, mux *http.ServeMux, cfg *config.Config, logger *slog
 	lc.Append(fx.StartHook(
 		func() {
 			go func() {
-				logger.Info("Metrics server start:%s", "http://localhost:8080/debug/statsviz")
+				logger.Info("Metrics server start:%s", slog.String("test", "http://localhost:8080/debug/statsviz"))
 				_ = http.ListenAndServe("localhost:8080", mux)
 			}()
 		},

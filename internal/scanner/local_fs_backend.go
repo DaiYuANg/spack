@@ -16,7 +16,7 @@ type localFSBackend struct {
 
 // NewLocalFSBackend 构建 LocalFS backend
 func NewLocalFSBackend(root string, logger *slog.Logger) Backend {
-	logger.Info("Local fs backend root", slog.AnyValue(root))
+	logger.Info("Local fs backend root", slog.String("root", root))
 	return &localFSBackend{root: root, logger: logger}
 }
 

@@ -23,13 +23,13 @@ func httpLifecycle(dep Dependency) {
 		func() {
 			go func() {
 				localAddress := "http://127.0.0.1:" + cfg.Http.GetPort()
-				log.Info("Http Listening on %s", localAddress)
-				log.Info("Registry data on %s", localAddress+"/registry")
+				log.Info("Http Listening on %s", slog.String("address", localAddress))
+				log.Info("Registry data on %s", slog.String("address", localAddress+"/registry"))
 				err := app.Listen(
 					":" + cfg.Http.GetPort(),
 				)
 				if err != nil {
-					log.Error("spack start fail: %v", err) // 打印原始错误
+					log.Error("spack start fail: %v", slog.String("err", err.Error())) // 打印原始错误
 					panic(err)
 				}
 			}()
