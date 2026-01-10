@@ -23,7 +23,6 @@ var Module = fx.Module("logger_module",
 		newZerolog,
 		newSlog,
 	),
-	//fx.Invoke(deferLogger),
 )
 
 func newZerolog(

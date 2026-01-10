@@ -16,8 +16,5 @@ var Module = fx.Module("processor",
 		processorAnnotation(
 			NewZstdVariantProcessor,
 		),
-		processorAnnotation(
-			NewWebPProcessor,
-		),
 	),
 )

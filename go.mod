@@ -14,7 +14,6 @@ require (
 	github.com/arl/statsviz v0.8.0
 	github.com/aws/aws-sdk-go-v2 v1.41.0
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.95.0
-	github.com/chai2010/webp v1.4.0
 	github.com/dgraph-io/ristretto/v2 v2.3.0
 	github.com/eko/gocache/lib/v4 v4.2.3
 	github.com/eko/gocache/store/ristretto/v4 v4.3.2
