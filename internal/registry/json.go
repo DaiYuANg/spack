@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/daiyuang/spack/internal/model"
+	"github.com/samber/lo"
 )
 
 // 可序列化的 ObjectInfo 表示（不包含 Reader）
@@ -32,15 +33,12 @@ type nodeTreeJSON struct {
 
 // Json 返回扁平化的 JSON（每个节点的完整 info + 父/子 key 列表）
 func (r *InMemoryRegistry) Json() (string, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
 	if r == nil {
 		return "", errors.New("registry is nil")
 	}
 
-	out := make([]nodeFlatJSON, 0, len(r.nodes))
-	for _, n := range r.nodes {
+	out := make([]nodeFlatJSON, 0, r.nodes.Len())
+	for _, n := range r.nodes.All() {
 		// prepare info
 		info := objectInfoJSON{
 			Key:      n.Info.Key,
@@ -52,14 +50,14 @@ func (r *InMemoryRegistry) Json() (string, error) {
 		}
 
 		// parents keys
-		parents := make([]string, 0, len(n.Parents))
-		for k := range n.Parents {
+		parents := make([]string, 0, n.Parents.Len())
+		for k := range n.Parents.All() {
 			parents = append(parents, k)
 		}
 
 		// children keys
-		children := make([]string, 0, len(n.Children))
-		for k := range n.Children {
+		children := make([]string, 0, n.Children.Len())
+		for k := range n.Children.All() {
 			children = append(children, k)
 		}
 
@@ -80,17 +78,14 @@ func (r *InMemoryRegistry) Json() (string, error) {
 // JsonTree 从所有 root（无 parents 的节点）开始，递归构建嵌套结构并返回 JSON。
 // 为避免无限循环，使用 visited map（按 key）。
 func (r *InMemoryRegistry) JsonTree() (string, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
 	if r == nil {
 		return "", errors.New("registry is nil")
 	}
 
 	// 找到 roots（无 parents 的节点）
 	roots := make([]*model.ObjectNode, 0)
-	for _, n := range r.nodes {
-		if len(n.Parents) == 0 {
+	for _, n := range r.nodes.All() {
+		if n.Parents.Len() == 0 {
 			roots = append(roots, n)
 		}
 	}
@@ -113,16 +108,16 @@ func (r *InMemoryRegistry) JsonTree() (string, error) {
 		node := &nodeTreeJSON{Info: info}
 		visited[n.Info.Key] = node
 
-		for _, child := range n.Children {
+		for _, child := range n.Children.All() {
 			node.Children = append(node.Children, build(child))
 		}
 		return node
 	}
 
 	out := make([]*nodeTreeJSON, 0, len(roots))
-	for _, rnode := range roots {
-		out = append(out, build(rnode))
-	}
+	lo.ForEach(roots, func(item *model.ObjectNode, index int) {
+		out = append(out, build(item))
+	})
 
 	data, err := json.MarshalIndent(out, "", "  ")
 	if err != nil {

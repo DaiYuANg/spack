@@ -19,6 +19,7 @@ require (
 	github.com/gabriel-vasile/mimetype v1.4.12
 	github.com/gofiber/fiber/v2 v2.52.10
 	github.com/gofiber/template/html/v2 v2.1.3
+	github.com/goradd/maps v1.3.0
 	github.com/joho/godotenv v1.5.1
 	github.com/knadh/koanf/providers/env v1.1.0
 	github.com/knadh/koanf/providers/structs v1.0.0
