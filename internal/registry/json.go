@@ -15,14 +15,11 @@ func (r *Metadata) Json() (string, error) {
 
 	// 构造 JSON 对象
 	jsonOrig := lo.Map(originals, func(e *OriginalFileInfo, _ int) *jsonOriginal {
-		vars, _ := r.registry.GetVariants(e.Path)
 		return &jsonOriginal{
-			Path:     e.Path,
-			MIME:     e.Mimetype,
-			Size:     e.Size,
-			Hash:     e.Hash,
-			Variants: mapVariants(vars),
-			VarCount: len(vars),
+			Path: e.Path,
+			MIME: e.Mimetype,
+			Size: e.Size,
+			Hash: e.Hash,
 		}
 	})
 
@@ -49,15 +46,4 @@ func (r *Metadata) Json() (string, error) {
 		return "", oops.Wrap(mashhalerr)
 	}
 	return string(bs), nil
-}
-
-func mapVariants(vars []*VariantFileInfo) []*jsonVariant {
-	return lo.Map(vars, func(v *VariantFileInfo, _ int) *jsonVariant {
-		return &jsonVariant{
-			Ext:         v.Ext,
-			VariantType: string(v.VariantType),
-			Size:        v.Size,
-			StorageKey:  v.StorageKey,
-		}
-	})
 }

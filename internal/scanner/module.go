@@ -15,5 +15,6 @@ var Module = fx.Module("scanner",
 )
 
 func newLocalFsBackendInstance(config *config.Config, logger *slog.Logger) Backend {
+	logger.Debug("path", slog.Any("root", config.Spa))
 	return NewLocalFSBackend(config.Spa.Static, logger)
 }

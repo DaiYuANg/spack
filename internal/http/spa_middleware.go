@@ -2,16 +2,13 @@ package http
 
 import (
 	"log/slog"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/daiyuang/spack/internal/config"
-	"github.com/daiyuang/spack/internal/constant"
-	"github.com/daiyuang/spack/pkg"
+	"github.com/daiyuang/spack/internal/finder"
 	"github.com/gofiber/fiber/v2"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/samber/lo"
+	"github.com/samber/oops"
 	"go.uber.org/fx"
 )
 
@@ -21,21 +18,11 @@ type SpaMiddlewareDependency struct {
 	Config            *config.Config
 	Log               *slog.Logger
 	HttpRequestsTotal *prometheus.CounterVec
-}
-
-var SupportCompressExt = map[string]string{
-	"br":   ".br",
-	"gzip": ".gz",
-	"svgz": ".svgz",
-	"zz":   ".zz",
-	"xz":   ".xz",
-	"lz":   ".lz",
-	"lz4":  ".lz4",
-	"zst":  ".zst",
+	Finder            *finder.Finder
 }
 
 func spaMiddleware(dep SpaMiddlewareDependency) {
-	app, cfg, log, total := dep.App, dep.Config, dep.Log, dep.HttpRequestsTotal
+	app, cfg, log, total, f := dep.App, dep.Config, dep.Log, dep.HttpRequestsTotal, dep.Finder
 
 	servePath := strings.TrimSpace(cfg.Spa.Path) + "*"
 	app.Use(servePath, func(c *fiber.Ctx) error {
@@ -43,103 +30,14 @@ func spaMiddleware(dep SpaMiddlewareDependency) {
 			total.WithLabelValues(c.Method(), c.Path(), label).Inc()
 		}
 		reqPath := strings.TrimPrefix(c.Path(), "/")
-		fullPath := filepath.Join(cfg.Spa.Static, reqPath)
-		if ok, err := tryServeCompressed(c, fullPath, log); ok && err == nil {
-			incr(constant.Compress)
-			return nil
-		}
 
-		// 普通静态文件
-		if ok, err := tryServeStatic(c, fullPath, log); ok && err == nil {
-			incr(constant.Normal)
-			return nil
-		}
-
-		// fallback
-		if ok, err := tryServeFallback(c, cfg, log); ok && err == nil {
-			incr(constant.Fallback)
-			return nil
+		lookup, err := f.Lookup(finder.NewLookupContext(c.Get("Accept-Encoding"), reqPath))
+		if err != nil {
+			log.Error("Find error", slog.Any("error", oops.Wrap(err)))
+			return fiber.ErrNotFound
 		}
 
 		incr("not_found")
-		return fiber.ErrNotFound
+		return c.Send(lookup)
 	})
-}
-
-func tryServeCompressed(c *fiber.Ctx, fullPath string, log *slog.Logger) (bool, error) {
-	acceptEncoding := c.Get(fiber.HeaderAcceptEncoding)
-	encodings := lo.Map(strings.Split(acceptEncoding, ","), func(e string, _ int) string {
-		return strings.TrimSpace(e)
-	})
-
-	enc, found := lo.Find(encodings, func(enc string) bool {
-		ext, supported := SupportCompressExt[enc]
-		if !supported {
-			return false
-		}
-		compressedPath := fullPath + ext
-		return pkg.FileExists(compressedPath)
-	})
-	if !found {
-		return false, nil
-	}
-
-	// enc 是支持且存在的编码
-	ext := SupportCompressExt[enc]
-	compressedPath := fullPath + ext
-	content, err := os.ReadFile(compressedPath)
-	if err != nil {
-		return false, err
-	}
-
-	cacheControl := "public, max-age=31536000, immutable"
-	contentEncoding := enc
-	log.Debug("Serving compressed file: %s", compressedPath)
-
-	c.Set(fiber.HeaderContentEncoding, contentEncoding)
-	c.Set(fiber.HeaderVary, fiber.HeaderAcceptEncoding)
-	c.Set(fiber.HeaderCacheControl, cacheControl)
-	c.Type(filepath.Ext(fullPath))
-	if err := c.Send(content); err != nil {
-		return false, err
-	}
-
-	return true, nil
-}
-
-func tryServeStatic(c *fiber.Ctx, fullPath string, log *slog.Logger) (bool, error) {
-	if !pkg.FileExists(fullPath) {
-		return false, nil
-	}
-
-	content, err := os.ReadFile(fullPath)
-	if err != nil {
-		return false, err
-	}
-
-	ext := filepath.Ext(fullPath)
-	cacheControl := lo.Ternary(ext != constant.HTML, "public, max-age=31536000, immutable", "no-registry")
-
-	log.Debug("Serving scanner file: %s", fullPath)
-
-	c.Type(ext)
-	c.Set(fiber.HeaderCacheControl, cacheControl)
-	if err := c.Send(content); err != nil {
-		return false, err
-	}
-
-	return true, nil
-}
-
-func tryServeFallback(c *fiber.Ctx, cfg *config.Config, log *slog.Logger) (bool, error) {
-	fallbackPath := filepath.Join(cfg.Spa.Static, cfg.Spa.Fallback)
-	if !pkg.FileExists(fallbackPath) {
-		return false, nil
-	}
-
-	log.Debug("into fallback")
-	c.Set(fiber.HeaderCacheControl, "no-registry")
-	err := c.SendFile(fallbackPath)
-
-	return err == nil, err
 }

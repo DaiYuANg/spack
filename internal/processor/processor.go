@@ -21,8 +21,6 @@ type Context struct {
 	Registry registry.Writer
 
 	Open func() (io.ReadCloser, error)
-
-	EmitVariant func(v *registry.VariantFileInfo) error
 }
 
 type Processor interface {

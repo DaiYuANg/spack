@@ -15,14 +15,14 @@ func requestMeta(cfg *config.Config, httpRequestsTotal *prometheus.CounterVec) f
 		fullPath := filepath.Join(cfg.Spa.Static, reqPath)
 
 		// 将请求路径挂到 Context 上，供后续中间件使用
-		c.Locals("spa:fullPath", fullPath)
-		c.Locals("spa:reqPath", reqPath)
+		c.Locals("finder:fullPath", fullPath)
+		c.Locals("finder:reqPath", reqPath)
 
 		// 提供一个统一的打点函数
 		incr := func(label string) {
 			httpRequestsTotal.WithLabelValues(c.Method(), c.Path(), label).Inc()
 		}
-		c.Locals("spa:incr", incr)
+		c.Locals("finder:incr", incr)
 
 		return c.Next()
 	}

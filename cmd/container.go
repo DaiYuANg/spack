@@ -8,7 +8,6 @@ import (
 	"github.com/daiyuang/spack/internal/logger"
 	"github.com/daiyuang/spack/internal/pool"
 	"github.com/daiyuang/spack/internal/processor"
-	"github.com/daiyuang/spack/internal/storage"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 )
@@ -19,7 +18,6 @@ func createContainer(userModules ...fx.Option) *fx.App {
 		config.Module,
 		logger.Module,
 		processor.Module,
-		storage.Module,
 		lifecycle.Module,
 		fx.WithLogger(func(log *slog.Logger) fxevent.Logger {
 			return &fxevent.SlogLogger{Logger: log}

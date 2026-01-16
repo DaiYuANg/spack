@@ -7,14 +7,5 @@ var Module = fx.Module("processor",
 		processorAnnotation(
 			NewOriginProcessor,
 		),
-		processorAnnotation(
-			NewGzipVariantProcessor,
-		),
-		processorAnnotation(
-			NewBrotliVariantProcessor,
-		),
-		processorAnnotation(
-			NewZstdVariantProcessor,
-		),
 	),
 )

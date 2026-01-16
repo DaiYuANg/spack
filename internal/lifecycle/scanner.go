@@ -8,7 +8,6 @@ import (
 	"github.com/daiyuang/spack/internal/processor"
 	"github.com/daiyuang/spack/internal/registry"
 	"github.com/daiyuang/spack/internal/scanner"
-	"github.com/daiyuang/spack/internal/storage"
 	"github.com/panjf2000/ants/v2"
 	"github.com/samber/lo"
 	"github.com/samber/oops"
@@ -22,7 +21,6 @@ type ScanParameter struct {
 	Pps      []processor.Processor `group:"processor"`
 	Pool     *ants.Pool
 	Logger   *slog.Logger
-	Storage  *storage.LocalFS
 }
 
 func scan(parameter ScanParameter) error {
@@ -30,33 +28,18 @@ func scan(parameter ScanParameter) error {
 	reg := parameter.Registry
 	pool := parameter.Pool
 	logger := parameter.Logger
-	st := parameter.Storage
 	lo.ForEach(parameter.Pps, func(p processor.Processor, _ int) {
 		logger.Info("Scanners", slog.String("scanner name", p.Name()))
 	})
 	writer := reg.Writer()
 	var wg sync.WaitGroup
-	var submitErr atomic.Pointer[error] // 可记录第一个 submit 错误
+	var submitErr atomic.Pointer[error]
 	err := scannerInstance.Scan(func(obj *scanner.ObjectInfo, hash string) error {
 		ctx := processor.Context{
 			Obj:      obj,
 			Hash:     hash,
 			Registry: writer,
 			Open:     obj.Reader,
-			EmitVariant: func(v *registry.VariantFileInfo) error {
-				if reg.IsFrozen() {
-					return registry.ErrFrozen
-				}
-				key, size, err := st.Put(v.Reader)
-				if err != nil {
-					return oops.Wrap(err)
-				}
-
-				v.StorageKey = key
-				v.Size = size
-
-				return oops.Wrap(reg.Writer().AddVariant(obj.Key, v))
-			},
 		}
 
 		// 为每个 processor 生成任务
@@ -74,7 +57,7 @@ func scan(parameter ScanParameter) error {
 				}
 			})
 			if submitErrVal != nil {
-				logger.Error("failed to submit task", oops.Wrap(submitErrVal))
+				logger.Error("failed to submit task", slog.String("task error", oops.Wrap(submitErrVal).Error()))
 				submitErr.Store(&submitErrVal)
 				wg.Done() // 提交失败要减少计数
 			}
@@ -93,6 +76,5 @@ func scan(parameter ScanParameter) error {
 		return oops.Wrap(err)
 	}
 
-	logger.Debug("storage idx", slog.AnyValue(st.IndexSnapshot()))
 	return nil
 }

@@ -2,11 +2,9 @@ package registry
 
 import (
 	"errors"
-	"io"
 	"sync/atomic"
 
 	"github.com/daiyuang/spack/internal/constant"
-	"github.com/daiyuang/spack/internal/storage"
 )
 
 var ErrFrozen = errors.New("registry is frozen")
@@ -20,27 +18,12 @@ type OriginalFileInfo struct {
 	Metrics  *Metrics
 }
 
-type VariantFileInfo struct {
-	Ext         string
-	Reader      io.Reader
-	StorageKey  storage.Key
-	VariantType constant.VariantType
-	Size        int64
-	Metrics     *Metrics
-}
-
 var (
 	ErrNotFound = errors.New("not found")
 )
 
 type ViewData struct {
 	Originals []*OriginalFileInfo
-	Variants  []*VariantView
-}
-
-type VariantView struct {
-	OriginalPath string
-	*VariantFileInfo
 }
 
 type Registry interface {
@@ -48,11 +31,7 @@ type Registry interface {
 
 	//READ ONLY
 	GetOriginal(path string) (*OriginalFileInfo, error)
-	GetVariants(originalPath string) ([]*VariantFileInfo, error)
-	HasVariants(originalPath string) bool
-
 	CountOriginals() int
-	CountVariants(originalPath string) int
 	ListOriginals() []*OriginalFileInfo
 
 	ViewData() *ViewData
@@ -63,7 +42,6 @@ type Registry interface {
 
 type Writer interface {
 	RegisterOriginal(info *OriginalFileInfo) error
-	AddVariant(path string, v *VariantFileInfo) error
 }
 type Metrics struct {
 	AccessCount atomic.Int64
