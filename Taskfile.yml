@@ -24,7 +24,10 @@ tasks:
   build:
     desc: 构建当前平台（默认启用 CGO）
     cmds:
-      - go build -o {{.DIST_DIR}}/{{.BIN_NAME}} .
+      - go build -ldflags="-X main.Version={{.GIT_COMMIT}}" -o {{.DIST_DIR}}/{{.BIN_NAME}} .
+    vars:
+      GIT_COMMIT:
+        sh: git log -n 1 --format=%h
 
   build:all:
     desc: 构建所有平台（含 CGO）
@@ -70,8 +73,12 @@ tasks:
           --platform {{.CONTAINER_PLATFORM}} \
           -t {{.DOCKERHUB_REPO}}:alpine \
           -t {{.DOCKERHUB_REPO}}:latest \
+          -t {{.DOCKERHUB_REPO}}:alpine-{{.GIT_COMMIT}} \
           --push \
           .
+    vars:
+      GIT_COMMIT:
+        sh: git log -n 1 --format=%h
 
   build:docker:debian:
     desc: 构建 Debian Slim 运行时镜像
@@ -81,8 +88,12 @@ tasks:
           --target debian \
           --platform {{.CONTAINER_PLATFORM}} \
           -t {{.DOCKERHUB_REPO}}:debian \
+          -t {{.DOCKERHUB_REPO}}:debian-{{.GIT_COMMIT}} \
           --push \
           .
+    vars:
+      GIT_COMMIT:
+        sh: git log -n 1 --format=%h
 
   build:docker:
     desc: build container
