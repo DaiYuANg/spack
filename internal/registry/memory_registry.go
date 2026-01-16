@@ -1,107 +1,144 @@
 package registry
 
 import (
-	"fmt"
-	"sort"
 	"sync"
 
-	"github.com/samber/lo"
-	"github.com/samber/oops"
+	"github.com/daiyuang/spack/internal/model"
 )
 
-type memoryRegistry struct {
-	// 构建期间可写的原始数据结构
-	mu        sync.Mutex
-	originals map[string]*OriginalFileInfo
-
-	// 冻结标记（构建期写、运行期读）
-	frozen bool
-
-	// 冻结之后的快照
-	snapshot ViewData
+// InMemoryRegistry 内存版实现
+type InMemoryRegistry struct {
+	mu      sync.RWMutex
+	nodes   map[string]*model.ObjectNode // key -> node
+	metrics *Metrics
 }
 
-func NewInMemoryRegistry() Registry {
-	return &memoryRegistry{
-		originals: make(map[string]*OriginalFileInfo),
+func NewInMemoryRegistry() *InMemoryRegistry {
+	return &InMemoryRegistry{
+		nodes:   make(map[string]*model.ObjectNode),
+		metrics: &Metrics{},
 	}
 }
 
 // GetOriginal 在运行时读取原始文件信息
-func (r *memoryRegistry) GetOriginal(path string) (*OriginalFileInfo, error) {
-	if !r.frozen {
-		return nil, oops.
-			In("Registry.GetOriginal").
-			With("path", path).
-			Wrap(fmt.Errorf("registry not frozen"))
-	}
-
-	info, ok := lo.Find(r.snapshot.Originals, func(o *OriginalFileInfo) bool {
-		return o.Path == path
-	})
-	if !ok {
-		return nil, oops.
-			In("Registry.GetOriginal").
-			With("path", path).
-			Wrap(ErrNotFound)
-	}
-	return info, nil
-}
-
-func (r *memoryRegistry) CountOriginals() int {
-	if !r.frozen {
-		return 0
-	}
-	return len(r.snapshot.Originals)
-}
-
-func (r *memoryRegistry) ListOriginals() []*OriginalFileInfo {
-	if !r.frozen {
-		return nil
-	}
-	return r.snapshot.Originals
-}
-func (r *memoryRegistry) ViewData() *ViewData {
-	if !r.frozen {
-		return nil
-	}
-	return &r.snapshot
-}
-
-// Freeze builds a read-only snapshot and disables further writes.
-func (r *memoryRegistry) Freeze() error {
+// Register 注册单个 ObjectInfo
+func (r *InMemoryRegistry) Register(info *model.ObjectInfo) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if r.frozen {
-		return ErrFrozen
+	if _, exists := r.nodes[info.Key]; exists {
+		return nil // 已存在则忽略
 	}
 
-	// collect all originals
-	origList := lo.Values(r.originals)
-
-	// sort for stable order
-	sort.Slice(origList, func(i, j int) bool {
-		return origList[i].Path < origList[j].Path
-	})
-
-	// write snapshot
-	r.snapshot = ViewData{
-		Originals: origList,
+	r.nodes[info.Key] = &model.ObjectNode{
+		Info:     info,
+		Parents:  make(map[string]*model.ObjectNode),
+		Children: make(map[string]*model.ObjectNode),
 	}
-
-	// clear original maps (enforce read-only)
-	r.originals = nil
-	r.frozen = true
 
 	return nil
 }
 
-func (r *memoryRegistry) IsFrozen() bool {
-	return r.frozen
+// RegisterParents 将 info 与 parents 建立父子关系
+func (r *InMemoryRegistry) RegisterParents(info *model.ObjectInfo, parents ...*model.ObjectInfo) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	node, ok := r.nodes[info.Key]
+	if !ok {
+		return ErrNotFound
+	}
+
+	for _, p := range parents {
+		parentNode, ok := r.nodes[p.Key]
+		if !ok {
+			// 自动注册 parent
+			parentNode = &model.ObjectNode{
+				Info:     p,
+				Parents:  make(map[string]*model.ObjectNode),
+				Children: make(map[string]*model.ObjectNode),
+			}
+			r.nodes[p.Key] = parentNode
+		}
+
+		node.Parents[p.Key] = parentNode
+		parentNode.Children[info.Key] = node
+	}
+
+	return nil
 }
 
-// Writer 返回构建期写入接口
-func (r *memoryRegistry) Writer() Writer {
-	return &memoryWriter{r}
+// RegisterChildren 将 info 与 children 建立父子关系
+func (r *InMemoryRegistry) RegisterChildren(info *model.ObjectInfo, children ...*model.ObjectInfo) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	node, ok := r.nodes[info.Key]
+	if !ok {
+		return ErrNotFound
+	}
+
+	for _, c := range children {
+		childNode, ok := r.nodes[c.Key]
+		if !ok {
+			childNode = &model.ObjectNode{
+				Info:     c,
+				Parents:  make(map[string]*model.ObjectNode),
+				Children: make(map[string]*model.ObjectNode),
+			}
+			r.nodes[c.Key] = childNode
+		}
+
+		node.Children[c.Key] = childNode
+		childNode.Parents[info.Key] = node
+	}
+
+	return nil
+}
+func (r *InMemoryRegistry) FindByKey(key string) (*model.ObjectInfo, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	node, ok := r.nodes[key]
+	if !ok {
+		return nil, ErrNotFound
+	}
+
+	return node.Info, nil
+}
+
+// FindByPath 与 FindByKey 逻辑一样（如果 Key=Path 可以共用）
+func (r *InMemoryRegistry) FindByPath(path string) (*model.ObjectInfo, error) {
+	return r.FindByKey(path)
+}
+
+// Count 返回注册的对象数量
+func (r *InMemoryRegistry) Count() int {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return len(r.nodes)
+}
+
+// List 返回所有 ObjectInfo
+func (r *InMemoryRegistry) List() []*model.ObjectInfo {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	out := make([]*model.ObjectInfo, 0, len(r.nodes))
+	for _, n := range r.nodes {
+		out = append(out, n.Info)
+	}
+	return out
+}
+
+// ViewData 返回对象快照
+func (r *InMemoryRegistry) ViewData() *ViewData {
+	return &ViewData{
+		Objects: r.List(),
+	}
+}
+
+// Metrics 返回访问统计
+func (r *InMemoryRegistry) Metrics() *Metrics {
+	return r.metrics
 }

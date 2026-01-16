@@ -4,46 +4,40 @@ import (
 	"errors"
 	"sync/atomic"
 
-	"github.com/daiyuang/spack/internal/constant"
+	"github.com/daiyuang/spack/internal/model"
 )
-
-var ErrFrozen = errors.New("registry is frozen")
-
-type OriginalFileInfo struct {
-	Path     string
-	FullPath string
-	Size     int64
-	Hash     string
-	Ext      string
-	Mimetype constant.MimeType
-	Metrics  *Metrics
-}
 
 var (
 	ErrNotFound = errors.New("not found")
 )
 
 type ViewData struct {
-	Originals []*OriginalFileInfo
+	Objects []*model.ObjectInfo
 }
 
 type Registry interface {
-	Writer() Writer
+	// Register 核心注册
+	Register(info *model.ObjectInfo) error
 
-	// GetOriginal READ ONLY
-	GetOriginal(path string) (*OriginalFileInfo, error)
-	CountOriginals() int
-	ListOriginals() []*OriginalFileInfo
+	// RegisterParents 关联关系
+	RegisterParents(info *model.ObjectInfo, parents ...*model.ObjectInfo) error
+	RegisterChildren(info *model.ObjectInfo, children ...*model.ObjectInfo) error
 
+	// FindByKey 查找
+	FindByKey(key string) (*model.ObjectInfo, error)
+	FindByPath(path string) (*model.ObjectInfo, error)
+
+	// Count 遍历
+	Count() int
+	List() []*model.ObjectInfo
 	ViewData() *ViewData
 
-	Freeze() error
-	IsFrozen() bool
+	// Metrics 统计
+	Metrics() *Metrics
+
+	Json() (string, error)
 }
 
-type Writer interface {
-	RegisterOriginal(info *OriginalFileInfo) error
-}
 type Metrics struct {
 	AccessCount atomic.Int64
 	BytesSent   atomic.Int64

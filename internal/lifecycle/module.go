@@ -8,5 +8,6 @@ var Module = fx.Module("lifecycle",
 		register,
 		start,
 		httpLifecycle,
+		startPrint,
 	),
 )

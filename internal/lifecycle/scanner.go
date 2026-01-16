@@ -5,6 +5,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/daiyuang/spack/internal/model"
 	"github.com/daiyuang/spack/internal/processor"
 	"github.com/daiyuang/spack/internal/registry"
 	"github.com/daiyuang/spack/internal/scanner"
@@ -31,14 +32,13 @@ func scan(parameter ScanParameter) error {
 	lo.ForEach(parameter.Pps, func(p processor.Processor, _ int) {
 		logger.Info("Scanners", slog.String("scanner name", p.Name()))
 	})
-	writer := reg.Writer()
 	var wg sync.WaitGroup
 	var submitErr atomic.Pointer[error]
-	err := scannerInstance.Scan(func(obj *scanner.ObjectInfo, hash string) error {
+	err := scannerInstance.Scan(func(obj *model.ObjectInfo, hash string) error {
 		ctx := processor.Context{
 			Obj:      obj,
 			Hash:     hash,
-			Registry: writer,
+			Registry: reg,
 			Open:     obj.Reader,
 		}
 
@@ -69,12 +69,6 @@ func scan(parameter ScanParameter) error {
 		return oops.Wrap(err)
 	}
 	wg.Wait()
-
-	//registry freeze
-	err = reg.Freeze()
-	if err != nil {
-		return oops.Wrap(err)
-	}
 
 	return nil
 }

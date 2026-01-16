@@ -7,6 +7,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/daiyuang/spack/internal/model"
 )
 
 type s3Backend struct {
@@ -19,7 +20,7 @@ func NewS3Backend(client *s3.Client, bucket, prefix string) Backend {
 	return &s3Backend{client: client, bucket: bucket, prefix: prefix}
 }
 
-func (b *s3Backend) Walk(walkFn func(obj *ObjectInfo) error) error {
+func (b *s3Backend) Walk(walkFn func(obj *model.ObjectInfo) error) error {
 	ctx := context.Background()
 	paginator := s3.NewListObjectsV2Paginator(b.client, &s3.ListObjectsV2Input{
 		Bucket: aws.String(b.bucket),
@@ -33,7 +34,7 @@ func (b *s3Backend) Walk(walkFn func(obj *ObjectInfo) error) error {
 		}
 		for _, item := range output.Contents {
 			key := *item.Key
-			obj := &ObjectInfo{
+			obj := &model.ObjectInfo{
 				Key:   key,
 				Size:  aws.ToInt64(item.Size),
 				IsDir: false,
@@ -60,7 +61,7 @@ func (b *s3Backend) Walk(walkFn func(obj *ObjectInfo) error) error {
 	return nil
 }
 
-func (b *s3Backend) Stat(key string) (*ObjectInfo, error) {
+func (b *s3Backend) Stat(key string) (*model.ObjectInfo, error) {
 	// 可以用 HeadObject 获取元数据
 	return nil, fmt.Errorf("not implemented")
 }

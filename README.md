@@ -67,6 +67,42 @@ ENV SPACK_SPA_PATH=/
 ENV SPACK_SPA_LOGGER_LEVEL=info
 ```
 
+┌──────────────────────┐
+│      Bootstrap        │
+│  (启动扫描阶段)       │
+│                      │
+│  LocalFSBackend      │
+│       │              │
+│       ▼              │
+│  OriginProcessor     │
+│       │              │
+│       ▼              │
+│  MemoryRegistry      │  <-- 核心数据中心
+└──────────────────────┘
+│
+│ 数据注册 / 查询
+▼
+┌──────────────────────┐
+│       Finder          │  <-- HTTP 层解耦
+│  (路径 → 文件内容)    │
+│  fallback / lookup    │
+└──────────────────────┘
+│
+▼
+┌──────────────────────┐
+│   Fiber SPA Middleware│
+│                      │
+│  - HTTP 映射          │
+│  - Prometheus 统计    │
+│  - 日志 / ContentType │
+│  - fallback 策略       │
+└──────────────────────┘
+│
+▼
+HTTP Response
+(SendFile / Bytes)
+
+
 ### 📂 Project Index
 
 <details open>

@@ -1,4 +1,4 @@
-package scanner
+package model
 
 import (
 	"io"
@@ -21,7 +21,11 @@ type ObjectInfo struct {
 	Mimetype constant.MimeType
 }
 
-func newObjectInfo(root, fullPath string, info os.FileInfo) (*ObjectInfo, error) {
+func (i *ObjectInfo) MimeString() string {
+	return string(i.Mimetype)
+}
+
+func NewObjectInfo(root, fullPath string, info os.FileInfo) (*ObjectInfo, error) {
 	rel, err := filepath.Rel(root, fullPath)
 	if err != nil {
 		return nil, oops.Wrap(err)

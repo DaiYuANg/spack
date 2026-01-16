@@ -4,8 +4,8 @@ import (
 	"io"
 
 	"github.com/daiyuang/spack/internal/constant"
+	"github.com/daiyuang/spack/internal/model"
 	"github.com/daiyuang/spack/internal/registry"
-	"github.com/daiyuang/spack/internal/scanner"
 )
 
 type VariantPlan struct {
@@ -15,10 +15,10 @@ type VariantPlan struct {
 }
 
 type Context struct {
-	Obj  *scanner.ObjectInfo
+	Obj  *model.ObjectInfo
 	Hash string
 
-	Registry registry.Writer
+	Registry registry.Registry
 
 	Open func() (io.ReadCloser, error)
 }
@@ -27,7 +27,7 @@ type Processor interface {
 	Name() string
 
 	// Match 是否处理该 original
-	Match(o *scanner.ObjectInfo) bool
+	Match(o *model.ObjectInfo) bool
 
 	// Run 真正执行
 	Run(

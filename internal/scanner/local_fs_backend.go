@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/daiyuang/spack/internal/model"
 	"github.com/samber/oops"
 )
 
@@ -20,12 +21,12 @@ func NewLocalFSBackend(root string, logger *slog.Logger) Backend {
 	return &localFSBackend{root: root, logger: logger}
 }
 
-func (b *localFSBackend) Walk(walkFn func(obj *ObjectInfo) error) error {
+func (b *localFSBackend) Walk(walkFn func(obj *model.ObjectInfo) error) error {
 	return filepath.Walk(b.root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return oops.Wrap(err)
 		}
-		obj, err := newObjectInfo(b.root, path, info)
+		obj, err := model.NewObjectInfo(b.root, path, info)
 		if err != nil {
 			return err
 		}
@@ -33,11 +34,11 @@ func (b *localFSBackend) Walk(walkFn func(obj *ObjectInfo) error) error {
 	})
 }
 
-func (b *localFSBackend) Stat(key string) (*ObjectInfo, error) {
+func (b *localFSBackend) Stat(key string) (*model.ObjectInfo, error) {
 	full := filepath.Join(b.root, filepath.FromSlash(key))
 	info, err := os.Stat(full)
 	if err != nil {
 		return nil, oops.Wrap(err)
 	}
-	return newObjectInfo(b.root, full, info)
+	return model.NewObjectInfo(b.root, full, info)
 }
