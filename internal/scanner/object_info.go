@@ -14,6 +14,7 @@ import (
 type ObjectInfo struct {
 	Key      string // 相对路径或对象 key
 	Size     int64
+	FullPath string
 	Reader   func() (io.ReadCloser, error) // 延迟打开 Reader
 	IsDir    bool
 	Metadata map[string]string // 可选字段（MIME、etag 等）
@@ -27,11 +28,11 @@ func newObjectInfo(root, fullPath string, info os.FileInfo) (*ObjectInfo, error)
 	}
 	key := filepath.ToSlash(rel)
 	mimetype := pkg.DetectMIME(fullPath)
-
 	return &ObjectInfo{
-		Key:   key,
-		Size:  info.Size(),
-		IsDir: info.IsDir(),
+		Key:      key,
+		Size:     info.Size(),
+		IsDir:    info.IsDir(),
+		FullPath: fullPath,
 		Reader: func() (io.ReadCloser, error) {
 			if info.IsDir() {
 				return nil, nil

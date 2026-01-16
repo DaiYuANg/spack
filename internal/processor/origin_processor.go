@@ -54,6 +54,7 @@ func (p *OriginProcessor) Run(ctx Context) (int64, error) {
 	info := &registry.OriginalFileInfo{
 		Mimetype: ctx.Obj.Mimetype,
 		Path:     ctx.Obj.Key,
+		FullPath: ctx.Obj.FullPath,
 		Size:     ctx.Obj.Size, // 或者用 size
 		Hash:     ctx.Hash,
 		Ext:      filepath.Ext(ctx.Obj.Key),

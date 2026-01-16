@@ -5,6 +5,7 @@ type Spa struct {
 	//Serve scanner spa config
 	Static string `koanf:"static"`
 	//default load file config like nginx try file
-	Fallback string `koanf:"fallback"`
-	Preload  bool   `koanf:"preload"`
+	Fallback         string `koanf:"fallback"`
+	Preload          bool   `koanf:"preload"`
+	NotFoundFallback bool   `koanf:"not_found_fallback"`
 }

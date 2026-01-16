@@ -34,10 +34,21 @@ func spaMiddleware(dep SpaMiddlewareDependency) {
 		lookup, err := f.Lookup(finder.NewLookupContext(c.Get("Accept-Encoding"), reqPath))
 		if err != nil {
 			log.Error("Find error", slog.Any("error", oops.Wrap(err)))
+			if cfg.Spa.NotFoundFallback {
+				result, err := f.Lookup(finder.NewLookupContext("", cfg.Spa.Fallback))
+				if err != nil {
+					log.Error("Find error", slog.Any("error", oops.Wrap(err)))
+					return fiber.ErrNotFound
+				}
+				c.Set(fiber.HeaderContentType, result.MediaTypeString())
+				return c.Send(result.Data)
+			}
 			return fiber.ErrNotFound
 		}
 
 		incr("not_found")
-		return c.Send(lookup)
+
+		c.Set(fiber.HeaderContentType, lookup.MediaTypeString())
+		return c.Send(lookup.Data)
 	})
 }

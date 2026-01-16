@@ -11,6 +11,7 @@ var ErrFrozen = errors.New("registry is frozen")
 
 type OriginalFileInfo struct {
 	Path     string
+	FullPath string
 	Size     int64
 	Hash     string
 	Ext      string
@@ -29,7 +30,7 @@ type ViewData struct {
 type Registry interface {
 	Writer() Writer
 
-	//READ ONLY
+	// GetOriginal READ ONLY
 	GetOriginal(path string) (*OriginalFileInfo, error)
 	CountOriginals() int
 	ListOriginals() []*OriginalFileInfo

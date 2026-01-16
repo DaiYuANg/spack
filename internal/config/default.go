@@ -7,9 +7,10 @@ func defaultConfig() Config {
 			LowMemory: true,
 		},
 		Spa: Spa{
-			Path:     "/",
-			Fallback: "index.html",
-			Preload:  false,
+			Path:             "/",
+			Fallback:         "index.html",
+			Preload:          false,
+			NotFoundFallback: true,
 		},
 		Logger: Logger{
 			Level: "debug",

@@ -2,8 +2,6 @@ package finder
 
 import (
 	"log/slog"
-	"os"
-	"path/filepath"
 
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/registry"
@@ -33,32 +31,4 @@ func newFinder(dependency Dependency) *Finder {
 		httpRequestsTotal: dependency.HttpRequestsTotal,
 		config:            dependency.Config,
 	}
-}
-
-func (p *Finder) Lookup(ctx LookupContext) ([]byte, error) {
-	p.Info("Lookup", slog.Any("path", ctx.Path))
-
-	// 1️⃣ 尝试 Registry
-	original, err := p.registry.GetOriginal(ctx.Path)
-	if err == nil && original != nil {
-		content, err := os.ReadFile(original.Path)
-		if err == nil {
-			return content, nil
-		}
-		// 如果读取失败，也可以 log 一下
-		p.Warn("Failed to read original file, fallback will be used", slog.String("path", original.Path), slog.StringValue(err.Error()))
-	}
-
-	// 2️⃣ fallback 文件
-	fallbackPath := filepath.Join(p.config.Spa.Static, p.config.Spa.Fallback)
-	if fallbackPath == "" {
-		return nil, err // 没有 fallback，只能返回错误
-	}
-
-	content, err := os.ReadFile(fallbackPath)
-	if err != nil {
-		return nil, err
-	}
-
-	return content, nil
 }
