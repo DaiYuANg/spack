@@ -14,7 +14,7 @@ func (p *Finder) Lookup(ctx LookupOption) (*Result, error) {
 	p.Info("Lookup", slog.Any("path", original.FullPath))
 	content, err := os.ReadFile(original.FullPath)
 	if err != nil {
-		p.Warn("Failed to read original file, fallback will be used", slog.String("path", original.Path), slog.StringValue(err.Error()))
+		p.Warn("Failed to read original file, fallback will be used", slog.String("path", original.Path), slog.String("err", err.Error()))
 		return nil, err
 	}
 	// 如果读取失败，也可以 log 一下

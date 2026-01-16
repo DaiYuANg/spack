@@ -17,7 +17,7 @@ func proxyMiddleware(app *fiber.App, config *config.Config, log *slog.Logger) {
 	app.Use(
 		config.Proxy.Path+"*",
 		func(ctx *fiber.Ctx) error {
-			log.Debug("into proxy %s", ctx.OriginalURL())
+			log.Debug("into proxy", slog.String("url", ctx.OriginalURL()))
 			ctx.Set(constant.PROXY, ctx.OriginalURL())
 			return proxy.Do(ctx, config.Proxy.Target)
 		},

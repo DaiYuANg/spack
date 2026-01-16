@@ -53,7 +53,7 @@ func scan(parameter ScanParameter) error {
 				defer wg.Done()
 				_, err := p.Run(ctx)
 				if err != nil {
-					logger.Error("processor error", oops.Wrap(err))
+					logger.Error("processor error", slog.String("err", oops.Wrap(err).Error()))
 				}
 			})
 			if submitErrVal != nil {
