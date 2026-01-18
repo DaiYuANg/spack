@@ -24,7 +24,7 @@ type SpaMiddlewareDependency struct {
 func spaMiddleware(dep SpaMiddlewareDependency) {
 	app, cfg, logger, total, f := dep.App, dep.Config, dep.Log, dep.HttpRequestsTotal, dep.Finder
 
-	servePath := strings.TrimSpace(cfg.Spa.Path) + "*"
+	servePath := strings.TrimSpace(cfg.Assets.Path) + "*"
 	app.Use(servePath, func(c *fiber.Ctx) error {
 		// ---- 计数器辅助函数 ----
 		incr := func(label string) {
@@ -32,8 +32,8 @@ func spaMiddleware(dep SpaMiddlewareDependency) {
 		}
 
 		// ---- 处理请求路径 ----
-		reqPath := strings.TrimPrefix(c.Path(), "/")       // 去掉前导 /
-		spaPrefix := strings.TrimPrefix(cfg.Spa.Path, "/") // 去掉 SPA 前缀
+		reqPath := strings.TrimPrefix(c.Path(), "/")          // 去掉前导 /
+		spaPrefix := strings.TrimPrefix(cfg.Assets.Path, "/") // 去掉 SPA 前缀
 		lookupPath := strings.TrimPrefix(reqPath, spaPrefix)
 		lookupPath = strings.TrimPrefix(lookupPath, "/") // 保证无多余 /
 
@@ -46,8 +46,8 @@ func spaMiddleware(dep SpaMiddlewareDependency) {
 			logger.Debug("Lookup failed, trying fallback", slog.Any("error", oops.Wrap(err)))
 			incr("not_found")
 
-			if cfg.Spa.NotFoundFallback && cfg.Spa.Fallback != "" {
-				result, err = f.Lookup(finder.NewLookupContext("", strings.TrimPrefix(cfg.Spa.Fallback, "/")))
+			if cfg.Assets.Fallback.On == config.FallbackOnNotFound && cfg.Assets.Fallback.Target != "" {
+				result, err = f.Lookup(finder.NewLookupContext("", strings.TrimPrefix(cfg.Assets.Fallback.Target, "/")))
 				if err != nil {
 					logger.Error("Fallback lookup failed", slog.Any("error", oops.Wrap(err)))
 					return fiber.ErrNotFound

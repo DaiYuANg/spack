@@ -10,7 +10,7 @@ import (
 func startPrint(lc fx.Lifecycle, cfg *config.Config, logger *slog.Logger) {
 	lc.Append(fx.StartHook(func() {
 		localAddress := "http://127.0.0.1:" + cfg.Http.GetPort()
-		accessAddress := localAddress + cfg.Spa.Path
+		accessAddress := localAddress + cfg.Assets.Path
 		logger.Info("Server startup", slog.String("access path", accessAddress))
 	}))
 }

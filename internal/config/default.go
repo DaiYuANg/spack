@@ -6,11 +6,10 @@ func defaultConfig() Config {
 			Port:      80,
 			LowMemory: true,
 		},
-		Spa: Spa{
-			Path:             "/",
-			Fallback:         "index.html",
-			Preload:          false,
-			NotFoundFallback: true,
+		Assets: Assets{
+			Path:     "/",
+			Entry:    "index.html",
+			Fallback: Fallback{On: FallbackOnNotFound, Target: "index.html"},
 		},
 		Logger: Logger{
 			Level: "debug",
