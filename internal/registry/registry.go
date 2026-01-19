@@ -26,7 +26,11 @@ type Registry interface {
 	// FindByKey 查找
 	FindByKey(key string) (*model.ObjectInfo, error)
 	FindByPath(path string) (*model.ObjectInfo, error)
+	// ListChildren 查找指定 key 的所有子节点（可用于查找压缩文件）
+	ListChildren(key string) ([]*model.ObjectInfo, error)
 
+	// ListParents 查找指定 key 的所有父节点（可用于回溯原始文件）
+	ListParents(key string) ([]*model.ObjectInfo, error)
 	// Count 遍历
 	Count() int
 	List() []*model.ObjectInfo

@@ -12,7 +12,7 @@ import (
 	"go.uber.org/fx"
 )
 
-type SpaMiddlewareDependency struct {
+type AssetsMiddlewareDependency struct {
 	fx.In
 	App               *fiber.App
 	Config            *config.Config
@@ -21,7 +21,7 @@ type SpaMiddlewareDependency struct {
 	Finder            *finder.Finder
 }
 
-func spaMiddleware(dep SpaMiddlewareDependency) {
+func assetsMiddleware(dep AssetsMiddlewareDependency) {
 	app, cfg, logger, total, f := dep.App, dep.Config, dep.Log, dep.HttpRequestsTotal, dep.Finder
 
 	servePath := strings.TrimSpace(cfg.Assets.Path) + "*"
@@ -37,11 +37,11 @@ func spaMiddleware(dep SpaMiddlewareDependency) {
 		lookupPath := strings.TrimPrefix(reqPath, spaPrefix)
 		lookupPath = strings.TrimPrefix(lookupPath, "/") // 保证无多余 /
 
-		logger.Debug("SPA request path", slog.String("reqPath", reqPath))
-		logger.Debug("SPA lookup path", slog.String("lookupPath", lookupPath))
+		logger.Debug("Assets request path", slog.String("reqPath", reqPath))
+		logger.Debug("Assets lookup path", slog.String("lookupPath", lookupPath))
 
 		// ---- 查找文件 ----
-		result, err := f.Lookup(finder.NewLookupContext(c.Get("Accept-Encoding"), lookupPath))
+		result, err := f.Lookup(finder.NewLookupContext(c.Get(fiber.HeaderAcceptEncoding), lookupPath))
 		if err != nil {
 			logger.Debug("Lookup failed, trying fallback", slog.Any("error", oops.Wrap(err)))
 			incr("not_found")
@@ -59,8 +59,18 @@ func spaMiddleware(dep SpaMiddlewareDependency) {
 			incr("hit")
 		}
 
-		// ---- 返回结果 ----
-		c.Set(fiber.HeaderContentType, result.MediaTypeString())
+		// ---- 设置响应头 ----
+		c.Set(fiber.HeaderContentType, result.MediaTypeString()) // 原始 MIME
+
+		// ---- 日志 ----
+		logger.Debug("Serving asset",
+			slog.String("path", lookupPath),
+			slog.String("mediaType", result.MediaTypeString()),
+			slog.String("encoding", result.Encoding),
+			slog.Int("size", len(result.Data)),
+		)
+
+		// ---- 返回内容 ----
 		return c.Send(result.Data)
 	})
 }

@@ -15,16 +15,29 @@ var Module = fx.Module("config", fx.Provide(
 	loadConfig,
 ))
 
+type LoadResult struct {
+	fx.Out
+	Config    *Config
+	Debug     *Debug
+	Metrics   *Metrics
+	Logger    *Logger
+	Http      *Http
+	Limit     *Limit
+	Processor *Processor
+	Assets    *Assets
+	Cache     *Cache
+}
+
 func newKoanf() *koanf.Koanf {
 	return koanf.New(".")
 }
 
-func loadConfig(k *koanf.Koanf) (*Config, error) {
+func loadConfig(k *koanf.Koanf) (LoadResult, error) {
 	def := defaultConfig()
 
 	// 加载默认配置
 	if err := k.Load(structs.Provider(def, "koanf"), nil); err != nil {
-		return nil, err
+		return LoadResult{}, err
 	}
 
 	// 使用 lo.Ternary 优化字符串映射函数
@@ -32,12 +45,22 @@ func loadConfig(k *koanf.Koanf) (*Config, error) {
 		return strings.ReplaceAll(strings.ToLower(strings.TrimPrefix(s, constant.EnvPrefix)), "_", ".")
 	}
 	if err := k.Load(env.Provider(constant.EnvPrefix, ".", mapEnvKey), nil); err != nil {
-		return nil, err
+		return LoadResult{}, err
 	}
 
 	if err := k.Unmarshal("", &def); err != nil {
-		return nil, err
+		return LoadResult{}, err
 	}
 
-	return &def, nil
+	return LoadResult{
+		Config:    &def,
+		Assets:    &def.Assets,
+		Cache:     &def.Cache,
+		Debug:     &def.Debug,
+		Http:      &def.Http,
+		Limit:     &def.Limit,
+		Logger:    &def.Logger,
+		Metrics:   &def.Metrics,
+		Processor: &def.Processor,
+	}, nil
 }

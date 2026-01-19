@@ -78,7 +78,7 @@ func (r *InMemoryRegistry) RegisterChildren(info *model.ObjectInfo, children ...
 			}
 			r.nodes.Set(c.Key, childNode)
 		}
-		node.Parents.Set(c.Key, childNode)
+		node.Children.Set(c.Key, childNode) // info 的子节点列表添加 child
 		childNode.Parents.Set(info.Key, node)
 	})
 	return nil
@@ -124,4 +124,30 @@ func (r *InMemoryRegistry) ViewData() *ViewData {
 // Metrics 返回访问统计
 func (r *InMemoryRegistry) Metrics() *Metrics {
 	return r.metrics
+}
+
+func (r *InMemoryRegistry) ListChildren(key string) ([]*model.ObjectInfo, error) {
+	node, ok := r.nodes.Load(key)
+	if !ok {
+		return nil, ErrNotFound
+	}
+
+	children := make([]*model.ObjectInfo, 0, node.Children.Len())
+	for _, childNode := range node.Children.All() {
+		children = append(children, childNode.Info)
+	}
+	return children, nil
+}
+
+func (r *InMemoryRegistry) ListParents(key string) ([]*model.ObjectInfo, error) {
+	node, ok := r.nodes.Load(key)
+	if !ok {
+		return nil, ErrNotFound
+	}
+
+	parents := make([]*model.ObjectInfo, 0, node.Parents.Len())
+	for _, parentNode := range node.Parents.All() {
+		parents = append(parents, parentNode.Info)
+	}
+	return parents, nil
 }

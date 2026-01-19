@@ -3,7 +3,6 @@ package http
 import (
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/etag"
 	expvarmw "github.com/gofiber/fiber/v2/middleware/expvar"
 	"github.com/gofiber/fiber/v2/middleware/healthcheck"
@@ -20,7 +19,6 @@ var middlewareModule = fx.Module(
 	fx.Invoke(
 		requestIdMiddleware,
 		requestMetaMiddleware,
-		compressMiddleware,
 		etagMiddleware,
 		loggerMiddleware,
 		helmetMiddleware,
@@ -28,16 +26,10 @@ var middlewareModule = fx.Module(
 		healthcheckMiddleware,
 		debugMiddleware,
 		registryViewMiddleware,
-		spaMiddleware,
+		assetsMiddleware,
 		recoverMiddleware,
 	),
 )
-
-func compressMiddleware(app *fiber.App) {
-	app.Use(compress.New(compress.Config{
-		Level: compress.LevelBestSpeed,
-	}))
-}
 
 func etagMiddleware(app *fiber.App) {
 	app.Use(etag.New())
@@ -53,12 +45,12 @@ func helmetMiddleware(app *fiber.App) {
 	app.Use(helmet.New())
 }
 
-func debugMiddleware(app *fiber.App, config *config.Config) {
-	if !config.Debug.Enable {
+func debugMiddleware(app *fiber.App, debugCfg *config.Debug) {
+	if !debugCfg.Enable {
 		return
 	}
 	app.Use(expvarmw.New())
-	app.Use(pprof.New(pprof.Config{Prefix: config.Debug.PprofPrefix}))
+	app.Use(pprof.New(pprof.Config{Prefix: debugCfg.PprofPrefix}))
 }
 
 func recoverMiddleware(app *fiber.App) {

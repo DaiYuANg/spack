@@ -28,8 +28,8 @@ require (
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rs/zerolog v1.34.0
 	github.com/samber/lo v1.52.0
-	github.com/samber/oops v1.20.0
-	github.com/samber/oops/loggers/zerolog v0.0.0-20260115113324-2abf8f20931c
+	github.com/samber/oops v1.21.0
+	github.com/samber/oops/loggers/zerolog v0.0.0-20260118214853-5a99d5f9cee9
 	github.com/samber/slog-fiber v1.20.1
 	github.com/samber/slog-zerolog/v2 v2.9.0
 	github.com/spf13/cobra v1.10.2
@@ -97,7 +97,7 @@ require (
 	github.com/chavacava/garif v0.1.0 // indirect
 	github.com/ckaznocha/intrange v0.3.1 // indirect
 	github.com/clipperhouse/stringish v0.1.1 // indirect
-	github.com/clipperhouse/uax29/v2 v2.3.0 // indirect
+	github.com/clipperhouse/uax29/v2 v2.3.1 // indirect
 	github.com/cloudflare/circl v1.6.1 // indirect
 	github.com/creack/pty v1.1.24 // indirect
 	github.com/curioswitch/go-reassign v0.3.0 // indirect
