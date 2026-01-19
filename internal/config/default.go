@@ -21,7 +21,7 @@ func defaultConfig() Config {
 		Processor: Processor{
 			Enable: false,
 		},
-		Metrics: Metrics{Prefix: "premetheus"},
+		Metrics: Metrics{Prefix: "/premetheus"},
 		Debug: Debug{
 			Enable:      true,
 			PprofPrefix: "/pprof",

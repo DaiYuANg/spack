@@ -35,9 +35,9 @@ func assetsMiddleware(dep AssetsMiddlewareDependency) {
 		}
 
 		// ---- 处理请求路径 ----
-		reqPath := strings.TrimPrefix(c.Path(), "/")          // 去掉前导 /
-		spaPrefix := strings.TrimPrefix(cfg.Assets.Path, "/") // 去掉 SPA 前缀
-		lookupPath := strings.TrimPrefix(reqPath, spaPrefix)
+		reqPath := strings.TrimPrefix(c.Path(), "/")             // 去掉前导 /
+		assetsPrefix := strings.TrimPrefix(cfg.Assets.Path, "/") // 去掉 SPA 前缀
+		lookupPath := strings.TrimPrefix(reqPath, assetsPrefix)
 		lookupPath = strings.TrimPrefix(lookupPath, "/") // 保证无多余 /
 
 		logger.Debug("Assets request path", slog.String("reqPath", reqPath))

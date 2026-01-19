@@ -4,11 +4,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/lifecycle"
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/adaptor"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func prometheusMiddleware(dep lifecycle.IndicatorDependency) fiber.Handler {
@@ -24,6 +23,10 @@ func prometheusMiddleware(dep lifecycle.IndicatorDependency) fiber.Handler {
 }
 
 func registerPrometheus(app *fiber.App, dep lifecycle.IndicatorDependency, metricsCfg *config.Metrics) {
-	app.Get(metricsCfg.Prefix, adaptor.HTTPHandler(promhttp.Handler()))
 	app.Use(prometheusMiddleware(dep))
+	prometheus := fiberprometheus.New("my-service-name")
+	prometheus.RegisterAt(app, metricsCfg.Prefix)
+	prometheus.SetSkipPaths([]string{"/ping"})            // Optional: Remove some paths from metrics
+	prometheus.SetIgnoreStatusCodes([]int{401, 403, 404}) // Optional: Skip metrics for these status codes
+	app.Use(prometheus.Middleware)
 }
