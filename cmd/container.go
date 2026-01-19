@@ -4,6 +4,7 @@ import (
 	"log/slog"
 
 	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/eventbus"
 	"github.com/daiyuang/spack/internal/lifecycle"
 	"github.com/daiyuang/spack/internal/logger"
 	"github.com/daiyuang/spack/internal/pool"
@@ -19,6 +20,7 @@ func createContainer(userModules ...fx.Option) *fx.App {
 		logger.Module,
 		processor.Module,
 		lifecycle.Module,
+		eventbus.Module,
 		fx.WithLogger(func(log *slog.Logger) fxevent.Logger {
 			return &fxevent.SlogLogger{Logger: log}
 		}),

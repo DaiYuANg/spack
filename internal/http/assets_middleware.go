@@ -5,10 +5,12 @@ import (
 	"strings"
 
 	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/constant"
 	"github.com/daiyuang/spack/internal/finder"
 	"github.com/gofiber/fiber/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/samber/oops"
+	goeventbus "github.com/stanipetrosyan/go-eventbus"
 	"go.uber.org/fx"
 )
 
@@ -19,6 +21,7 @@ type AssetsMiddlewareDependency struct {
 	Log               *slog.Logger
 	HttpRequestsTotal *prometheus.CounterVec
 	Finder            *finder.Finder
+	EventBus          goeventbus.EventBus
 }
 
 func assetsMiddleware(dep AssetsMiddlewareDependency) {
@@ -58,10 +61,27 @@ func assetsMiddleware(dep AssetsMiddlewareDependency) {
 		} else {
 			incr("hit")
 		}
-
+		logger.Debug("Finder Result", slog.Any("result", result))
 		// ---- 设置响应头 ----
 		c.Set(fiber.HeaderContentType, result.MediaTypeString()) // 原始 MIME
+		// 如果请求了 Accept-Encoding 但是没有找到压缩文件
+		if result.Encoding == "" && c.Get(fiber.HeaderAcceptEncoding) != "" {
+			encodings := result.Encoding
+			if len(encodings) > 0 {
+				options := goeventbus.NewMessageHeadersBuilder().SetHeader("header", "value").Build()
+				message := goeventbus.NewMessageBuilder().SetPayload(map[string]interface{}{
+					"sourceKey": result.Key,
+					"formats":   encodings,
+				}).SetHeaders(options).Build()
+				dep.EventBus.Channel(constant.CompressEvent).Publisher().Publish(message)
+				logger.Debug("Triggered compress event", slog.String("sourceKey", result.Key), slog.Any("formats", encodings))
+			}
+		}
 
+		// 如果返回了压缩文件，设置 Content-Encoding
+		if result.Encoding != "" {
+			c.Set(fiber.HeaderContentEncoding, result.Encoding)
+		}
 		// ---- 日志 ----
 		logger.Debug("Serving asset",
 			slog.String("path", lookupPath),

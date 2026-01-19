@@ -84,6 +84,7 @@ func (p *Finder) Lookup(ctx LookupOption) (*Result, error) {
 	)
 
 	return &Result{
+		Key:       orig.Key,
 		Data:      content,
 		MediaType: orig.Mimetype,    // 始终使用原始 MIME
 		Encoding:  selectedEncoding, // 实际使用的编码

@@ -33,6 +33,7 @@ require (
 	github.com/samber/slog-fiber v1.20.1
 	github.com/samber/slog-zerolog/v2 v2.9.0
 	github.com/spf13/cobra v1.10.2
+	github.com/stanipetrosyan/go-eventbus v0.9.0
 	go.uber.org/fx v1.24.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
