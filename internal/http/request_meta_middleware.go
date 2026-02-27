@@ -5,12 +5,12 @@ import (
 	"strings"
 
 	"github.com/daiyuang/spack/internal/config"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 func requestMeta(cfg *config.Config, httpRequestsTotal *prometheus.CounterVec) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		reqPath := strings.TrimPrefix(c.Path(), "/")
 		fullPath := filepath.Join(cfg.Assets.Root, reqPath)
 

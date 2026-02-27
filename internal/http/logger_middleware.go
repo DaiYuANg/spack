@@ -3,7 +3,7 @@ package http
 import (
 	"log/slog"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	slogfiber "github.com/samber/slog-fiber"
 )
 

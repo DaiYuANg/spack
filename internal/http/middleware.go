@@ -2,14 +2,14 @@ package http
 
 import (
 	"github.com/daiyuang/spack/internal/config"
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/etag"
-	expvarmw "github.com/gofiber/fiber/v2/middleware/expvar"
-	"github.com/gofiber/fiber/v2/middleware/healthcheck"
-	"github.com/gofiber/fiber/v2/middleware/helmet"
-	"github.com/gofiber/fiber/v2/middleware/pprof"
-	recoverer "github.com/gofiber/fiber/v2/middleware/recover"
-	"github.com/gofiber/fiber/v2/middleware/requestid"
+	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/etag"
+	expvarmw "github.com/gofiber/fiber/v3/middleware/expvar"
+	"github.com/gofiber/fiber/v3/middleware/healthcheck"
+	"github.com/gofiber/fiber/v3/middleware/helmet"
+	"github.com/gofiber/fiber/v3/middleware/pprof"
+	recoverer "github.com/gofiber/fiber/v3/middleware/recover"
+	"github.com/gofiber/fiber/v3/middleware/requestid"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/fx"
 )
@@ -22,7 +22,7 @@ var middlewareModule = fx.Module(
 		etagMiddleware,
 		loggerMiddleware,
 		helmetMiddleware,
-		registerPrometheus,
+		//registerPrometheus,
 		healthcheckMiddleware,
 		debugMiddleware,
 		registryViewMiddleware,
@@ -60,7 +60,7 @@ func recoverMiddleware(app *fiber.App) {
 }
 
 func healthcheckMiddleware(app *fiber.App) {
-	app.Get(healthcheck.DefaultLivenessEndpoint, healthcheck.New())
+	app.Get(healthcheck.LivenessEndpoint, healthcheck.New())
 }
 
 func requestMetaMiddleware(app *fiber.App, cfg *config.Config, httpRequestsTotal *prometheus.CounterVec) {

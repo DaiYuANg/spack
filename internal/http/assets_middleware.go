@@ -7,7 +7,7 @@ import (
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/constant"
 	"github.com/daiyuang/spack/internal/finder"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/samber/oops"
 	goeventbus "github.com/stanipetrosyan/go-eventbus"
@@ -28,7 +28,7 @@ func assetsMiddleware(dep AssetsMiddlewareDependency) {
 	app, cfg, logger, total, f := dep.App, dep.Config, dep.Log, dep.HttpRequestsTotal, dep.Finder
 
 	servePath := strings.TrimSpace(cfg.Assets.Path) + "*"
-	app.Use(servePath, func(c *fiber.Ctx) error {
+	app.Use(servePath, func(c fiber.Ctx) error {
 		// ---- 计数器辅助函数 ----
 		incr := func(label string) {
 			total.WithLabelValues(c.Method(), c.Path(), label).Inc()
