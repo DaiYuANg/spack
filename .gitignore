@@ -78,3 +78,5 @@ Temporary Items
 .env
 *.db
 dist
+test/node_modules
+test/build

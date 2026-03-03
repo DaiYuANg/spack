@@ -1,6 +1,7 @@
 package processor
 
 import (
+	"fmt"
 	"io"
 	"path/filepath"
 	"strings"
@@ -54,6 +55,14 @@ func (p *OriginProcessor) Run(ctx Context) (int64, error) {
 				return size, oops.Wrap(err)
 			}
 		}
+	}
+
+	if ctx.Obj.Metadata == nil {
+		ctx.Obj.Metadata = map[string]string{}
+	}
+	if ctx.Hash != "" {
+		ctx.Obj.Metadata["source_hash"] = ctx.Hash
+		ctx.Obj.Metadata["etag"] = fmt.Sprintf("\"%s\"", ctx.Hash)
 	}
 
 	// 判断 rootKey（去掉压缩后缀，如 .gz/.br/.xz 等）

@@ -4,13 +4,12 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/daiyuang/spack/internal/compress"
 	"github.com/daiyuang/spack/internal/config"
-	"github.com/daiyuang/spack/internal/constant"
 	"github.com/daiyuang/spack/internal/finder"
 	"github.com/gofiber/fiber/v3"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/samber/oops"
-	goeventbus "github.com/stanipetrosyan/go-eventbus"
 	"go.uber.org/fx"
 )
 
@@ -21,7 +20,7 @@ type AssetsMiddlewareDependency struct {
 	Log               *slog.Logger
 	HttpRequestsTotal *prometheus.CounterVec
 	Finder            *finder.Finder
-	EventBus          goeventbus.EventBus
+	Compressor        *compress.Service
 }
 
 func assetsMiddleware(dep AssetsMiddlewareDependency) {
@@ -43,14 +42,21 @@ func assetsMiddleware(dep AssetsMiddlewareDependency) {
 		logger.Debug("Assets request path", slog.String("reqPath", reqPath))
 		logger.Debug("Assets lookup path", slog.String("lookupPath", lookupPath))
 
+		acceptEncoding := c.Get(fiber.HeaderAcceptEncoding)
+		isRangeRequest := strings.TrimSpace(c.Get(fiber.HeaderRange)) != ""
+		if isRangeRequest {
+			// v1: Range 请求统一降级到原始文件，避免压缩字节范围处理的复杂性。
+			acceptEncoding = ""
+		}
+
 		// ---- 查找文件 ----
-		result, err := f.Lookup(finder.NewLookupContext(c.Get(fiber.HeaderAcceptEncoding), lookupPath))
+		result, err := f.Lookup(finder.NewLookupContext(acceptEncoding, lookupPath))
 		if err != nil {
 			logger.Debug("Lookup failed, trying fallback", slog.Any("error", oops.Wrap(err)))
 			incr("not_found")
 
 			if cfg.Assets.Fallback.On == config.FallbackOnNotFound && cfg.Assets.Fallback.Target != "" {
-				result, err = f.Lookup(finder.NewLookupContext("", strings.TrimPrefix(cfg.Assets.Fallback.Target, "/")))
+				result, err = f.Lookup(finder.NewLookupContext(acceptEncoding, strings.TrimPrefix(cfg.Assets.Fallback.Target, "/")))
 				if err != nil {
 					logger.Error("Fallback lookup failed", slog.Any("error", oops.Wrap(err)))
 					return fiber.ErrNotFound
@@ -63,19 +69,15 @@ func assetsMiddleware(dep AssetsMiddlewareDependency) {
 		}
 		logger.Debug("Finder Result", slog.Any("result", result))
 		// ---- 设置响应头 ----
-		c.Set(fiber.HeaderContentType, result.MediaTypeString()) // 原始 MIME
-		// 如果请求了 Accept-Encoding 但是没有找到压缩文件
-		if result.Encoding == "" && c.Get(fiber.HeaderAcceptEncoding) != "" {
-			encodings := result.Encoding
-			if len(encodings) > 0 {
-				options := goeventbus.NewMessageHeadersBuilder().SetHeader("header", "value").Build()
-				message := goeventbus.NewMessageBuilder().SetPayload(map[string]interface{}{
-					"sourceKey": result.Key,
-					"formats":   encodings,
-				}).SetHeaders(options).Build()
-				dep.EventBus.Channel(constant.CompressEvent).Publisher().Publish(message)
-				logger.Debug("Triggered compress event", slog.String("sourceKey", result.Key), slog.Any("formats", encodings))
-			}
+		c.Set(fiber.HeaderContentType, result.MediaTypeString()) // 保持原始 MIME
+		c.Append(fiber.HeaderVary, fiber.HeaderAcceptEncoding)
+		if result.ETag != "" {
+			c.Set(fiber.HeaderETag, result.ETag)
+		}
+
+		// 请求可压缩但当前未命中变体时，后台异步生成。
+		if !isRangeRequest && result.Encoding == "" && len(result.AcceptEncoding) > 0 {
+			dep.Compressor.Enqueue(result.Key, result.AcceptEncoding)
 		}
 
 		// 如果返回了压缩文件，设置 Content-Encoding

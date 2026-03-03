@@ -22,8 +22,10 @@ func NewInMemoryRegistry() *InMemoryRegistry {
 // GetOriginal 在运行时读取原始文件信息
 // Register 注册单个 ObjectInfo
 func (r *InMemoryRegistry) Register(info *model.ObjectInfo) error {
-	if _, exists := r.nodes.Load(info.Key); exists {
-		return nil // 已存在则忽略
+	if node, exists := r.nodes.Load(info.Key); exists {
+		// 允许在运行时刷新节点信息（例如同 key 的压缩变体更新）。
+		node.Info = info
+		return nil
 	}
 
 	r.nodes.Set(info.Key, &model.ObjectNode{

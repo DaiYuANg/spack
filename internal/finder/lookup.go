@@ -1,12 +1,14 @@
 package finder
 
 import (
+	"log/slog"
 	"os"
+	"sort"
+	"strconv"
 	"strings"
 
-	"log/slog"
-
 	"github.com/daiyuang/spack/internal/model"
+	"github.com/samber/lo"
 )
 
 // Registry 你已有的接口
@@ -37,21 +39,27 @@ func (p *Finder) Lookup(ctx LookupOption) (*Result, error) {
 		slog.String("mime", string(orig.Mimetype)),
 	)
 
+	requestedEncodings := p.parseAcceptEncoding(ctx.AcceptEncoding)
 	selected := orig
 	selectedEncoding := ""
 
 	// 2️⃣ 如果客户端提供 Accept-Encoding，尝试匹配子节点（压缩文件）
-	if ctx.AcceptEncoding != "" {
-		children, _ := p.registry.ListChildren(orig.Key)
+	if len(requestedEncodings) > 0 {
+		children, err := p.registry.ListChildren(orig.Key)
+		if err != nil {
+			p.Debug("List children failed",
+				slog.String("key", orig.Key),
+				slog.String("err", err.Error()),
+			)
+			children = nil
+		}
 		p.Debug("Found children", slog.Int("count", len(children)))
-
-		encodings := p.parseAcceptEncoding(ctx.AcceptEncoding)
-		p.Debug("Parsed Accept-Encoding", slog.Any("encodings", encodings))
+		p.Debug("Parsed Accept-Encoding", slog.Any("encodings", requestedEncodings))
 
 	loopEnc:
-		for _, enc := range encodings {
+		for _, enc := range requestedEncodings {
 			for _, child := range children {
-				if p.matchesEncoding(enc, child.Key, orig.Key) {
+				if p.isUsableVariant(orig, child, enc) {
 					selected = child
 					selectedEncoding = enc
 					p.Debug("Matched child encoding",
@@ -82,29 +90,146 @@ func (p *Finder) Lookup(ctx LookupOption) (*Result, error) {
 		slog.String("path", selected.FullPath),
 		slog.String("encoding", selectedEncoding),
 	)
+	etag := ""
+	if selected.Metadata != nil {
+		etag = selected.Metadata["etag"]
+	}
+	if etag == "" && orig.Metadata != nil {
+		etag = orig.Metadata["etag"]
+	}
 
 	return &Result{
-		Key:       orig.Key,
-		Data:      content,
-		MediaType: orig.Mimetype,    // 始终使用原始 MIME
-		Encoding:  selectedEncoding, // 实际使用的编码
+		Key:            orig.Key,
+		Data:           content,
+		MediaType:      orig.Mimetype,      // 始终使用原始 MIME
+		Encoding:       selectedEncoding,   // 实际使用的编码
+		AcceptEncoding: requestedEncodings, // 如果未命中可用于后台压缩
+		ETag:           etag,
 	}, nil
 }
 
-// parseAcceptEncoding 简单解析 Accept-Encoding
+// parseAcceptEncoding parses Accept-Encoding and returns preferred supported encodings.
 func (p *Finder) parseAcceptEncoding(header string) []string {
-	if header == "" {
+	if strings.TrimSpace(header) == "" {
 		return nil
 	}
+
+	explicit := make(map[string]float64, 4)
+	wildcardQ := 0.0
+	hasWildcard := false
 	parts := strings.Split(header, ",")
-	out := make([]string, 0, len(parts))
-	for _, part := range parts {
-		enc := strings.TrimSpace(strings.Split(part, ";")[0])
-		if enc != "" {
-			out = append(out, enc)
+	for _, rawPart := range parts {
+		part := strings.TrimSpace(rawPart)
+		if part == "" {
+			continue
+		}
+		fragments := strings.Split(part, ";")
+		enc := strings.ToLower(strings.TrimSpace(fragments[0]))
+		if enc == "" {
+			continue
+		}
+		q := 1.0
+		for _, rawParam := range fragments[1:] {
+			param := strings.TrimSpace(rawParam)
+			if !strings.HasPrefix(strings.ToLower(param), "q=") {
+				continue
+			}
+			v := strings.TrimSpace(strings.TrimPrefix(strings.ToLower(param), "q="))
+			parsed, err := strconv.ParseFloat(v, 64)
+			if err != nil {
+				continue
+			}
+			if parsed < 0 {
+				parsed = 0
+			}
+			if parsed > 1 {
+				parsed = 1
+			}
+			q = parsed
+		}
+		if enc == "*" {
+			wildcardQ = q
+			hasWildcard = true
+			continue
+		}
+		if oldQ, exists := explicit[enc]; !exists || q > oldQ {
+			explicit[enc] = q
 		}
 	}
-	return out
+
+	type candidate struct {
+		encoding string
+		q        float64
+		priority int
+	}
+	supported := []string{"br", "gzip"}
+	candidates := make([]candidate, 0, len(supported))
+	for i, enc := range supported {
+		q, exists := explicit[enc]
+		if !exists {
+			if hasWildcard {
+				q = wildcardQ
+			} else {
+				q = 0
+			}
+		}
+		if q <= 0 {
+			continue
+		}
+		candidates = append(candidates, candidate{
+			encoding: enc,
+			q:        q,
+			priority: i,
+		})
+	}
+	sort.SliceStable(candidates, func(i, j int) bool {
+		if candidates[i].q == candidates[j].q {
+			return candidates[i].priority < candidates[j].priority
+		}
+		return candidates[i].q > candidates[j].q
+	})
+
+	return lo.Map(candidates, func(c candidate, _ int) string {
+		return c.encoding
+	})
+}
+
+func (p *Finder) isUsableVariant(parent, child *model.ObjectInfo, enc string) bool {
+	if !p.matchesEncoding(enc, child.Key, parent.Key) {
+		return false
+	}
+	if child.Metadata != nil {
+		if variantEncoding := strings.ToLower(strings.TrimSpace(child.Metadata["encoding"])); variantEncoding != "" && variantEncoding != enc {
+			return false
+		}
+	}
+
+	if parent.Metadata != nil && child.Metadata != nil {
+		sourceHash := strings.TrimSpace(parent.Metadata["source_hash"])
+		variantSourceHash := strings.TrimSpace(child.Metadata["source_hash"])
+		if sourceHash != "" && variantSourceHash != "" && sourceHash != variantSourceHash {
+			p.Debug("Skip stale variant due to source hash mismatch",
+				slog.String("parent", parent.Key),
+				slog.String("child", child.Key),
+				slog.String("parentHash", sourceHash),
+				slog.String("variantHash", variantSourceHash),
+			)
+			return false
+		}
+	}
+
+	if child.FullPath == "" {
+		return false
+	}
+	if _, err := os.Stat(child.FullPath); err != nil {
+		p.Debug("Skip missing variant file",
+			slog.String("child", child.Key),
+			slog.String("path", child.FullPath),
+			slog.String("err", err.Error()),
+		)
+		return false
+	}
+	return true
 }
 
 // matchesEncoding 判断 childKey 是否是 parentKey 的指定编码版本

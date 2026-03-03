@@ -17,15 +17,16 @@ var Module = fx.Module("config", fx.Provide(
 
 type LoadResult struct {
 	fx.Out
-	Config    *Config
-	Debug     *Debug
-	Metrics   *Metrics
-	Logger    *Logger
-	Http      *Http
-	Limit     *Limit
-	Processor *Processor
-	Assets    *Assets
-	Cache     *Cache
+	Config      *Config
+	Debug       *Debug
+	Metrics     *Metrics
+	Logger      *Logger
+	Http        *Http
+	Limit       *Limit
+	Processor   *Processor
+	Assets      *Assets
+	Cache       *Cache
+	Compression *Compression
 }
 
 func newKoanf() *koanf.Koanf {
@@ -53,14 +54,15 @@ func loadConfig(k *koanf.Koanf) (LoadResult, error) {
 	}
 
 	return LoadResult{
-		Config:    &def,
-		Assets:    &def.Assets,
-		Cache:     &def.Cache,
-		Debug:     &def.Debug,
-		Http:      &def.Http,
-		Limit:     &def.Limit,
-		Logger:    &def.Logger,
-		Metrics:   &def.Metrics,
-		Processor: &def.Processor,
+		Config:      &def,
+		Assets:      &def.Assets,
+		Cache:       &def.Cache,
+		Debug:       &def.Debug,
+		Http:        &def.Http,
+		Limit:       &def.Limit,
+		Logger:      &def.Logger,
+		Metrics:     &def.Metrics,
+		Processor:   &def.Processor,
+		Compression: &def.Compression,
 	}, nil
 }

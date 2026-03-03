@@ -1,0 +1,9 @@
+{
+  "name": "spack-spa-smoke",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "clean": "node scripts/build.mjs --clean"
+  }
+}
