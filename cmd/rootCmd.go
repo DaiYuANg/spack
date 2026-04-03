@@ -1,12 +1,12 @@
 package cmd
 
 import (
-	"github.com/daiyuang/spack/internal/cache"
-	"github.com/daiyuang/spack/internal/finder"
-	"github.com/daiyuang/spack/internal/http"
+	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/metrics"
-	"github.com/daiyuang/spack/internal/registry"
-	"github.com/daiyuang/spack/internal/scanner"
+	"github.com/daiyuang/spack/internal/pipeline"
+	"github.com/daiyuang/spack/internal/resolver"
+	"github.com/daiyuang/spack/internal/server"
+	"github.com/daiyuang/spack/internal/source"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -17,12 +17,12 @@ var rootCmd = &cobra.Command{
 	Use: "spack",
 	PreRun: func(cmd *cobra.Command, args []string) {
 		container = createContainer(
-			cache.Module,
-			registry.Module,
-			scanner.Module,
 			metrics.Module,
-			finder.Module,
-			http.Module,
+			source.Module,
+			artifact.Module,
+			pipeline.Module,
+			resolver.Module,
+			server.Module,
 		)
 	},
 	Run: func(cmd *cobra.Command, args []string) {

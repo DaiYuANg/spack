@@ -29,6 +29,7 @@ Then open:
 - `http://127.0.0.1/`
 - `http://127.0.0.1/docs`
 - `http://127.0.0.1/about`
+- `http://127.0.0.1/catalog`
 
 ## Compression Check
 

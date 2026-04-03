@@ -19,13 +19,11 @@ type LoadResult struct {
 	fx.Out
 	Config      *Config
 	Debug       *Debug
+	Image       *Image
 	Metrics     *Metrics
 	Logger      *Logger
 	Http        *Http
-	Limit       *Limit
-	Processor   *Processor
 	Assets      *Assets
-	Cache       *Cache
 	Compression *Compression
 }
 
@@ -56,13 +54,11 @@ func loadConfig(k *koanf.Koanf) (LoadResult, error) {
 	return LoadResult{
 		Config:      &def,
 		Assets:      &def.Assets,
-		Cache:       &def.Cache,
 		Debug:       &def.Debug,
+		Image:       &def.Image,
 		Http:        &def.Http,
-		Limit:       &def.Limit,
 		Logger:      &def.Logger,
 		Metrics:     &def.Metrics,
-		Processor:   &def.Processor,
 		Compression: &def.Compression,
 	}, nil
 }
