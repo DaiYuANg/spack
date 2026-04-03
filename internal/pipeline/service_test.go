@@ -8,8 +8,7 @@ import (
 	"testing"
 	"time"
 
-	collectionmapping "github.com/DaiYuANg/arcgo/collectionx/mapping"
-	collectionset "github.com/DaiYuANg/arcgo/collectionx/set"
+	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 )
@@ -22,20 +21,20 @@ func TestEnqueueDeduplicatesRequests(t *testing.T) {
 		},
 		logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
 		tasks:   make(chan Request, 2),
-		pending: collectionset.NewSet[string](),
+		pending: collectionx.NewSet[string](),
 	}
 
 	svc.Enqueue(Request{
 		AssetPath:          "hero.png",
-		PreferredEncodings: []string{"gzip", "br"},
-		PreferredFormats:   []string{"jpeg", "png"},
-		PreferredWidths:    []int{1280, 640},
+		PreferredEncodings: collectionx.NewList("gzip", "br"),
+		PreferredFormats:   collectionx.NewList("jpeg", "png"),
+		PreferredWidths:    collectionx.NewList(1280, 640),
 	})
 	svc.Enqueue(Request{
 		AssetPath:          "hero.png",
-		PreferredEncodings: []string{"br", "gzip"},
-		PreferredFormats:   []string{"png", "jpeg"},
-		PreferredWidths:    []int{640, 1280},
+		PreferredEncodings: collectionx.NewList("br", "gzip"),
+		PreferredFormats:   collectionx.NewList("png", "jpeg"),
+		PreferredWidths:    collectionx.NewList(640, 1280),
 	})
 
 	if len(svc.tasks) != 1 {
@@ -54,7 +53,7 @@ func TestEnqueueDropsWhenQueueFull(t *testing.T) {
 		},
 		logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
 		tasks:   make(chan Request, 1),
-		pending: collectionset.NewSet[string](),
+		pending: collectionx.NewSet[string](),
 	}
 
 	svc.Enqueue(Request{AssetPath: "a.js"})
@@ -97,8 +96,8 @@ func TestCleanupArtifactsRemovesExpiredVariants(t *testing.T) {
 		catalog:                cat,
 		cleanupDefaultMaxAge:   time.Hour,
 		cleanupMaxCacheBytes:   0,
-		cleanupNamespaceMaxAge: collectionmapping.NewMap[string, time.Duration](),
-		variantHits:            collectionmapping.NewMap[string, time.Time](),
+		cleanupNamespaceMaxAge: collectionx.NewMap[string, time.Duration](),
+		variantHits:            collectionx.NewMap[string, time.Time](),
 	}
 
 	result := svc.cleanupArtifacts(time.Now())
@@ -108,7 +107,7 @@ func TestCleanupArtifactsRemovesExpiredVariants(t *testing.T) {
 	if _, err := os.Stat(expiredPath); !os.IsNotExist(err) {
 		t.Fatalf("expected expired file removed, err=%v", err)
 	}
-	if len(cat.ListVariants("app.js")) != 0 {
+	if cat.ListVariants("app.js").Len() != 0 {
 		t.Fatalf("expected variant removed from catalog, got %#v", cat.ListVariants("app.js"))
 	}
 }
@@ -156,8 +155,8 @@ func TestCleanupArtifactsEnforcesMaxCacheBytes(t *testing.T) {
 		catalog:                cat,
 		cleanupDefaultMaxAge:   0,
 		cleanupMaxCacheBytes:   16,
-		cleanupNamespaceMaxAge: collectionmapping.NewMap[string, time.Duration](),
-		variantHits:            collectionmapping.NewMap[string, time.Time](),
+		cleanupNamespaceMaxAge: collectionx.NewMap[string, time.Duration](),
+		variantHits:            collectionx.NewMap[string, time.Time](),
 	}
 
 	result := svc.cleanupArtifacts(time.Now())
@@ -171,7 +170,8 @@ func TestCleanupArtifactsEnforcesMaxCacheBytes(t *testing.T) {
 		t.Fatalf("expected newest file retained, err=%v", err)
 	}
 	variants := cat.ListVariants("bundle.js")
-	if len(variants) != 1 || variants[0].Encoding != "gzip" {
+	first, ok := variants.GetFirst()
+	if !ok || variants.Len() != 1 || first.Encoding != "gzip" {
 		t.Fatalf("expected only gzip variant retained, got %#v", variants)
 	}
 }
@@ -204,10 +204,10 @@ func TestCleanupArtifactsUsesNamespaceMaxAge(t *testing.T) {
 		logger:               slog.New(slog.NewTextHandler(io.Discard, nil)),
 		catalog:              cat,
 		cleanupDefaultMaxAge: 24 * time.Hour,
-		cleanupNamespaceMaxAge: collectionmapping.NewMapFrom(map[string]time.Duration{
+		cleanupNamespaceMaxAge: collectionx.NewMapFrom(map[string]time.Duration{
 			"image": time.Hour,
 		}),
-		variantHits: collectionmapping.NewMap[string, time.Time](),
+		variantHits: collectionx.NewMap[string, time.Time](),
 	}
 
 	result := svc.cleanupArtifacts(time.Now())
@@ -247,10 +247,10 @@ func TestCleanupArtifactsKeepsHotVariant(t *testing.T) {
 		logger:               slog.New(slog.NewTextHandler(io.Discard, nil)),
 		catalog:              cat,
 		cleanupDefaultMaxAge: time.Hour,
-		variantHits: collectionmapping.NewMapFrom(map[string]time.Time{
+		variantHits: collectionx.NewMapFrom(map[string]time.Time{
 			oldPath: time.Now(),
 		}),
-		cleanupNamespaceMaxAge: collectionmapping.NewMap[string, time.Duration](),
+		cleanupNamespaceMaxAge: collectionx.NewMap[string, time.Duration](),
 	}
 
 	result := svc.cleanupArtifacts(time.Now())

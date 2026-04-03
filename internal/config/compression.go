@@ -4,6 +4,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/DaiYuANg/arcgo/collectionx"
 )
 
 const (
@@ -72,13 +74,13 @@ func (c Compression) ParsedMaxAge() time.Duration {
 	return parseFlexibleDuration(c.MaxAge)
 }
 
-func (c Compression) NamespaceMaxAges() map[string]time.Duration {
-	out := make(map[string]time.Duration, 2)
+func (c Compression) NamespaceMaxAges() collectionx.Map[string, time.Duration] {
+	out := collectionx.NewMapWithCapacity[string, time.Duration](2)
 	if d := parseFlexibleDuration(c.EncodingMaxAge); d > 0 {
-		out["encoding"] = d
+		out.Set("encoding", d)
 	}
 	if d := parseFlexibleDuration(c.ImageMaxAge); d > 0 {
-		out["image"] = d
+		out.Set("image", d)
 	}
 	return out
 }

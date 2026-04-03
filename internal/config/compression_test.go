@@ -52,11 +52,13 @@ func TestCompressionNamespaceMaxAges(t *testing.T) {
 		ImageMaxAge:    "72h",
 	}
 	got := cfg.NamespaceMaxAges()
-	if got["encoding"] != 24*time.Hour {
-		t.Fatalf("expected encoding max age 24h, got %s", got["encoding"])
+	encodingMaxAge, ok := got.Get("encoding")
+	if !ok || encodingMaxAge != 24*time.Hour {
+		t.Fatalf("expected encoding max age 24h, got %s", encodingMaxAge)
 	}
-	if got["image"] != 72*time.Hour {
-		t.Fatalf("expected image max age 72h, got %s", got["image"])
+	imageMaxAge, ok := got.Get("image")
+	if !ok || imageMaxAge != 72*time.Hour {
+		t.Fatalf("expected image max age 72h, got %s", imageMaxAge)
 	}
 
 	cfg = Compression{
@@ -64,7 +66,7 @@ func TestCompressionNamespaceMaxAges(t *testing.T) {
 		ImageMaxAge:    "0",
 	}
 	got = cfg.NamespaceMaxAges()
-	if len(got) != 0 {
+	if got.Len() != 0 {
 		t.Fatalf("expected empty namespace max ages, got %#v", got)
 	}
 }

@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
@@ -57,7 +58,7 @@ func TestCompressionStagePlanSkipsExistingVariant(t *testing.T) {
 
 	tasks := stage.Plan(asset, Request{
 		AssetPath:          asset.Path,
-		PreferredEncodings: []string{"br", "gzip"},
+		PreferredEncodings: collectionx.NewList("br", "gzip"),
 	})
 	if len(tasks) != 1 {
 		t.Fatalf("expected one task, got %d", len(tasks))
@@ -139,7 +140,7 @@ func TestImageStagePlanSchedulesWidthVariant(t *testing.T) {
 		Catalog: cat,
 	}).(*imageStage)
 
-	tasks := stage.Plan(asset, Request{AssetPath: asset.Path, PreferredWidths: []int{640}})
+	tasks := stage.Plan(asset, Request{AssetPath: asset.Path, PreferredWidths: collectionx.NewList(640)})
 	if len(tasks) != 1 || tasks[0].Width != 640 {
 		t.Fatalf("unexpected image tasks: %#v", tasks)
 	}
@@ -169,7 +170,7 @@ func TestImageStagePlanSchedulesFormatVariant(t *testing.T) {
 
 	tasks := stage.Plan(asset, Request{
 		AssetPath:        asset.Path,
-		PreferredFormats: []string{"jpeg"},
+		PreferredFormats: collectionx.NewList("jpeg"),
 	})
 	if len(tasks) != 1 {
 		t.Fatalf("expected one format task, got %d", len(tasks))

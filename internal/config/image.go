@@ -1,9 +1,11 @@
 package config
 
 import (
-	"slices"
+	"cmp"
 	"strconv"
 	"strings"
+
+	"github.com/DaiYuANg/arcgo/collectionx"
 )
 
 type Image struct {
@@ -12,29 +14,22 @@ type Image struct {
 	JPEGQuality int    `koanf:"jpeg_quality"`
 }
 
-func (i Image) ParsedWidths() []int {
+func (i Image) ParsedWidths() collectionx.List[int] {
 	if strings.TrimSpace(i.Widths) == "" {
-		return nil
+		return collectionx.NewList[int]()
 	}
 
-	parts := strings.Split(i.Widths, ",")
-	out := make([]int, 0, len(parts))
-	for _, part := range parts {
+	widths := collectionx.FilterMapList(collectionx.NewList(strings.Split(i.Widths, ",")...), func(_ int, part string) (int, bool) {
 		width, err := strconv.Atoi(strings.TrimSpace(part))
 		if err != nil || width <= 0 {
-			continue
+			return 0, false
 		}
-		out = append(out, width)
+		return width, true
+	})
+	if widths.IsEmpty() {
+		return widths
 	}
-	slices.Sort(out)
 
-	unique := out[:0]
-	var last int
-	for index, width := range out {
-		if index == 0 || width != last {
-			unique = append(unique, width)
-			last = width
-		}
-	}
-	return unique
+	widths.Sort(cmp.Compare[int])
+	return collectionx.NewList(collectionx.NewOrderedSet(widths.Values()...).Values()...)
 }

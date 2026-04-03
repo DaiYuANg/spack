@@ -1,16 +1,15 @@
 package resolver
 
 import (
+	"cmp"
 	"errors"
 	"log/slog"
 	"os"
 	"path"
-	"sort"
 	"strconv"
 	"strings"
 
-	collectionmapping "github.com/DaiYuANg/arcgo/collectionx/mapping"
-	collectionset "github.com/DaiYuANg/arcgo/collectionx/set"
+	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 )
@@ -33,9 +32,9 @@ type Result struct {
 	MediaType          string
 	ContentEncoding    string
 	ETag               string
-	PreferredEncodings []string
-	PreferredWidths    []int
-	PreferredFormats   []string
+	PreferredEncodings collectionx.List[string]
+	PreferredWidths    collectionx.List[int]
+	PreferredFormats   collectionx.List[string]
 	FallbackUsed       bool
 }
 
@@ -76,7 +75,7 @@ func (r *Resolver) Resolve(request Request) (*Result, error) {
 	encodings := parseAcceptEncoding(request.AcceptEncoding)
 	requestedFormat := normalizeImageFormat(request.Format)
 	preferredImageFormats := preferredImageFormats(request.Accept, requestedFormat, asset.MediaType)
-	if request.Width > 0 || len(preferredImageFormats) > 0 {
+	if request.Width > 0 || preferredImageFormats.Len() > 0 {
 		if variant := r.pickImageVariant(asset, request.Width, preferredImageFormats); variant != nil {
 			return &Result{
 				Asset:        asset,
@@ -89,7 +88,7 @@ func (r *Resolver) Resolve(request Request) (*Result, error) {
 		}
 	}
 
-	if !request.RangeRequested && len(encodings) > 0 {
+	if !request.RangeRequested && encodings.Len() > 0 {
 		if variant := r.pickVariant(asset, encodings); variant != nil {
 			return &Result{
 				Asset:           asset,
@@ -116,10 +115,16 @@ func (r *Resolver) Resolve(request Request) (*Result, error) {
 }
 
 func (r *Resolver) findAsset(requestPath string) (*catalog.Asset, bool) {
-	for _, candidate := range candidates(requestPath, r.cfg.Entry) {
-		if asset, ok := r.catalog.FindAsset(candidate); ok {
-			return asset, false
+	var asset *catalog.Asset
+	candidates(requestPath, r.cfg.Entry).Range(func(_ int, candidate string) bool {
+		if found, ok := r.catalog.FindAsset(candidate); ok {
+			asset = found
+			return false
 		}
+		return true
+	})
+	if asset != nil {
+		return asset, false
 	}
 
 	if r.cfg.Fallback.On == config.FallbackOnNotFound {
@@ -133,105 +138,76 @@ func (r *Resolver) findAsset(requestPath string) (*catalog.Asset, bool) {
 	return nil, false
 }
 
-func (r *Resolver) pickVariant(asset *catalog.Asset, encodings []string) *catalog.Variant {
+func (r *Resolver) pickVariant(asset *catalog.Asset, encodings collectionx.List[string]) *catalog.Variant {
 	variants := r.catalog.ListVariants(asset.Path)
-	for _, encoding := range encodings {
-		for _, variant := range variants {
-			if variant.Encoding != encoding {
-				continue
-			}
-			if asset.SourceHash != "" && variant.SourceHash != "" && variant.SourceHash != asset.SourceHash {
-				continue
-			}
-			if variant.ArtifactPath == "" {
-				continue
-			}
-			if _, err := os.Stat(variant.ArtifactPath); err != nil {
-				continue
-			}
-			return variant
-		}
-	}
-	return nil
+
+	var picked *catalog.Variant
+	encodings.Range(func(_ int, encoding string) bool {
+		picked, _ = variants.FirstWhere(func(_ int, variant *catalog.Variant) bool {
+			return variant.Encoding == encoding && isUsableVariant(variant, asset.SourceHash)
+		}).Get()
+		return picked == nil
+	})
+	return picked
 }
 
-func (r *Resolver) pickImageVariant(asset *catalog.Asset, width int, formats []string) *catalog.Variant {
+func (r *Resolver) pickImageVariant(asset *catalog.Asset, width int, formats collectionx.List[string]) *catalog.Variant {
 	sourceFormat := imageFormat(asset.MediaType)
-
-	var candidates []*catalog.Variant
-	for _, variant := range r.catalog.ListVariants(asset.Path) {
+	candidates := r.catalog.ListVariants(asset.Path).Where(func(_ int, variant *catalog.Variant) bool {
 		if variant.Width <= 0 && variant.Format == "" {
-			continue
+			return false
 		}
-		if asset.SourceHash != "" && variant.SourceHash != "" && variant.SourceHash != asset.SourceHash {
-			continue
-		}
-		if variant.ArtifactPath == "" {
-			continue
-		}
-		if _, err := os.Stat(variant.ArtifactPath); err != nil {
-			continue
-		}
-		candidates = append(candidates, variant)
-	}
-	if len(candidates) == 0 {
+		return isUsableVariant(variant, asset.SourceHash)
+	})
+	if candidates.IsEmpty() {
 		return nil
 	}
 
-	if len(formats) == 0 {
-		formats = []string{imageFormat(asset.MediaType)}
+	if formats.IsEmpty() {
+		formats = collectionx.NewList(sourceFormat)
 	}
 
-	for _, format := range formats {
-		var byFormat []*catalog.Variant
-		for _, candidate := range candidates {
-			candidateFormat := candidate.Format
-			if candidateFormat == "" {
-				candidateFormat = sourceFormat
-			}
-			if format == "" || candidateFormat == format {
-				byFormat = append(byFormat, candidate)
-			}
-		}
-		if len(byFormat) == 0 {
-			continue
+	var picked *catalog.Variant
+	formats.Range(func(_ int, format string) bool {
+		byFormat := candidates.Where(func(_ int, candidate *catalog.Variant) bool {
+			return format == "" || variantFormat(candidate, sourceFormat) == format
+		})
+		if byFormat.IsEmpty() {
+			return true
 		}
 
 		if width <= 0 {
-			for _, candidate := range byFormat {
-				if candidate.Width == 0 {
-					return candidate
-				}
-			}
-			continue
+			picked, _ = byFormat.FirstWhere(func(_ int, candidate *catalog.Variant) bool {
+				return candidate.Width == 0
+			}).Get()
+			return picked == nil
 		}
 
-		sort.Slice(byFormat, func(i, j int) bool {
-			return byFormat[i].Width < byFormat[j].Width
+		byFormat.Sort(func(left, right *catalog.Variant) int {
+			return cmp.Compare(left.Width, right.Width)
 		})
-		for _, candidate := range byFormat {
-			if candidate.Width >= width {
-				return candidate
-			}
+		picked, _ = byFormat.FirstWhere(func(_ int, candidate *catalog.Variant) bool {
+			return candidate.Width >= width
+		}).Get()
+		if picked != nil {
+			return false
 		}
-		return byFormat[len(byFormat)-1]
-	}
 
-	if width <= 0 {
-		return nil
-	}
-	return nil
+		picked, _ = byFormat.GetLast()
+		return picked == nil
+	})
+	return picked
 }
 
-func candidates(requestPath, entry string) []string {
+func candidates(requestPath, entry string) collectionx.List[string] {
 	normalized := normalizeAssetPath(requestPath)
 	if normalized == "" {
-		return []string{entry}
+		return collectionx.NewList(entry)
 	}
 
-	result := []string{normalized}
+	result := collectionx.NewList(normalized)
 	if strings.HasSuffix(strings.TrimSpace(requestPath), "/") || path.Ext(normalized) == "" {
-		result = append(result, path.Join(normalized, entry))
+		result.Add(path.Join(normalized, entry))
 	}
 	return uniqueStrings(result)
 }
@@ -250,12 +226,12 @@ func normalizeAssetPath(raw string) string {
 	return strings.TrimPrefix(clean, "/")
 }
 
-func parseAcceptEncoding(header string) []string {
+func parseAcceptEncoding(header string) collectionx.List[string] {
 	if strings.TrimSpace(header) == "" {
-		return nil
+		return collectionx.NewList[string]()
 	}
 
-	explicit := collectionmapping.NewMapWithCapacity[string, float64](4)
+	explicit := collectionx.NewMapWithCapacity[string, float64](4)
 	wildcardQ := 0.0
 	hasWildcard := false
 	for _, rawPart := range strings.Split(header, ",") {
@@ -305,54 +281,71 @@ func parseAcceptEncoding(header string) []string {
 		priority int
 	}
 
-	supported := []string{"br", "gzip"}
-	choices := make([]candidate, 0, len(supported))
-	for index, encoding := range supported {
+	supported := collectionx.NewList("br", "gzip")
+	choices := collectionx.NewListWithCapacity[candidate](supported.Len())
+	supported.Range(func(index int, encoding string) bool {
 		q, ok := explicit.Get(encoding)
 		if !ok {
 			if !hasWildcard {
-				continue
+				return true
 			}
 			q = wildcardQ
 		}
 		if q <= 0 {
-			continue
+			return true
 		}
-		choices = append(choices, candidate{
+		choices.Add(candidate{
 			encoding: encoding,
 			q:        q,
 			priority: index,
 		})
-	}
-
-	sort.SliceStable(choices, func(i, j int) bool {
-		if choices[i].q == choices[j].q {
-			return choices[i].priority < choices[j].priority
-		}
-		return choices[i].q > choices[j].q
+		return true
 	})
 
-	out := make([]string, 0, len(choices))
-	for _, choice := range choices {
-		out = append(out, choice.encoding)
-	}
-	return out
+	choices.Sort(func(left, right candidate) int {
+		if left.q == right.q {
+			return cmp.Compare(left.priority, right.priority)
+		}
+		if left.q > right.q {
+			return -1
+		}
+		return 1
+	})
+
+	return collectionx.MapList(choices, func(_ int, choice candidate) string {
+		return choice.encoding
+	})
 }
 
-func uniqueStrings(values []string) []string {
-	seen := collectionset.NewSetWithCapacity[string](len(values))
-	out := make([]string, 0, len(values))
-	for _, value := range values {
+func uniqueStrings(values collectionx.List[string]) collectionx.List[string] {
+	ordered := collectionx.NewOrderedSetWithCapacity[string](values.Len())
+	values.Each(func(_ int, value string) {
 		if value == "" {
-			continue
+			return
 		}
-		if seen.Contains(value) {
-			continue
-		}
-		seen.Add(value)
-		out = append(out, value)
+		ordered.Add(value)
+	})
+	return collectionx.NewList(ordered.Values()...)
+}
+
+func isUsableVariant(variant *catalog.Variant, assetSourceHash string) bool {
+	if variant == nil || strings.TrimSpace(variant.ArtifactPath) == "" {
+		return false
 	}
-	return out
+	if assetSourceHash != "" && variant.SourceHash != "" && variant.SourceHash != assetSourceHash {
+		return false
+	}
+	if _, err := os.Stat(variant.ArtifactPath); err != nil {
+		return false
+	}
+	return true
+}
+
+func variantFormat(variant *catalog.Variant, sourceFormat string) string {
+	if variant == nil || strings.TrimSpace(variant.Format) == "" {
+		return sourceFormat
+	}
+	return variant.Format
 }
 
 func firstNonEmpty(values ...string) string {
@@ -364,19 +357,19 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func preferredWidths(width int) []int {
+func preferredWidths(width int) collectionx.List[int] {
 	if width <= 0 {
-		return nil
+		return collectionx.NewList[int]()
 	}
-	return []int{width}
+	return collectionx.NewList(width)
 }
 
-func preferredImageFormats(acceptHeader string, explicitFormat string, sourceMediaType string) []string {
+func preferredImageFormats(acceptHeader string, explicitFormat string, sourceMediaType string) collectionx.List[string] {
 	if explicitFormat != "" {
-		return []string{explicitFormat}
+		return collectionx.NewList(explicitFormat)
 	}
 	if !isImageMediaType(sourceMediaType) {
-		return nil
+		return collectionx.NewList[string]()
 	}
 	return parseAcceptImageFormats(acceptHeader, imageFormat(sourceMediaType))
 }
@@ -407,12 +400,12 @@ func isImageMediaType(mediaType string) bool {
 	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(mediaType)), "image/")
 }
 
-func parseAcceptImageFormats(header string, sourceFormat string) []string {
+func parseAcceptImageFormats(header string, sourceFormat string) collectionx.List[string] {
 	if strings.TrimSpace(header) == "" {
-		return nil
+		return collectionx.NewList[string]()
 	}
 
-	explicit := collectionmapping.NewMapWithCapacity[string, float64](4)
+	explicit := collectionx.NewMapWithCapacity[string, float64](4)
 	wildcardImageQ := 0.0
 	hasWildcardImage := false
 	wildcardAnyQ := 0.0
@@ -473,9 +466,9 @@ func parseAcceptImageFormats(header string, sourceFormat string) []string {
 		priority int
 	}
 
-	supported := []string{"jpeg", "png"}
-	candidates := make([]candidate, 0, len(supported))
-	for index, format := range supported {
+	supported := collectionx.NewList("jpeg", "png")
+	candidates := collectionx.NewListWithCapacity[candidate](supported.Len())
+	supported.Range(func(index int, format string) bool {
 		q, ok := explicit.Get(format)
 		if !ok {
 			if hasWildcardImage {
@@ -487,29 +480,31 @@ func parseAcceptImageFormats(header string, sourceFormat string) []string {
 			}
 		}
 		if q <= 0 {
-			continue
+			return true
 		}
 		priority := index
 		if format == sourceFormat {
 			priority = -1
 		}
-		candidates = append(candidates, candidate{
+		candidates.Add(candidate{
 			format:   format,
 			q:        q,
 			priority: priority,
 		})
-	}
-
-	sort.SliceStable(candidates, func(i, j int) bool {
-		if candidates[i].q == candidates[j].q {
-			return candidates[i].priority < candidates[j].priority
-		}
-		return candidates[i].q > candidates[j].q
+		return true
 	})
 
-	out := make([]string, 0, len(candidates))
-	for _, candidate := range candidates {
-		out = append(out, candidate.format)
-	}
-	return out
+	candidates.Sort(func(left, right candidate) int {
+		if left.q == right.q {
+			return cmp.Compare(left.priority, right.priority)
+		}
+		if left.q > right.q {
+			return -1
+		}
+		return 1
+	})
+
+	return collectionx.MapList(candidates, func(_ int, candidate candidate) string {
+		return candidate.format
+	})
 }

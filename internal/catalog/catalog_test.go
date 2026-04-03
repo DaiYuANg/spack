@@ -47,7 +47,7 @@ func TestDeleteVariantByArtifactPath(t *testing.T) {
 	if cat.DeleteVariantByArtifactPath(artifactPath) {
 		t.Fatal("expected second delete to return false")
 	}
-	if len(cat.ListVariants("app.js")) != 0 {
+	if cat.ListVariants("app.js").Len() != 0 {
 		t.Fatalf("expected no variants, got %#v", cat.ListVariants("app.js"))
 	}
 }

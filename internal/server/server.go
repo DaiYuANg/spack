@@ -86,7 +86,7 @@ func newServer(
 			return fiber.ErrNotFound
 		}
 
-		if len(result.PreferredEncodings) > 0 || len(result.PreferredWidths) > 0 || len(result.PreferredFormats) > 0 {
+		if result.PreferredEncodings.Len() > 0 || result.PreferredWidths.Len() > 0 || result.PreferredFormats.Len() > 0 {
 			pipelineSvc.Enqueue(pipeline.Request{
 				AssetPath:          result.Asset.Path,
 				PreferredEncodings: result.PreferredEncodings,

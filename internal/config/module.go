@@ -44,10 +44,12 @@ func setupConfig(c *dix.Container, _ dix.Lifecycle) error {
 }
 
 func loadConfig() (*Config, error) {
-	def := defaultConfig()
-	loaded, err := configx.LoadTErr[Config](
-		configx.WithTypedDefaults(def),
+	loaded := defaultConfig()
+	err := configx.Load(
+		&loaded,
 		configx.WithEnvPrefix(constant.EnvPrefix),
+		configx.WithIgnoreDotenvError(true),
+		configx.WithDotenv(),
 	)
 	if err != nil {
 		return nil, err

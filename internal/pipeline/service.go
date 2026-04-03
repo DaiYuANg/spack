@@ -1,18 +1,17 @@
 package pipeline
 
 import (
+	"cmp"
 	"context"
 	"log/slog"
 	"os"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	collectionmapping "github.com/DaiYuANg/arcgo/collectionx/mapping"
-	collectionset "github.com/DaiYuANg/arcgo/collectionx/set"
+	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
@@ -29,7 +28,7 @@ type Service struct {
 	tasks     chan Request
 	wg        sync.WaitGroup
 	sf        singleflight.Group
-	pending   *collectionset.Set[string]
+	pending   collectionx.Set[string]
 	pendingMu sync.Mutex
 
 	cleanupMu   sync.Mutex
@@ -37,10 +36,10 @@ type Service struct {
 	cleanupDone chan struct{}
 
 	hitMu       sync.Mutex
-	variantHits *collectionmapping.Map[string, time.Time]
+	variantHits collectionx.Map[string, time.Time]
 
 	cleanupDefaultMaxAge   time.Duration
-	cleanupNamespaceMaxAge *collectionmapping.Map[string, time.Duration]
+	cleanupNamespaceMaxAge collectionx.Map[string, time.Duration]
 	cleanupMaxCacheBytes   int64
 }
 
@@ -68,10 +67,10 @@ func newService(
 		metrics:                metrics,
 		stages:                 stages,
 		tasks:                  make(chan Request, queueSize),
-		pending:                collectionset.NewSetWithCapacity[string](queueSize),
-		variantHits:            collectionmapping.NewMapWithCapacity[string, time.Time](queueSize),
+		pending:                collectionx.NewSetWithCapacity[string](queueSize),
+		variantHits:            collectionx.NewMapWithCapacity[string, time.Time](queueSize),
 		cleanupDefaultMaxAge:   cfg.ParsedMaxAge(),
-		cleanupNamespaceMaxAge: collectionmapping.NewMapFrom(cfg.NamespaceMaxAges()),
+		cleanupNamespaceMaxAge: cfg.NamespaceMaxAges(),
 		cleanupMaxCacheBytes:   cfg.MaxCacheBytes,
 	}
 	if svc.metrics != nil {
@@ -203,14 +202,18 @@ func (s *Service) Warm(ctx context.Context) error {
 		return nil
 	}
 
-	for _, asset := range s.catalog.AllAssets() {
+	s.catalog.AllAssets().Range(func(_ int, asset *catalog.Asset) bool {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return false
 		default:
 		}
 
 		s.process(Request{AssetPath: asset.Path})
+		return true
+	})
+	if ctx.Err() != nil {
+		return ctx.Err()
 	}
 	return nil
 }
@@ -263,59 +266,52 @@ func requestKey(request Request) string {
 	encodings := normalizeRequestStrings(request.PreferredEncodings)
 	formats := normalizeRequestStrings(request.PreferredFormats)
 	widths := normalizeRequestInts(request.PreferredWidths)
-	return assetPath + "|e=" + strings.Join(encodings, ",") + "|f=" + strings.Join(formats, ",") + "|w=" + joinInts(widths)
+	return assetPath + "|e=" + encodings.Join(",") + "|f=" + formats.Join(",") + "|w=" + joinInts(widths)
 }
 
-func normalizeRequestStrings(values []string) []string {
-	if len(values) == 0 {
-		return nil
+func normalizeRequestStrings(values collectionx.List[string]) collectionx.List[string] {
+	if values.IsEmpty() {
+		return collectionx.NewList[string]()
 	}
-	seen := collectionset.NewSetWithCapacity[string](len(values))
-	out := make([]string, 0, len(values))
-	for _, value := range values {
+
+	normalized := collectionx.FilterMapList(values, func(_ int, value string) (string, bool) {
 		normalized := strings.ToLower(strings.TrimSpace(value))
 		if normalized == "" {
-			continue
+			return "", false
 		}
-		if seen.Contains(normalized) {
-			continue
-		}
-		seen.Add(normalized)
-		out = append(out, normalized)
+		return normalized, true
+	})
+	if normalized.IsEmpty() {
+		return normalized
 	}
-	sort.Strings(out)
-	return out
+
+	normalized.Sort(strings.Compare)
+	return collectionx.NewList(collectionx.NewOrderedSet(normalized.Values()...).Values()...)
 }
 
-func normalizeRequestInts(values []int) []int {
-	if len(values) == 0 {
-		return nil
+func normalizeRequestInts(values collectionx.List[int]) collectionx.List[int] {
+	if values.IsEmpty() {
+		return collectionx.NewList[int]()
 	}
-	seen := collectionset.NewSetWithCapacity[int](len(values))
-	out := make([]int, 0, len(values))
-	for _, value := range values {
+
+	normalized := collectionx.FilterMapList(values, func(_ int, value int) (int, bool) {
 		if value <= 0 {
-			continue
+			return 0, false
 		}
-		if seen.Contains(value) {
-			continue
-		}
-		seen.Add(value)
-		out = append(out, value)
+		return value, true
+	})
+	if normalized.IsEmpty() {
+		return normalized
 	}
-	sort.Ints(out)
-	return out
+
+	normalized.Sort(cmp.Compare[int])
+	return collectionx.NewList(collectionx.NewOrderedSet(normalized.Values()...).Values()...)
 }
 
-func joinInts(values []int) string {
-	if len(values) == 0 {
-		return ""
-	}
-	parts := make([]string, 0, len(values))
-	for _, value := range values {
-		parts = append(parts, strconv.Itoa(value))
-	}
-	return strings.Join(parts, ",")
+func joinInts(values collectionx.List[int]) string {
+	return collectionx.MapList(values, func(_ int, value int) string {
+		return strconv.Itoa(value)
+	}).Join(",")
 }
 
 type cleanupFile struct {
@@ -417,9 +413,9 @@ func (s *Service) cleanupArtifacts(now time.Time) cleanupResult {
 	}
 
 	if s.cleanupMaxCacheBytes > 0 && result.totalBytes > s.cleanupMaxCacheBytes {
-		sort.Slice(remaining, func(i, j int) bool {
-			return remaining[i].lastUsed.Before(remaining[j].lastUsed)
-		})
+		remaining = collectionx.NewList(remaining...).Sort(func(left, right cleanupFile) int {
+			return left.lastUsed.Compare(right.lastUsed)
+		}).Values()
 
 		for _, file := range remaining {
 			if result.totalBytes <= s.cleanupMaxCacheBytes {

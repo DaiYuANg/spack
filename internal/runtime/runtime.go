@@ -77,6 +77,34 @@ func bootstrapCatalog(
 	})
 }
 
+func logConfigLifecycle(lc dix.Lifecycle, cfg *config.Config, logger *slog.Logger) {
+	lc.OnStart(func(_ context.Context) error {
+		logger.Info("Config loaded",
+			slog.Int("http_port", cfg.Http.Port),
+			slog.Bool("http_low_memory", cfg.Http.LowMemory),
+			slog.String("assets_root", cfg.Assets.Root),
+			slog.String("assets_path", cfg.Assets.Path),
+			slog.String("assets_entry", cfg.Assets.Entry),
+			slog.String("fallback_on", string(cfg.Assets.Fallback.On)),
+			slog.String("fallback_target", cfg.Assets.Fallback.Target),
+			slog.Bool("compression_enable", cfg.Compression.Enable),
+			slog.String("compression_mode", cfg.Compression.NormalizedMode()),
+			slog.String("compression_cache_dir", cfg.Compression.CacheDir),
+			slog.Int64("compression_min_size", cfg.Compression.MinSize),
+			slog.Int("compression_workers", cfg.Compression.Workers),
+			slog.Int("compression_queue_size", cfg.Compression.QueueCapacity()),
+			slog.Bool("image_enable", cfg.Image.Enable),
+			slog.Any("image_widths", cfg.Image.ParsedWidths().Values()),
+			slog.Int("image_jpeg_quality", cfg.Image.JPEGQuality),
+			slog.Bool("debug_enable", cfg.Debug.Enable),
+			slog.Int("debug_live_port", cfg.Debug.LivePort),
+			slog.String("metrics_prefix", cfg.Metrics.Prefix),
+			slog.String("logger_level", cfg.Logger.Level),
+		)
+		return nil
+	})
+}
+
 func httpLifecycle(
 	lc dix.Lifecycle,
 	app *fiber.App,

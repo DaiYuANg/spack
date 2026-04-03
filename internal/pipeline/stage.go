@@ -1,12 +1,15 @@
 package pipeline
 
-import "github.com/daiyuang/spack/internal/catalog"
+import (
+	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/daiyuang/spack/internal/catalog"
+)
 
 type Request struct {
 	AssetPath          string
-	PreferredEncodings []string
-	PreferredFormats   []string
-	PreferredWidths    []int
+	PreferredEncodings collectionx.List[string]
+	PreferredFormats   collectionx.List[string]
+	PreferredWidths    collectionx.List[int]
 }
 
 type Task struct {

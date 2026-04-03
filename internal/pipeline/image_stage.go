@@ -9,7 +9,7 @@ import (
 	"os"
 	"strings"
 
-	collectionset "github.com/DaiYuANg/arcgo/collectionx/set"
+	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
@@ -54,31 +54,31 @@ func (s *imageStage) Plan(asset *catalog.Asset, request Request) []Task {
 	}
 
 	formats := normalizeImageFormats(request.PreferredFormats)
-	if len(formats) == 0 {
-		formats = []string{imageFormat(asset.MediaType)}
+	if formats.IsEmpty() {
+		formats = collectionx.NewList(imageFormat(asset.MediaType))
 	}
 
 	widths := request.PreferredWidths
-	if len(widths) == 0 {
-		if len(request.PreferredFormats) > 0 {
-			widths = []int{0}
+	if widths.IsEmpty() {
+		if request.PreferredFormats.Len() > 0 {
+			widths = collectionx.NewList(0)
 		} else {
 			widths = s.cfg.ParsedWidths()
 		}
 	}
-	if len(widths) == 0 {
+	if widths.IsEmpty() {
 		return nil
 	}
 
 	existing := s.catalog.ListVariants(asset.Path)
-	tasks := make([]Task, 0, len(widths)*len(formats))
-	for _, format := range formats {
-		for _, width := range widths {
+	tasks := make([]Task, 0, widths.Len()*formats.Len())
+	formats.Range(func(_ int, format string) bool {
+		widths.Range(func(_ int, width int) bool {
 			if width == 0 && format == imageFormat(asset.MediaType) {
-				continue
+				return true
 			}
 			if width < 0 || hasImageVariant(existing, asset.SourceHash, width, format) {
-				continue
+				return true
 			}
 
 			tasks = append(tasks, Task{
@@ -86,8 +86,10 @@ func (s *imageStage) Plan(asset *catalog.Asset, request Request) []Task {
 				Format:    format,
 				Width:     width,
 			})
-		}
-	}
+			return true
+		})
+		return true
+	})
 	return tasks
 }
 
@@ -169,26 +171,28 @@ func isResizableImage(asset *catalog.Asset) bool {
 	}
 }
 
-func hasImageVariant(variants []*catalog.Variant, sourceHash string, width int, format string) bool {
-	for _, variant := range variants {
+func hasImageVariant(variants collectionx.List[*catalog.Variant], sourceHash string, width int, format string) bool {
+	found := false
+	variants.Range(func(_ int, variant *catalog.Variant) bool {
 		if variant.Width != width {
-			continue
+			return true
 		}
 		if format != "" && variant.Format != format {
-			continue
+			return true
 		}
 		if sourceHash != "" && variant.SourceHash != "" && variant.SourceHash != sourceHash {
-			continue
+			return true
 		}
 		if variant.ArtifactPath == "" {
-			continue
+			return true
 		}
 		if _, err := os.Stat(variant.ArtifactPath); err != nil {
-			continue
+			return true
 		}
-		return true
-	}
-	return false
+		found = true
+		return false
+	})
+	return found
 }
 
 func encodeImage(img image.Image, format string, jpegQuality int) ([]byte, string, string, error) {
@@ -231,25 +235,20 @@ func imageFormat(mediaType string) string {
 	}
 }
 
-func normalizeImageFormats(formats []string) []string {
-	if len(formats) == 0 {
-		return nil
+func normalizeImageFormats(formats collectionx.List[string]) collectionx.List[string] {
+	if formats.IsEmpty() {
+		return collectionx.NewList[string]()
 	}
 
-	seen := collectionset.NewSetWithCapacity[string](len(formats))
-	out := make([]string, 0, len(formats))
-	for _, format := range formats {
+	ordered := collectionx.NewOrderedSetWithCapacity[string](formats.Len())
+	formats.Each(func(_ int, format string) {
 		normalized := normalizeImageFormat(format)
 		if normalized == "" {
-			continue
+			return
 		}
-		if seen.Contains(normalized) {
-			continue
-		}
-		seen.Add(normalized)
-		out = append(out, normalized)
-	}
-	return out
+		ordered.Add(normalized)
+	})
+	return collectionx.NewList(ordered.Values()...)
 }
 
 func normalizeImageFormat(format string) string {

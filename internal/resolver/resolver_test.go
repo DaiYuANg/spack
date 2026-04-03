@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/daiyuang/spack/internal/catalog"
@@ -13,21 +14,21 @@ import (
 
 func TestParseAcceptEncodingPriority(t *testing.T) {
 	got := parseAcceptEncoding("gzip;q=0.8, br;q=1.0")
-	if len(got) != 2 || got[0] != "br" || got[1] != "gzip" {
+	if !slices.Equal(got.Values(), []string{"br", "gzip"}) {
 		t.Fatalf("unexpected encodings: %#v", got)
 	}
 }
 
 func TestParseAcceptEncodingWildcard(t *testing.T) {
 	got := parseAcceptEncoding("gzip;q=0, *;q=0.5")
-	if len(got) != 1 || got[0] != "br" {
+	if !slices.Equal(got.Values(), []string{"br"}) {
 		t.Fatalf("unexpected encodings: %#v", got)
 	}
 }
 
 func TestParseAcceptImageFormatsPriority(t *testing.T) {
 	got := parseAcceptImageFormats("image/png;q=1,image/jpeg;q=0.6,*/*;q=0.1", "jpeg")
-	if len(got) != 2 || got[0] != "png" || got[1] != "jpeg" {
+	if !slices.Equal(got.Values(), []string{"png", "jpeg"}) {
 		t.Fatalf("unexpected image formats: %#v", got)
 	}
 }
@@ -134,6 +135,51 @@ func TestResolverFallsBackForSPAPath(t *testing.T) {
 	}
 }
 
+func TestResolverResolvesRootToEntry(t *testing.T) {
+	dir := t.TempDir()
+	sourcePath := filepath.Join(dir, "index.html")
+	if err := os.WriteFile(sourcePath, []byte("<html>origin</html>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cat := catalog.NewInMemoryCatalog()
+	if err := cat.UpsertAsset(&catalog.Asset{
+		Path:       "index.html",
+		FullPath:   sourcePath,
+		MediaType:  "text/html; charset=utf-8",
+		SourceHash: "hash-1",
+		ETag:       "\"hash-1\"",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	resolver := newResolver(resolverIn{
+		Config: &config.Assets{
+			Entry: "index.html",
+			Fallback: config.Fallback{
+				On:     config.FallbackOnNotFound,
+				Target: "index.html",
+			},
+		},
+		Catalog: cat,
+		Logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
+	})
+
+	result, err := resolver.Resolve(Request{Path: "/"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Asset == nil || result.Asset.Path != "index.html" {
+		t.Fatalf("expected root path to resolve to index.html, got %#v", result.Asset)
+	}
+	if result.FilePath != sourcePath {
+		t.Fatalf("expected entry path %q, got %q", sourcePath, result.FilePath)
+	}
+	if result.FallbackUsed {
+		t.Fatal("expected root path to resolve via entry, not fallback")
+	}
+}
+
 func TestResolverSelectsWidthVariant(t *testing.T) {
 	dir := t.TempDir()
 	sourcePath := filepath.Join(dir, "hero.jpg")
@@ -210,7 +256,7 @@ func TestResolverRequestsWidthGenerationWhenMissing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(result.PreferredWidths) != 1 || result.PreferredWidths[0] != 640 {
+	if !slices.Equal(result.PreferredWidths.Values(), []int{640}) {
 		t.Fatalf("expected width generation request, got %#v", result.PreferredWidths)
 	}
 }
@@ -292,7 +338,7 @@ func TestResolverRequestsFormatGenerationWhenMissing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(result.PreferredFormats) != 1 || result.PreferredFormats[0] != "jpeg" {
+	if !slices.Equal(result.PreferredFormats.Values(), []string{"jpeg"}) {
 		t.Fatalf("expected format generation request, got %#v", result.PreferredFormats)
 	}
 }
@@ -380,7 +426,8 @@ func TestResolverRequestsFormatGenerationFromAcceptWhenMissing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(result.PreferredFormats) == 0 || result.PreferredFormats[0] != "jpeg" {
+	first, ok := result.PreferredFormats.GetFirst()
+	if !ok || first != "jpeg" {
 		t.Fatalf("expected format generation request from accept, got %#v", result.PreferredFormats)
 	}
 }

@@ -64,6 +64,7 @@ func setupRuntime(c *dix.Container, lc dix.Lifecycle) error {
 		return err
 	}
 
+	logConfigLifecycle(lc, cfg, logger)
 	bootstrapCatalog(lc, cfg, src, cat, pipelineSvc, logger)
 	httpLifecycle(lc, app, cfg, cat, logger)
 	debugLifecycle(lc, cfg, logger, pipelineMetrics, metricsAdapter)

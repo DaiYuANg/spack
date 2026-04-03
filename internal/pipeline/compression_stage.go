@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	collectionset "github.com/DaiYuANg/arcgo/collectionx/set"
+	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/andybalholm/brotli"
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/catalog"
@@ -52,22 +52,23 @@ func (s *compressionStage) Plan(asset *catalog.Asset, request Request) []Task {
 	}
 
 	encodings := normalizeEncodings(request.PreferredEncodings)
-	if len(encodings) == 0 {
-		encodings = []string{"br", "gzip"}
+	if encodings.IsEmpty() {
+		encodings = collectionx.NewList("br", "gzip")
 	}
 
 	existing := s.catalog.ListVariants(asset.Path)
-	tasks := make([]Task, 0, len(encodings))
-	for _, encoding := range encodings {
+	tasks := make([]Task, 0, encodings.Len())
+	encodings.Range(func(_ int, encoding string) bool {
 		if hasEncodingVariant(existing, asset.SourceHash, encoding) {
-			continue
+			return true
 		}
 
 		tasks = append(tasks, Task{
 			AssetPath: asset.Path,
 			Encoding:  encoding,
 		})
-	}
+		return true
+	})
 
 	return tasks
 }
@@ -143,23 +144,25 @@ func (s *compressionStage) compress(raw []byte, encoding string) ([]byte, string
 	}
 }
 
-func hasEncodingVariant(variants []*catalog.Variant, sourceHash, encoding string) bool {
-	for _, variant := range variants {
+func hasEncodingVariant(variants collectionx.List[*catalog.Variant], sourceHash, encoding string) bool {
+	found := false
+	variants.Range(func(_ int, variant *catalog.Variant) bool {
 		if variant.Encoding != encoding {
-			continue
+			return true
 		}
 		if sourceHash != "" && variant.SourceHash != "" && variant.SourceHash != sourceHash {
-			continue
+			return true
 		}
 		if variant.ArtifactPath == "" {
-			continue
+			return true
 		}
 		if _, err := os.Stat(variant.ArtifactPath); err != nil {
-			continue
+			return true
 		}
-		return true
-	}
-	return false
+		found = true
+		return false
+	})
+	return found
 }
 
 func isCompressible(asset *catalog.Asset) bool {
@@ -191,26 +194,20 @@ func isCompressible(asset *catalog.Asset) bool {
 	}
 }
 
-func normalizeEncodings(encodings []string) []string {
-	if len(encodings) == 0 {
-		return nil
+func normalizeEncodings(encodings collectionx.List[string]) collectionx.List[string] {
+	if encodings.IsEmpty() {
+		return collectionx.NewList[string]()
 	}
 
-	seen := collectionset.NewSetWithCapacity[string](len(encodings))
-	out := make([]string, 0, len(encodings))
-	for _, raw := range encodings {
+	ordered := collectionx.NewOrderedSetWithCapacity[string](encodings.Len())
+	encodings.Each(func(_ int, raw string) {
 		encoding := strings.ToLower(strings.TrimSpace(raw))
-		if encoding != "br" && encoding != "gzip" {
-			continue
+		switch encoding {
+		case "br", "gzip":
+			ordered.Add(encoding)
 		}
-		if seen.Contains(encoding) {
-			continue
-		}
-		seen.Add(encoding)
-		out = append(out, encoding)
-	}
-
-	return out
+	})
+	return collectionx.NewList(ordered.Values()...)
 }
 
 func clampGzipLevel(level int) int {

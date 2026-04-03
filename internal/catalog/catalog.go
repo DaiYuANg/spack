@@ -1,12 +1,13 @@
 package catalog
 
 import (
+	"cmp"
 	"errors"
-	"sort"
+	"maps"
 	"strconv"
 	"sync"
 
-	collectionmapping "github.com/DaiYuANg/arcgo/collectionx/mapping"
+	"github.com/DaiYuANg/arcgo/collectionx"
 )
 
 var ErrAssetNotFound = errors.New("asset not found")
@@ -49,8 +50,8 @@ type Catalog interface {
 	UpsertVariant(variant *Variant) error
 	DeleteVariantByArtifactPath(artifactPath string) bool
 	FindAsset(assetPath string) (*Asset, bool)
-	ListVariants(assetPath string) []*Variant
-	AllAssets() []*Asset
+	ListVariants(assetPath string) collectionx.List[*Variant]
+	AllAssets() collectionx.List[*Asset]
 	AssetCount() int
 	VariantCount() int
 	Snapshot() *Snapshot
@@ -58,14 +59,14 @@ type Catalog interface {
 
 type InMemoryCatalog struct {
 	mu       sync.RWMutex
-	assets   *collectionmapping.Map[string, *Asset]
-	variants *collectionmapping.Map[string, *collectionmapping.Map[string, *Variant]]
+	assets   collectionx.Map[string, *Asset]
+	variants collectionx.Map[string, collectionx.Map[string, *Variant]]
 }
 
 func NewInMemoryCatalog() *InMemoryCatalog {
 	return &InMemoryCatalog{
-		assets:   collectionmapping.NewMap[string, *Asset](),
-		variants: collectionmapping.NewMap[string, *collectionmapping.Map[string, *Variant]](),
+		assets:   collectionx.NewMap[string, *Asset](),
+		variants: collectionx.NewMap[string, collectionx.Map[string, *Variant]](),
 	}
 }
 
@@ -92,7 +93,7 @@ func (c *InMemoryCatalog) UpsertVariant(variant *Variant) error {
 
 	byAsset, ok := c.variants.Get(variant.AssetPath)
 	if !ok {
-		byAsset = collectionmapping.NewMap[string, *Variant]()
+		byAsset = collectionx.NewMap[string, *Variant]()
 		c.variants.Set(variant.AssetPath, byAsset)
 	}
 
@@ -114,58 +115,56 @@ func (c *InMemoryCatalog) DeleteVariantByArtifactPath(artifactPath string) bool 
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	removed := false
-	c.variants.Range(func(assetPath string, byAsset *collectionmapping.Map[string, *Variant]) bool {
-		if byAsset == nil {
-			return true
-		}
-		byAsset.Range(func(id string, variant *Variant) bool {
-			if variant.ArtifactPath != artifactPath {
-				return true
-			}
-			byAsset.Delete(id)
-			if byAsset.Len() == 0 {
-				c.variants.Delete(assetPath)
-			}
-			removed = true
-			return false
+	assetPath, byAsset, ok := c.variants.FirstEntryWhere(func(_ string, byAsset collectionx.Map[string, *Variant]) bool {
+		return byAsset != nil && byAsset.AnyEntryMatch(func(_ string, variant *Variant) bool {
+			return variant.ArtifactPath == artifactPath
 		})
-		return !removed
 	})
-	return removed
+	if !ok || byAsset == nil {
+		return false
+	}
+
+	id, _, ok := byAsset.FirstEntryWhere(func(_ string, variant *Variant) bool {
+		return variant.ArtifactPath == artifactPath
+	})
+	if !ok {
+		return false
+	}
+
+	byAsset.Delete(id)
+	if byAsset.Len() == 0 {
+		c.variants.Delete(assetPath)
+	}
+	return true
 }
 
-func (c *InMemoryCatalog) ListVariants(assetPath string) []*Variant {
+func (c *InMemoryCatalog) ListVariants(assetPath string) collectionx.List[*Variant] {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	byAsset, ok := c.variants.Get(assetPath)
 	if !ok {
-		return nil
+		return collectionx.NewList[*Variant]()
 	}
 
-	out := make([]*Variant, 0, byAsset.Len())
-	byAsset.Range(func(_ string, variant *Variant) bool {
-		out = append(out, cloneVariant(variant))
-		return true
+	out := collectionx.MapList(collectionx.NewList(byAsset.Values()...), func(_ int, variant *Variant) *Variant {
+		return cloneVariant(variant)
 	})
-	sort.Slice(out, func(i, j int) bool {
-		return out[i].ID < out[j].ID
+	out.Sort(func(left, right *Variant) int {
+		return cmp.Compare(left.ID, right.ID)
 	})
 	return out
 }
 
-func (c *InMemoryCatalog) AllAssets() []*Asset {
+func (c *InMemoryCatalog) AllAssets() collectionx.List[*Asset] {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	out := make([]*Asset, 0, c.assets.Len())
-	c.assets.Range(func(_ string, asset *Asset) bool {
-		out = append(out, cloneAsset(asset))
-		return true
+	out := collectionx.MapList(collectionx.NewList(c.assets.Values()...), func(_ int, asset *Asset) *Asset {
+		return cloneAsset(asset)
 	})
-	sort.Slice(out, func(i, j int) bool {
-		return out[i].Path < out[j].Path
+	out.Sort(func(left, right *Asset) int {
+		return cmp.Compare(left.Path, right.Path)
 	})
 	return out
 }
@@ -181,26 +180,24 @@ func (c *InMemoryCatalog) VariantCount() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	total := 0
-	c.variants.Range(func(_ string, variants *collectionmapping.Map[string, *Variant]) bool {
-		if variants != nil {
-			total += variants.Len()
+	return collectionx.ReduceList(collectionx.NewList(c.variants.Values()...), 0, func(total int, _ int, variants collectionx.Map[string, *Variant]) int {
+		if variants == nil {
+			return total
 		}
-		return true
+		return total + variants.Len()
 	})
-	return total
 }
 
 func (c *InMemoryCatalog) Snapshot() *Snapshot {
 	assets := c.AllAssets()
-	entries := make([]*Entry, 0, len(assets))
-	for _, asset := range assets {
-		entries = append(entries, &Entry{
-			Asset:    asset,
-			Variants: c.ListVariants(asset.Path),
-		})
+	return &Snapshot{
+		Assets: collectionx.MapList(assets, func(_ int, asset *Asset) *Entry {
+			return &Entry{
+				Asset:    asset,
+				Variants: c.ListVariants(asset.Path).Values(),
+			}
+		}).Values(),
 	}
-	return &Snapshot{Assets: entries}
 }
 
 func cloneAsset(asset *Asset) *Asset {
@@ -227,12 +224,7 @@ func cloneMap(src map[string]string) map[string]string {
 	if len(src) == 0 {
 		return nil
 	}
-
-	dst := make(map[string]string, len(src))
-	for key, value := range src {
-		dst[key] = value
-	}
-	return dst
+	return maps.Clone(src)
 }
 
 func defaultVariantID(variant *Variant) string {
