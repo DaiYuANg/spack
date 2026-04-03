@@ -9,9 +9,9 @@ import (
 	"strconv"
 	"strings"
 
+	collectionset "github.com/DaiYuANg/arcgo/collectionx/set"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
-	"go.uber.org/fx"
 )
 
 var ErrNotFound = errors.New("asset not found")
@@ -45,7 +45,6 @@ type Resolver struct {
 }
 
 type resolverIn struct {
-	fx.In
 	Config  *config.Assets
 	Catalog catalog.Catalog
 	Logger  *slog.Logger
@@ -57,6 +56,14 @@ func newResolver(in resolverIn) *Resolver {
 		catalog: in.Catalog,
 		logger:  in.Logger,
 	}
+}
+
+func newResolverFromDeps(cfg *config.Assets, cat catalog.Catalog, logger *slog.Logger) *Resolver {
+	return newResolver(resolverIn{
+		Config:  cfg,
+		Catalog: cat,
+		Logger:  logger,
+	})
 }
 
 func (r *Resolver) Resolve(request Request) (*Result, error) {
@@ -332,16 +339,16 @@ func parseAcceptEncoding(header string) []string {
 }
 
 func uniqueStrings(values []string) []string {
-	seen := make(map[string]struct{}, len(values))
+	seen := collectionset.NewSetWithCapacity[string](len(values))
 	out := make([]string, 0, len(values))
 	for _, value := range values {
 		if value == "" {
 			continue
 		}
-		if _, ok := seen[value]; ok {
+		if seen.Contains(value) {
 			continue
 		}
-		seen[value] = struct{}{}
+		seen.Add(value)
 		out = append(out, value)
 	}
 	return out

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DaiYuANg/arcgo/observabilityx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/pipeline"
@@ -22,7 +24,6 @@ import (
 	recoverer "github.com/gofiber/fiber/v3/middleware/recover"
 	"github.com/gofiber/fiber/v3/middleware/requestid"
 	"github.com/gofiber/template/html/v2"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/samber/lo"
 )
 
@@ -32,9 +33,7 @@ func newServer(
 	cat catalog.Catalog,
 	assetResolver *resolver.Resolver,
 	pipelineSvc *pipeline.Service,
-	httpRequestsTotal *prometheus.CounterVec,
-	httpRequestDurationSeconds *prometheus.HistogramVec,
-	activeRequests *prometheus.GaugeVec,
+	obs observabilityx.Observability,
 ) *fiber.App {
 	engine := html.NewFileSystem(http.FS(view.View), ".html")
 	info, ok := debug.ReadBuildInfo()
@@ -55,7 +54,7 @@ func newServer(
 	app.Use(etag.New())
 	app.Use(helmet.New())
 	app.Use(requestLogMiddleware(logger))
-	app.Use(metricsMiddleware(httpRequestsTotal, httpRequestDurationSeconds, activeRequests))
+	app.Use(metricsMiddleware(obs))
 
 	if cfg.Debug.Enable {
 		app.Use(expvarmw.New())
@@ -126,23 +125,27 @@ func newServer(
 	return app
 }
 
-func metricsMiddleware(
-	httpRequestsTotal *prometheus.CounterVec,
-	httpRequestDurationSeconds *prometheus.HistogramVec,
-	activeRequests *prometheus.GaugeVec,
-) fiber.Handler {
+func metricsMiddleware(obs observabilityx.Observability) fiber.Handler {
+	if obs == nil {
+		obs = observabilityx.NopWithLogger(nil)
+	}
+
 	return func(c fiber.Ctx) error {
 		requestPath := c.Path()
 		method := c.Method()
 
-		activeRequests.WithLabelValues(method, requestPath).Inc()
 		startedAt := time.Now()
 		err := c.Next()
 		duration := time.Since(startedAt).Seconds()
-		activeRequests.WithLabelValues(method, requestPath).Dec()
+		status := strconv.Itoa(c.Response().StatusCode())
 
-		httpRequestDurationSeconds.WithLabelValues(method, requestPath).Observe(duration)
-		httpRequestsTotal.WithLabelValues(method, requestPath, strconv.Itoa(c.Response().StatusCode())).Inc()
+		attrs := []observabilityx.Attribute{
+			observabilityx.String("method", method),
+			observabilityx.String("path", requestPath),
+			observabilityx.String("status", status),
+		}
+		obs.AddCounter(context.Background(), "http_requests_total", 1, attrs...)
+		obs.RecordHistogram(context.Background(), "http_request_duration_seconds", duration, attrs...)
 		return err
 	}
 }

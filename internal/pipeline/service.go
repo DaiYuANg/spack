@@ -11,21 +11,12 @@ import (
 	"sync"
 	"time"
 
+	collectionset "github.com/DaiYuANg/arcgo/collectionx/set"
+	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
-	"go.uber.org/fx"
 	"golang.org/x/sync/singleflight"
 )
-
-type serviceIn struct {
-	fx.In
-	Lifecycle fx.Lifecycle
-	Config    *config.Compression
-	Logger    *slog.Logger
-	Catalog   catalog.Catalog
-	Metrics   *Metrics
-	Stages    []Stage `group:"pipeline_stage"`
-}
 
 type Service struct {
 	cfg     *config.Compression
@@ -52,103 +43,109 @@ type Service struct {
 	cleanupMaxCacheBytes   int64
 }
 
-func newService(in serviceIn) *Service {
-	workers := in.Config.Workers
+func newService(
+	lc dix.Lifecycle,
+	cfg *config.Compression,
+	logger *slog.Logger,
+	cat catalog.Catalog,
+	metrics *Metrics,
+	stages []Stage,
+) *Service {
+	workers := cfg.Workers
 	if workers < 1 {
 		workers = 1
 	}
-	queueSize := in.Config.QueueCapacity()
+	queueSize := cfg.QueueCapacity()
 	if queueSize < 1 {
 		queueSize = workers * 64
 	}
 
 	svc := &Service{
-		cfg:                    in.Config,
-		logger:                 in.Logger,
-		catalog:                in.Catalog,
-		metrics:                in.Metrics,
-		stages:                 in.Stages,
+		cfg:                    cfg,
+		logger:                 logger,
+		catalog:                cat,
+		metrics:                metrics,
+		stages:                 stages,
 		tasks:                  make(chan Request, queueSize),
 		pending:                make(map[string]struct{}, queueSize),
 		variantHits:            make(map[string]time.Time, queueSize),
-		cleanupDefaultMaxAge:   in.Config.ParsedMaxAge(),
-		cleanupNamespaceMaxAge: in.Config.NamespaceMaxAges(),
-		cleanupMaxCacheBytes:   in.Config.MaxCacheBytes,
+		cleanupDefaultMaxAge:   cfg.ParsedMaxAge(),
+		cleanupNamespaceMaxAge: cfg.NamespaceMaxAges(),
+		cleanupMaxCacheBytes:   cfg.MaxCacheBytes,
 	}
 	if svc.metrics != nil {
 		svc.metrics.QueueCapacity.Set(float64(queueSize))
 		svc.metrics.QueueLength.Set(0)
 	}
 
-	in.Lifecycle.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			if !in.Config.PipelineEnabled() {
-				in.Logger.Info("Pipeline disabled")
-				return nil
-			}
-			if strings.TrimSpace(in.Config.CacheDir) == "" {
-				return nil
-			}
-			if err := os.MkdirAll(in.Config.CacheDir, 0o755); err != nil {
-				return err
-			}
-			for workerID := 0; workerID < workers; workerID++ {
-				svc.wg.Add(1)
-				go func() {
-					defer svc.wg.Done()
-					for request := range svc.tasks {
-						key := requestKey(request)
-						svc.updateQueueLengthMetric()
-						svc.process(request)
-						svc.finishRequest(key)
-					}
-				}()
-			}
-			in.Logger.Info("Pipeline workers started",
-				slog.Int("workers", workers),
-				slog.Int("queue_size", queueSize),
-				slog.String("mode", in.Config.NormalizedMode()),
-				slog.String("cache_dir", in.Config.CacheDir),
-			)
-
-			if svc.cleanupDefaultMaxAge > 0 || len(svc.cleanupNamespaceMaxAge) > 0 || svc.cleanupMaxCacheBytes > 0 {
-				interval := svc.cfg.ParsedCleanupInterval()
-				svc.cleanupStop = make(chan struct{})
-				svc.cleanupDone = make(chan struct{})
-				go svc.cleanupLoop(interval)
-				in.Logger.Info("Pipeline cleanup enabled",
-					slog.String("interval", interval.String()),
-					slog.String("max_age", svc.cleanupDefaultMaxAge.String()),
-					slog.String("encoding_max_age", svc.cleanupNamespaceMaxAge["encoding"].String()),
-					slog.String("image_max_age", svc.cleanupNamespaceMaxAge["image"].String()),
-					slog.Int64("max_cache_bytes", svc.cleanupMaxCacheBytes),
-				)
-			}
+	lc.OnStart(func(ctx context.Context) error {
+		if !cfg.PipelineEnabled() {
+			logger.Info("Pipeline disabled")
 			return nil
-		},
-		OnStop: func(ctx context.Context) error {
-			if svc.cleanupStop != nil {
-				close(svc.cleanupStop)
-				select {
-				case <-svc.cleanupDone:
-				case <-ctx.Done():
-					return ctx.Err()
-				}
-			}
-
-			close(svc.tasks)
-			done := make(chan struct{})
+		}
+		if strings.TrimSpace(cfg.CacheDir) == "" {
+			return nil
+		}
+		if err := os.MkdirAll(cfg.CacheDir, 0o755); err != nil {
+			return err
+		}
+		for workerID := 0; workerID < workers; workerID++ {
+			svc.wg.Add(1)
 			go func() {
-				svc.wg.Wait()
-				close(done)
+				defer svc.wg.Done()
+				for request := range svc.tasks {
+					key := requestKey(request)
+					svc.updateQueueLengthMetric()
+					svc.process(request)
+					svc.finishRequest(key)
+				}
 			}()
+		}
+		logger.Info("Pipeline workers started",
+			slog.Int("workers", workers),
+			slog.Int("queue_size", queueSize),
+			slog.String("mode", cfg.NormalizedMode()),
+			slog.String("cache_dir", cfg.CacheDir),
+		)
+
+		if svc.cleanupDefaultMaxAge > 0 || len(svc.cleanupNamespaceMaxAge) > 0 || svc.cleanupMaxCacheBytes > 0 {
+			interval := svc.cfg.ParsedCleanupInterval()
+			svc.cleanupStop = make(chan struct{})
+			svc.cleanupDone = make(chan struct{})
+			go svc.cleanupLoop(interval)
+			logger.Info("Pipeline cleanup enabled",
+				slog.String("interval", interval.String()),
+				slog.String("max_age", svc.cleanupDefaultMaxAge.String()),
+				slog.String("encoding_max_age", svc.cleanupNamespaceMaxAge["encoding"].String()),
+				slog.String("image_max_age", svc.cleanupNamespaceMaxAge["image"].String()),
+				slog.Int64("max_cache_bytes", svc.cleanupMaxCacheBytes),
+			)
+		}
+		return nil
+	})
+
+	lc.OnStop(func(ctx context.Context) error {
+		if svc.cleanupStop != nil {
+			close(svc.cleanupStop)
 			select {
-			case <-done:
-				return nil
+			case <-svc.cleanupDone:
 			case <-ctx.Done():
 				return ctx.Err()
 			}
-		},
+		}
+
+		close(svc.tasks)
+		done := make(chan struct{})
+		go func() {
+			svc.wg.Wait()
+			close(done)
+		}()
+		select {
+		case <-done:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	})
 
 	return svc
@@ -272,17 +269,17 @@ func normalizeRequestStrings(values []string) []string {
 	if len(values) == 0 {
 		return nil
 	}
-	seen := make(map[string]struct{}, len(values))
+	seen := collectionset.NewSetWithCapacity[string](len(values))
 	out := make([]string, 0, len(values))
 	for _, value := range values {
 		normalized := strings.ToLower(strings.TrimSpace(value))
 		if normalized == "" {
 			continue
 		}
-		if _, ok := seen[normalized]; ok {
+		if seen.Contains(normalized) {
 			continue
 		}
-		seen[normalized] = struct{}{}
+		seen.Add(normalized)
 		out = append(out, normalized)
 	}
 	sort.Strings(out)
@@ -293,16 +290,16 @@ func normalizeRequestInts(values []int) []int {
 	if len(values) == 0 {
 		return nil
 	}
-	seen := make(map[int]struct{}, len(values))
+	seen := collectionset.NewSetWithCapacity[int](len(values))
 	out := make([]int, 0, len(values))
 	for _, value := range values {
 		if value <= 0 {
 			continue
 		}
-		if _, ok := seen[value]; ok {
+		if seen.Contains(value) {
 			continue
 		}
-		seen[value] = struct{}{}
+		seen.Add(value)
 		out = append(out, value)
 	}
 	sort.Ints(out)

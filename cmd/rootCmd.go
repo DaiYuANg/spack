@@ -1,23 +1,25 @@
 package cmd
 
 import (
+	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/daiyuang/spack/internal/artifact"
+	"github.com/daiyuang/spack/internal/event"
 	"github.com/daiyuang/spack/internal/metrics"
 	"github.com/daiyuang/spack/internal/pipeline"
 	"github.com/daiyuang/spack/internal/resolver"
 	"github.com/daiyuang/spack/internal/server"
 	"github.com/daiyuang/spack/internal/source"
 	"github.com/spf13/cobra"
-	"go.uber.org/fx"
 )
 
-var container *fx.App
+var container *dix.App
 
 var rootCmd = &cobra.Command{
 	Use: "spack",
 	PreRun: func(cmd *cobra.Command, args []string) {
 		container = createContainer(
 			metrics.Module,
+			event.Module,
 			source.Module,
 			artifact.Module,
 			pipeline.Module,
@@ -25,8 +27,8 @@ var rootCmd = &cobra.Command{
 			server.Module,
 		)
 	},
-	Run: func(cmd *cobra.Command, args []string) {
-		container.Run()
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return container.Run()
 	},
 }
 

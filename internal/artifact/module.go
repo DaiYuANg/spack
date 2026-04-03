@@ -1,12 +1,14 @@
 package artifact
 
 import (
+	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/daiyuang/spack/internal/config"
-	"go.uber.org/fx"
 )
 
-var Module = fx.Module("artifact", fx.Provide(
-	func(cfg *config.Compression) Store {
-		return newLocalStore(cfg.CacheDir)
-	},
-))
+var Module = dix.NewModule("artifact",
+	dix.WithModuleProviders(
+		dix.Provider1(func(cfg *config.Compression) Store {
+			return newLocalStore(cfg.CacheDir)
+		}),
+	),
+)

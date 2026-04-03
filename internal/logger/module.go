@@ -2,110 +2,48 @@ package logger
 
 import (
 	"context"
-	"io"
 	"log/slog"
-	"os"
 
+	dixadvanced "github.com/DaiYuANg/arcgo/dix/advanced"
+	"github.com/DaiYuANg/arcgo/logx"
+
+	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/daiyuang/spack/internal/config"
-	slogzerolog "github.com/samber/slog-zerolog/v2"
-
-	"github.com/rs/zerolog"
-	zlog "github.com/rs/zerolog/log"
-
-	oopszerolog "github.com/samber/oops/loggers/zerolog"
-
-	"go.uber.org/fx"
-	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-var Module = fx.Module("logger_module",
-	fx.Provide(
-		newZerolog,
-		newSlog,
+var Module = dix.NewModule("logger",
+	dix.WithModuleSetups(
+		dixadvanced.Override1(buildLogger),
+	),
+	dix.WithModuleHooks(
+		dix.OnStop(func(ctx context.Context, logger *slog.Logger) error {
+			return logx.Close(logger)
+		}),
 	),
 )
 
-func newZerolog(
-	lc fx.Lifecycle,
-	cfg *config.Config,
-) zerolog.Logger {
-	var writers []io.Writer
-	var closers []io.Closer
-
-	// Console
-	if cfg.Logger.Console.Enabled {
-		writers = append(writers, zerolog.ConsoleWriter{
-			Out:        os.Stdout,
-			TimeFormat: "2006-01-02 15:04:05",
-		})
+func buildLogger(cfg *config.Config) *slog.Logger {
+	opts := []logx.Option{
+		logx.WithLevelString(cfg.Logger.Level),
+		logx.WithConsole(cfg.Logger.Console.Enabled),
+		logx.WithCaller(true),
+		logx.WithGlobalLogger(),
 	}
 
-	// File
 	if cfg.Logger.File.Enabled {
-		lj := &lumberjack.Logger{
-			Filename:   cfg.Logger.File.Path,
-			MaxSize:    cfg.Logger.File.MaxSize,
-			MaxAge:     cfg.Logger.File.MaxAge,
-			MaxBackups: cfg.Logger.File.MaxFiles,
-		}
-		writers = append(writers, lj)
-		closers = append(closers, lj)
+		opts = append(opts,
+			logx.WithFile(cfg.Logger.File.Path),
+			logx.WithFileRotation(cfg.Logger.File.MaxSize, cfg.Logger.File.MaxAge, cfg.Logger.File.MaxFiles),
+		)
 	}
 
-	if len(writers) == 0 {
-		writers = append(writers, os.Stdout)
-	}
-
-	level, err := zerolog.ParseLevel(cfg.Logger.Level)
+	logger, err := logx.New(opts...)
 	if err != nil {
-		level = zerolog.InfoLevel
+		fallback := slog.Default()
+		fallback.Error("logger bootstrap failed, fallback to slog default", slog.String("err", err.Error()))
+		return fallback
 	}
 
-	mw := io.MultiWriter(writers...)
-
-	logger := zerolog.New(mw).
-		Level(level).
-		With().
-		Timestamp().
-		Logger()
-
-	zerolog.ErrorStackMarshaler = oopszerolog.OopsStackMarshaller
-	zerolog.ErrorMarshalFunc = oopszerolog.OopsMarshalFunc
-
-	// 设置全局 logger（给不走 DI 的地方用）
-	zlog.Logger = logger
-
-	// lifecycle
-	if len(closers) > 0 {
-		lc.Append(fx.Hook{
-			OnStop: func(ctx context.Context) error {
-				for _, c := range closers {
-					_ = c.Close()
-				}
-				return nil
-			},
-		})
-	}
-
-	return logger
-}
-
-/*
-slog facade
-*/
-
-func newSlog(zlogger zerolog.Logger) *slog.Logger {
-	// 使用官方 slog-zerolog adapter
-	handler := slogzerolog.Option{
-		Level:     slog.LevelDebug,
-		Logger:    &zlogger,
-		AddSource: true,
-	}.NewZerologHandler()
-
-	logger := slog.New(handler)
-
-	// 设置为全局 slog
-	slog.SetDefault(logger)
-
+	logx.SetDefault(logger)
 	return logger
 }

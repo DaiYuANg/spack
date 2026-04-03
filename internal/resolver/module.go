@@ -1,7 +1,9 @@
 package resolver
 
-import "go.uber.org/fx"
+import "github.com/DaiYuANg/arcgo/dix"
 
-var Module = fx.Module("resolver", fx.Provide(
-	newResolver,
-))
+var Module = dix.NewModule("resolver",
+	dix.WithModuleProviders(
+		dix.Provider3(newResolverFromDeps),
+	),
+)

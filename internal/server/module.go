@@ -1,7 +1,9 @@
 package server
 
-import "go.uber.org/fx"
+import "github.com/DaiYuANg/arcgo/dix"
 
-var Module = fx.Module("server", fx.Provide(
-	newServer,
-))
+var Module = dix.NewModule("server",
+	dix.WithModuleProviders(
+		dix.Provider6(newServer),
+	),
+)

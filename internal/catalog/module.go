@@ -1,10 +1,11 @@
 package catalog
 
-import "go.uber.org/fx"
+import "github.com/DaiYuANg/arcgo/dix"
 
-var Module = fx.Module("catalog", fx.Provide(
-	fx.Annotate(
-		NewInMemoryCatalog,
-		fx.As(new(Catalog)),
+var Module = dix.NewModule("catalog",
+	dix.WithModuleProviders(
+		dix.Provider0(func() Catalog {
+			return NewInMemoryCatalog()
+		}),
 	),
-))
+)

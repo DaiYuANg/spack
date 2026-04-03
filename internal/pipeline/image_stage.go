@@ -9,10 +9,10 @@ import (
 	"os"
 	"strings"
 
+	collectionset "github.com/DaiYuANg/arcgo/collectionx/set"
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
-	"go.uber.org/fx"
 	"golang.org/x/image/draw"
 )
 
@@ -23,7 +23,6 @@ type imageStage struct {
 }
 
 type imageStageIn struct {
-	fx.In
 	Config  *config.Image
 	Store   artifact.Store
 	Catalog catalog.Catalog
@@ -35,6 +34,14 @@ func newImageStage(in imageStageIn) Stage {
 		store:   in.Store,
 		catalog: in.Catalog,
 	}
+}
+
+func newImageStageFromDeps(cfg *config.Image, store artifact.Store, cat catalog.Catalog) *imageStage {
+	return newImageStage(imageStageIn{
+		Config:  cfg,
+		Store:   store,
+		Catalog: cat,
+	}).(*imageStage)
 }
 
 func (s *imageStage) Name() string {
@@ -229,17 +236,17 @@ func normalizeImageFormats(formats []string) []string {
 		return nil
 	}
 
-	seen := make(map[string]struct{}, len(formats))
+	seen := collectionset.NewSetWithCapacity[string](len(formats))
 	out := make([]string, 0, len(formats))
 	for _, format := range formats {
 		normalized := normalizeImageFormat(format)
 		if normalized == "" {
 			continue
 		}
-		if _, ok := seen[normalized]; ok {
+		if seen.Contains(normalized) {
 			continue
 		}
-		seen[normalized] = struct{}{}
+		seen.Add(normalized)
 		out = append(out, normalized)
 	}
 	return out

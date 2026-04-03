@@ -7,11 +7,11 @@ import (
 	"os"
 	"strings"
 
+	collectionset "github.com/DaiYuANg/arcgo/collectionx/set"
 	"github.com/andybalholm/brotli"
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
-	"go.uber.org/fx"
 )
 
 type compressionStage struct {
@@ -21,7 +21,6 @@ type compressionStage struct {
 }
 
 type compressionStageIn struct {
-	fx.In
 	Config  *config.Compression
 	Store   artifact.Store
 	Catalog catalog.Catalog
@@ -33,6 +32,14 @@ func newCompressionStage(in compressionStageIn) Stage {
 		store:   in.Store,
 		catalog: in.Catalog,
 	}
+}
+
+func newCompressionStageFromDeps(cfg *config.Compression, store artifact.Store, cat catalog.Catalog) *compressionStage {
+	return newCompressionStage(compressionStageIn{
+		Config:  cfg,
+		Store:   store,
+		Catalog: cat,
+	}).(*compressionStage)
 }
 
 func (s *compressionStage) Name() string {
@@ -189,17 +196,17 @@ func normalizeEncodings(encodings []string) []string {
 		return nil
 	}
 
-	seen := make(map[string]struct{}, len(encodings))
+	seen := collectionset.NewSetWithCapacity[string](len(encodings))
 	out := make([]string, 0, len(encodings))
 	for _, raw := range encodings {
 		encoding := strings.ToLower(strings.TrimSpace(raw))
 		if encoding != "br" && encoding != "gzip" {
 			continue
 		}
-		if _, ok := seen[encoding]; ok {
+		if seen.Contains(encoding) {
 			continue
 		}
-		seen[encoding] = struct{}{}
+		seen.Add(encoding)
 		out = append(out, encoding)
 	}
 
