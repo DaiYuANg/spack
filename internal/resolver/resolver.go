@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	collectionmapping "github.com/DaiYuANg/arcgo/collectionx/mapping"
 	collectionset "github.com/DaiYuANg/arcgo/collectionx/set"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
@@ -254,7 +255,7 @@ func parseAcceptEncoding(header string) []string {
 		return nil
 	}
 
-	explicit := make(map[string]float64, 4)
+	explicit := collectionmapping.NewMapWithCapacity[string, float64](4)
 	wildcardQ := 0.0
 	hasWildcard := false
 	for _, rawPart := range strings.Split(header, ",") {
@@ -293,8 +294,8 @@ func parseAcceptEncoding(header string) []string {
 			wildcardQ = q
 			continue
 		}
-		if oldQ, ok := explicit[encoding]; !ok || q > oldQ {
-			explicit[encoding] = q
+		if oldQ, ok := explicit.Get(encoding); !ok || q > oldQ {
+			explicit.Set(encoding, q)
 		}
 	}
 
@@ -307,7 +308,7 @@ func parseAcceptEncoding(header string) []string {
 	supported := []string{"br", "gzip"}
 	choices := make([]candidate, 0, len(supported))
 	for index, encoding := range supported {
-		q, ok := explicit[encoding]
+		q, ok := explicit.Get(encoding)
 		if !ok {
 			if !hasWildcard {
 				continue
@@ -411,7 +412,7 @@ func parseAcceptImageFormats(header string, sourceFormat string) []string {
 		return nil
 	}
 
-	explicit := make(map[string]float64, 4)
+	explicit := collectionmapping.NewMapWithCapacity[string, float64](4)
 	wildcardImageQ := 0.0
 	hasWildcardImage := false
 	wildcardAnyQ := 0.0
@@ -456,12 +457,12 @@ func parseAcceptImageFormats(header string, sourceFormat string) []string {
 			hasWildcardAny = true
 			wildcardAnyQ = q
 		case "image/jpeg", "image/jpg":
-			if oldQ, ok := explicit["jpeg"]; !ok || q > oldQ {
-				explicit["jpeg"] = q
+			if oldQ, ok := explicit.Get("jpeg"); !ok || q > oldQ {
+				explicit.Set("jpeg", q)
 			}
 		case "image/png":
-			if oldQ, ok := explicit["png"]; !ok || q > oldQ {
-				explicit["png"] = q
+			if oldQ, ok := explicit.Get("png"); !ok || q > oldQ {
+				explicit.Set("png", q)
 			}
 		}
 	}
@@ -475,7 +476,7 @@ func parseAcceptImageFormats(header string, sourceFormat string) []string {
 	supported := []string{"jpeg", "png"}
 	candidates := make([]candidate, 0, len(supported))
 	for index, format := range supported {
-		q, ok := explicit[format]
+		q, ok := explicit.Get(format)
 		if !ok {
 			if hasWildcardImage {
 				q = wildcardImageQ

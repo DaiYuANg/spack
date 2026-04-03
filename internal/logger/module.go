@@ -4,17 +4,12 @@ import (
 	"context"
 	"log/slog"
 
-	dixadvanced "github.com/DaiYuANg/arcgo/dix/advanced"
-	"github.com/DaiYuANg/arcgo/logx"
-
 	"github.com/DaiYuANg/arcgo/dix"
+	"github.com/DaiYuANg/arcgo/logx"
 	"github.com/daiyuang/spack/internal/config"
 )
 
 var Module = dix.NewModule("logger",
-	dix.WithModuleSetups(
-		dixadvanced.Override1(buildLogger),
-	),
 	dix.WithModuleHooks(
 		dix.OnStop(func(ctx context.Context, logger *slog.Logger) error {
 			return logx.Close(logger)
@@ -22,7 +17,7 @@ var Module = dix.NewModule("logger",
 	),
 )
 
-func buildLogger(cfg *config.Config) *slog.Logger {
+func Build(cfg *config.Config) *slog.Logger {
 	opts := []logx.Option{
 		logx.WithLevelString(cfg.Logger.Level),
 		logx.WithConsole(cfg.Logger.Console.Enabled),
@@ -46,4 +41,14 @@ func buildLogger(cfg *config.Config) *slog.Logger {
 
 	logx.SetDefault(logger)
 	return logger
+}
+
+func BootstrapFromEnv() *slog.Logger {
+	cfg, err := config.Load()
+	if err != nil {
+		fallback := slog.Default()
+		fallback.Error("config bootstrap failed, fallback to slog default", slog.String("err", err.Error()))
+		return fallback
+	}
+	return Build(cfg)
 }

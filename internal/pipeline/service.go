@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	collectionmapping "github.com/DaiYuANg/arcgo/collectionx/mapping"
 	collectionset "github.com/DaiYuANg/arcgo/collectionx/set"
 	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/daiyuang/spack/internal/catalog"
@@ -28,7 +29,7 @@ type Service struct {
 	tasks     chan Request
 	wg        sync.WaitGroup
 	sf        singleflight.Group
-	pending   map[string]struct{}
+	pending   *collectionset.Set[string]
 	pendingMu sync.Mutex
 
 	cleanupMu   sync.Mutex
@@ -36,10 +37,10 @@ type Service struct {
 	cleanupDone chan struct{}
 
 	hitMu       sync.Mutex
-	variantHits map[string]time.Time
+	variantHits *collectionmapping.Map[string, time.Time]
 
 	cleanupDefaultMaxAge   time.Duration
-	cleanupNamespaceMaxAge map[string]time.Duration
+	cleanupNamespaceMaxAge *collectionmapping.Map[string, time.Duration]
 	cleanupMaxCacheBytes   int64
 }
 
@@ -67,10 +68,10 @@ func newService(
 		metrics:                metrics,
 		stages:                 stages,
 		tasks:                  make(chan Request, queueSize),
-		pending:                make(map[string]struct{}, queueSize),
-		variantHits:            make(map[string]time.Time, queueSize),
+		pending:                collectionset.NewSetWithCapacity[string](queueSize),
+		variantHits:            collectionmapping.NewMapWithCapacity[string, time.Time](queueSize),
 		cleanupDefaultMaxAge:   cfg.ParsedMaxAge(),
-		cleanupNamespaceMaxAge: cfg.NamespaceMaxAges(),
+		cleanupNamespaceMaxAge: collectionmapping.NewMapFrom(cfg.NamespaceMaxAges()),
 		cleanupMaxCacheBytes:   cfg.MaxCacheBytes,
 	}
 	if svc.metrics != nil {
@@ -108,7 +109,7 @@ func newService(
 			slog.String("cache_dir", cfg.CacheDir),
 		)
 
-		if svc.cleanupDefaultMaxAge > 0 || len(svc.cleanupNamespaceMaxAge) > 0 || svc.cleanupMaxCacheBytes > 0 {
+		if svc.cleanupDefaultMaxAge > 0 || svc.cleanupNamespaceMaxAge.Len() > 0 || svc.cleanupMaxCacheBytes > 0 {
 			interval := svc.cfg.ParsedCleanupInterval()
 			svc.cleanupStop = make(chan struct{})
 			svc.cleanupDone = make(chan struct{})
@@ -116,8 +117,8 @@ func newService(
 			logger.Info("Pipeline cleanup enabled",
 				slog.String("interval", interval.String()),
 				slog.String("max_age", svc.cleanupDefaultMaxAge.String()),
-				slog.String("encoding_max_age", svc.cleanupNamespaceMaxAge["encoding"].String()),
-				slog.String("image_max_age", svc.cleanupNamespaceMaxAge["image"].String()),
+				slog.String("encoding_max_age", svc.cleanupNamespaceMaxAge.GetOrDefault("encoding", 0).String()),
+				slog.String("image_max_age", svc.cleanupNamespaceMaxAge.GetOrDefault("image", 0).String()),
 				slog.Int64("max_cache_bytes", svc.cleanupMaxCacheBytes),
 			)
 		}
@@ -161,7 +162,7 @@ func (s *Service) Enqueue(request Request) {
 
 	key := requestKey(request)
 	s.pendingMu.Lock()
-	if _, exists := s.pending[key]; exists {
+	if s.pending.Contains(key) {
 		s.pendingMu.Unlock()
 		if s.metrics != nil {
 			s.metrics.EnqueueDeduplicatedTotal.Inc()
@@ -171,7 +172,7 @@ func (s *Service) Enqueue(request Request) {
 
 	select {
 	case s.tasks <- request:
-		s.pending[key] = struct{}{}
+		s.pending.Add(key)
 		s.pendingMu.Unlock()
 		s.updateQueueLengthMetric()
 	default:
@@ -193,7 +194,7 @@ func (s *Service) MarkVariantHit(path string) {
 		return
 	}
 	s.hitMu.Lock()
-	s.variantHits[path] = time.Now()
+	s.variantHits.Set(path, time.Now())
 	s.hitMu.Unlock()
 }
 
@@ -253,7 +254,7 @@ func (s *Service) process(request Request) {
 
 func (s *Service) finishRequest(key string) {
 	s.pendingMu.Lock()
-	delete(s.pending, key)
+	s.pending.Remove(key)
 	s.pendingMu.Unlock()
 }
 
@@ -467,7 +468,7 @@ func cleanupNamespace(path string, root string) string {
 }
 
 func (s *Service) cleanupMaxAgeForNamespace(namespace string) time.Duration {
-	if maxAge, ok := s.cleanupNamespaceMaxAge[namespace]; ok && maxAge > 0 {
+	if maxAge, ok := s.cleanupNamespaceMaxAge.Get(namespace); ok && maxAge > 0 {
 		return maxAge
 	}
 	return s.cleanupDefaultMaxAge
@@ -475,7 +476,7 @@ func (s *Service) cleanupMaxAgeForNamespace(namespace string) time.Duration {
 
 func (s *Service) effectiveLastUsed(path string, modTime time.Time) time.Time {
 	s.hitMu.Lock()
-	lastHit, ok := s.variantHits[path]
+	lastHit, ok := s.variantHits.Get(path)
 	s.hitMu.Unlock()
 	if ok && lastHit.After(modTime) {
 		return lastHit
@@ -485,7 +486,7 @@ func (s *Service) effectiveLastUsed(path string, modTime time.Time) time.Time {
 
 func (s *Service) clearVariantHit(path string) {
 	s.hitMu.Lock()
-	delete(s.variantHits, path)
+	s.variantHits.Delete(path)
 	s.hitMu.Unlock()
 }
 

@@ -12,11 +12,11 @@ tool (
 require (
 	github.com/DaiYuANg/arcgo/collectionx v0.1.0
 	github.com/DaiYuANg/arcgo/configx v0.2.0
-	github.com/DaiYuANg/arcgo/dix v0.2.0
+	github.com/DaiYuANg/arcgo/dix v0.2.1
 	github.com/DaiYuANg/arcgo/eventx v0.2.0
 	github.com/DaiYuANg/arcgo/logx v0.1.0
 	github.com/DaiYuANg/arcgo/observabilityx v0.1.0
-	github.com/andybalholm/brotli v1.2.0
+	github.com/andybalholm/brotli v1.2.1
 	github.com/arl/statsviz v0.8.0
 	github.com/gabriel-vasile/mimetype v1.4.13
 	github.com/gofiber/fiber/v3 v3.1.0
@@ -26,7 +26,7 @@ require (
 	github.com/samber/lo v1.53.0
 	github.com/samber/oops v1.21.0
 	github.com/spf13/cobra v1.10.2
-	golang.org/x/image v0.28.0
+	golang.org/x/image v0.38.0
 	golang.org/x/sync v0.20.0
 )
 
@@ -40,7 +40,7 @@ require (
 	github.com/Antonboom/nilnil v1.1.0 // indirect
 	github.com/Antonboom/testifylint v1.6.1 // indirect
 	github.com/BurntSushi/toml v1.5.0 // indirect
-	github.com/DaiYuANg/arcgo/pkg/option v0.0.0-20260403041550-cb2753769556 // indirect
+	github.com/DaiYuANg/arcgo/pkg/option v0.0.0-20260403112347-2ed2801ae2e6 // indirect
 	github.com/Djarvur/go-err113 v0.0.0-20210108212216-aea10b59be24 // indirect
 	github.com/GaijinEntertainment/go-exhaustruct/v3 v3.3.1 // indirect
 	github.com/Ladicle/tabwriter v1.0.0 // indirect
@@ -280,8 +280,8 @@ require (
 	go-simpler.org/musttag v0.13.1 // indirect
 	go-simpler.org/sloglint v0.11.0 // indirect
 	go.augendre.info/fatcontext v0.8.0 // indirect
-	go.opentelemetry.io/otel v1.42.0 // indirect
-	go.opentelemetry.io/otel/trace v1.42.0 // indirect
+	go.opentelemetry.io/otel v1.43.0 // indirect
+	go.opentelemetry.io/otel/trace v1.43.0 // indirect
 	go.uber.org/automaxprocs v1.6.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.1 // indirect
@@ -291,7 +291,7 @@ require (
 	golang.org/x/exp v0.0.0-20260112195511-716be5621a96 // indirect
 	golang.org/x/exp/typeparams v0.0.0-20250210185358-939b2ce775ac // indirect
 	golang.org/x/mod v0.33.0 // indirect
-	golang.org/x/net v0.51.0 // indirect
+	golang.org/x/net v0.52.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/term v0.41.0 // indirect
 	golang.org/x/text v0.35.0 // indirect

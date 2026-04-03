@@ -16,7 +16,20 @@ var Module = dix.NewModule("pipeline",
 		dix.Provider2(newStages),
 	),
 	dix.WithModuleSetups(
-		dix.Setup(setupService),
+		dix.SetupWithMetadata(setupService, dix.SetupMetadata{
+			Label: "SetupService",
+			Dependencies: dix.ServiceRefs(
+				dix.TypedService[*config.Compression](),
+				dix.TypedService[*slog.Logger](),
+				dix.TypedService[catalog.Catalog](),
+				dix.TypedService[*Metrics](),
+				dix.TypedService[[]Stage](),
+			),
+			Provides: dix.ServiceRefs(
+				dix.TypedService[*Service](),
+			),
+			GraphMutation: true,
+		}),
 	),
 )
 

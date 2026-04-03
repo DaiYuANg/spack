@@ -18,5 +18,9 @@ func createContainer(userModules ...dix.Module) *dix.App {
 	allModules := append(commonModules, userModules...)
 	allModules = append(allModules, runtime.Module)
 
-	return dix.New("spack", dix.WithModules(allModules...))
+	return dix.New(
+		"spack",
+		dix.WithModules(allModules...),
+		dix.WithLoggerFrom0(logger.BootstrapFromEnv),
+	)
 }

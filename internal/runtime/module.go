@@ -14,7 +14,19 @@ import (
 
 var Module = dix.NewModule("runtime",
 	dix.WithModuleSetups(
-		dix.Setup(setupRuntime),
+		dix.SetupWithMetadata(setupRuntime, dix.SetupMetadata{
+			Label: "SetupRuntime",
+			Dependencies: dix.ServiceRefs(
+				dix.TypedService[*config.Config](),
+				dix.TypedService[source.Source](),
+				dix.TypedService[catalog.Catalog](),
+				dix.TypedService[*pipeline.Service](),
+				dix.TypedService[*pipeline.Metrics](),
+				dix.TypedService[*slog.Logger](),
+				dix.TypedService[*fiber.App](),
+				dix.TypedService[*obsprom.Adapter](),
+			),
+		}),
 	),
 )
 

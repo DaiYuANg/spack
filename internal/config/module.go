@@ -8,7 +8,20 @@ import (
 
 var Module = dix.NewModule("config",
 	dix.WithModuleSetups(
-		dix.Setup(setupConfig),
+		dix.SetupWithMetadata(setupConfig, dix.SetupMetadata{
+			Label: "SetupConfig",
+			Provides: dix.ServiceRefs(
+				dix.TypedService[*Config](),
+				dix.TypedService[*Debug](),
+				dix.TypedService[*Image](),
+				dix.TypedService[*Metrics](),
+				dix.TypedService[*Logger](),
+				dix.TypedService[*Http](),
+				dix.TypedService[*Assets](),
+				dix.TypedService[*Compression](),
+			),
+			GraphMutation: true,
+		}),
 	),
 )
 
@@ -40,4 +53,8 @@ func loadConfig() (*Config, error) {
 		return nil, err
 	}
 	return &loaded, nil
+}
+
+func Load() (*Config, error) {
+	return loadConfig()
 }

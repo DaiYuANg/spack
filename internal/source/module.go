@@ -9,7 +9,17 @@ import (
 
 var Module = dix.NewModule("source",
 	dix.WithModuleSetups(
-		dix.Setup(setupSource),
+		dix.SetupWithMetadata(setupSource, dix.SetupMetadata{
+			Label: "SetupSource",
+			Dependencies: dix.ServiceRefs(
+				dix.TypedService[*config.Assets](),
+				dix.TypedService[*slog.Logger](),
+			),
+			Provides: dix.ServiceRefs(
+				dix.TypedService[Source](),
+			),
+			GraphMutation: true,
+		}),
 	),
 )
 
