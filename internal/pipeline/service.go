@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"golang.org/x/sync/singleflight"
@@ -20,6 +21,7 @@ type Service struct {
 	catalog catalog.Catalog
 	metrics *Metrics
 	stages  []Stage
+	bus     eventx.BusRuntime
 
 	tasks     chan Request
 	wg        sync.WaitGroup
@@ -37,6 +39,8 @@ type Service struct {
 	cleanupDefaultMaxAge   time.Duration
 	cleanupNamespaceMaxAge collectionx.Map[string, time.Duration]
 	cleanupMaxCacheBytes   int64
+
+	variantServedUnsubscribe func()
 }
 
 func newServiceFromDeps(
@@ -45,11 +49,12 @@ func newServiceFromDeps(
 	cat catalog.Catalog,
 	metrics *Metrics,
 	stages []Stage,
+	bus eventx.BusRuntime,
 ) *Service {
 	workers := max(cfg.Workers, 1)
 	queueSize := resolveQueueSize(cfg, workers)
 
-	svc := newServiceState(cfg, logger, cat, metrics, stages, queueSize)
+	svc := newServiceState(cfg, logger, cat, metrics, stages, bus, queueSize)
 	svc.initializeMetrics(queueSize)
 	return svc
 }
@@ -91,12 +96,16 @@ func (s *Service) Enqueue(request Request) {
 }
 
 func (s *Service) MarkVariantHit(path string) {
+	s.markVariantHitAt(path, time.Now())
+}
+
+func (s *Service) markVariantHitAt(path string, hitAt time.Time) {
 	path = strings.TrimSpace(path)
 	if path == "" {
 		return
 	}
 	s.hitMu.Lock()
-	s.variantHits.Set(path, time.Now())
+	s.variantHits.Set(path, hitAt)
 	s.hitMu.Unlock()
 }
 

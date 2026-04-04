@@ -8,10 +8,12 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/DaiYuANg/arcgo/observabilityx"
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
+	appEvent "github.com/daiyuang/spack/internal/event"
 )
 
 func TestShouldServe(t *testing.T) {
@@ -117,6 +119,50 @@ func TestWarm(t *testing.T) {
 	assertCacheHitState(t, cache, largePath, false)
 	assertCounterValue(t, obs, "asset_cache_warm_entries_total", 1)
 	assertCounterValue(t, obs, "asset_cache_warm_bytes_total", 15)
+}
+
+func TestVariantRemovedEventInvalidatesCacheEntry(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "asset.js")
+	payload := []byte("console.log('invalidate');")
+	if err := os.WriteFile(path, payload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	bus := eventx.New()
+	cache := assetcache.NewCacheWithBusForTest(config.MemoryCache{
+		Enable:      true,
+		MaxEntries:  16,
+		MaxFileSize: 64 * 1024,
+		TTL:         "5m",
+	}, slog.New(slog.DiscardHandler), nil, bus)
+	if err := assetcache.StartForTest(cache); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, found, err := cache.GetOrLoad(path); err != nil {
+		t.Fatal(err)
+	} else if found {
+		t.Fatal("expected first load to miss memory cache")
+	}
+	if _, found, err := cache.GetOrLoad(path); err != nil {
+		t.Fatal(err)
+	} else if !found {
+		t.Fatal("expected second load to hit memory cache")
+	}
+
+	if err := bus.Publish(context.Background(), appEvent.VariantRemoved{
+		ArtifactPath: path,
+		Reason:       appEvent.VariantRemovalReasonTTL,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, found, err := cache.GetOrLoad(path); err != nil {
+		t.Fatal(err)
+	} else if found {
+		t.Fatal("expected load after invalidation to miss memory cache")
+	}
 }
 
 func writeAssetFile(t *testing.T, path string, body []byte) {

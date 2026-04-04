@@ -1,7 +1,12 @@
 package server
 
 import (
+	"context"
+	"log/slog"
+
+	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/DaiYuANg/arcgo/observabilityx"
+	"github.com/daiyuang/spack/internal/resolver"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -18,4 +23,14 @@ func MetricsMiddlewareForTest(obs observabilityx.Observability) fiber.Handler {
 // SetAssetDeliveryForTest exposes delivery tagging for external tests.
 func SetAssetDeliveryForTest(c fiber.Ctx, delivery string) {
 	setAssetDelivery(c, delivery)
+}
+
+// PublishVariantServedForTest exposes variant-served event publishing for external tests.
+func PublishVariantServedForTest(
+	ctx context.Context,
+	result *resolver.Result,
+	bus eventx.BusRuntime,
+	logger *slog.Logger,
+) {
+	publishVariantServed(ctx, result, bus, logger)
 }

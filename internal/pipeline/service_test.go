@@ -1,6 +1,7 @@
 package pipeline_test
 
 import (
+	"context"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -8,8 +9,10 @@ import (
 	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
+	appEvent "github.com/daiyuang/spack/internal/event"
 	"github.com/daiyuang/spack/internal/pipeline"
 )
 
@@ -217,6 +220,52 @@ func TestCleanupArtifactsKeepsHotVariant(t *testing.T) {
 	}
 	if _, err := os.Stat(oldPath); err != nil {
 		t.Fatalf("expected hot variant retained, err=%v", err)
+	}
+}
+
+func TestVariantServedEventKeepsHotVariant(t *testing.T) {
+	root := t.TempDir()
+	cat := catalog.NewInMemoryCatalog()
+	addAsset(t, cat, "bundle.js", "application/javascript", "hash-5")
+
+	oldPath := filepath.Join(root, "encoding", "hash-5", "bundle.js.br")
+	writeArtifact(t, oldPath, []byte("compressed"))
+	setMTime(t, oldPath, time.Now().Add(-3*time.Hour))
+
+	if err := cat.UpsertVariant(&catalog.Variant{
+		ID:           "bundle.js|encoding=br",
+		AssetPath:    "bundle.js",
+		ArtifactPath: oldPath,
+		MediaType:    "application/javascript",
+		SourceHash:   "hash-5",
+		ETag:         "\"hash-5-br\"",
+		Encoding:     "br",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	bus := eventx.New()
+	svc := pipeline.NewServiceWithBusForTest(&config.Compression{
+		CacheDir: root,
+		MaxAge:   "1h",
+	}, slog.New(slog.DiscardHandler), cat, bus, 1)
+	if err := pipeline.SubscribeVariantServedForTest(svc); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bus.Publish(context.Background(), appEvent.VariantServed{
+		AssetPath:    "bundle.js",
+		ArtifactPath: oldPath,
+		ServedAt:     time.Now(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if removed := pipeline.CleanupRemovedForTest(svc, time.Now()); removed != 0 {
+		t.Fatalf("expected no removed files for recently served variant, got %d", removed)
+	}
+	if _, err := os.Stat(oldPath); err != nil {
+		t.Fatalf("expected served variant retained, err=%v", err)
 	}
 }
 

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/DaiYuANg/arcgo/observabilityx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
@@ -35,6 +36,9 @@ type Cache struct {
 	maxFileSize int64
 	warmup      bool
 	cache       *hot.HotCache[string, []byte]
+	bus         eventx.BusRuntime
+
+	variantRemovedUnsubscribe func()
 }
 
 type WarmStats struct {
@@ -42,13 +46,14 @@ type WarmStats struct {
 	Bytes   int64
 }
 
-func newCache(cfg *config.HTTP, logger *slog.Logger, obs observabilityx.Observability) *Cache {
+func newCache(cfg *config.HTTP, logger *slog.Logger, obs observabilityx.Observability, bus eventx.BusRuntime) *Cache {
 	cacheCfg := cfg.MemoryCache
 	cache := &Cache{
 		logger:      logger,
 		obs:         observabilityx.Normalize(obs, logger),
 		maxFileSize: cacheCfg.MaxFileSize,
 		warmup:      cacheCfg.WarmupEnabled(),
+		bus:         bus,
 	}
 	if !cacheCfg.Enabled() {
 		return cache
@@ -98,6 +103,13 @@ func (c *Cache) GetOrLoad(path string) ([]byte, bool, error) {
 	c.addCounter(metricAssetCacheFills, 1)
 	c.addCounter(metricAssetCacheFillBytes, int64(len(body)))
 	return body, false, nil
+}
+
+func (c *Cache) Delete(path string) bool {
+	if !c.Enabled() {
+		return false
+	}
+	return c.cache.Delete(path)
 }
 
 func (c *Cache) Warm(ctx context.Context, cat catalog.Catalog) (WarmStats, error) {

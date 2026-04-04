@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/DaiYuANg/arcgo/observabilityx"
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"
@@ -36,6 +37,7 @@ func newServer(
 	assetResolver *resolver.Resolver,
 	pipelineSvc *pipeline.Service,
 	obs observabilityx.Observability,
+	bus eventx.BusRuntime,
 ) *fiber.App {
 	app := fiber.New(fiber.Config{
 		Views:             html.NewFileSystem(http.FS(view.View), ".html"),
@@ -48,7 +50,7 @@ func newServer(
 	})
 	registerMiddleware(app, cfg, logger, obs)
 	registerHealthRoutes(app, cat)
-	registerAssetRoute(app, cfg, logger, assetResolver, pipelineSvc, bodyCache)
+	registerAssetRoute(app, cfg, logger, assetResolver, pipelineSvc, bodyCache, bus)
 	return app
 }
 
@@ -92,6 +94,7 @@ func registerAssetRoute(
 	assetResolver *resolver.Resolver,
 	pipelineSvc *pipeline.Service,
 	bodyCache *assetcache.Cache,
+	bus eventx.BusRuntime,
 ) {
 	app.Use(routePattern(cfg.Assets.Path), func(c fiber.Ctx) error {
 		requestedFormat := normalizeImageFormat(c.Query("format"))
@@ -107,7 +110,7 @@ func registerAssetRoute(
 			return err
 		}
 		setAssetDelivery(c, delivery)
-		markVariantHit(result, pipelineSvc)
+		publishVariantServed(c.Context(), result, bus, logger)
 		return nil
 	})
 }
@@ -147,12 +150,6 @@ func applyResolvedHeaders(c fiber.Ctx, result *resolver.Result, requestedFormat 
 	}
 	if result.ContentEncoding != "" {
 		c.Set(fiber.HeaderContentEncoding, result.ContentEncoding)
-	}
-}
-
-func markVariantHit(result *resolver.Result, pipelineSvc *pipeline.Service) {
-	if result.Variant != nil {
-		pipelineSvc.MarkVariantHit(result.FilePath)
 	}
 }
 

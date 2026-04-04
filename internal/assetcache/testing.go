@@ -1,8 +1,10 @@
 package assetcache
 
 import (
+	"context"
 	"log/slog"
 
+	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/DaiYuANg/arcgo/observabilityx"
 	"github.com/daiyuang/spack/internal/config"
 )
@@ -18,5 +20,20 @@ func NewCacheWithObservabilityForTest(
 	logger *slog.Logger,
 	obs observabilityx.Observability,
 ) *Cache {
-	return newCache(&config.HTTP{MemoryCache: cfg}, logger, obs)
+	return newCache(&config.HTTP{MemoryCache: cfg}, logger, obs, nil)
+}
+
+// NewCacheWithBusForTest exposes cache construction with an event bus for external tests.
+func NewCacheWithBusForTest(
+	cfg config.MemoryCache,
+	logger *slog.Logger,
+	obs observabilityx.Observability,
+	bus eventx.BusRuntime,
+) *Cache {
+	return newCache(&config.HTTP{MemoryCache: cfg}, logger, obs, bus)
+}
+
+// StartForTest exposes cache lifecycle start for external tests.
+func StartForTest(cache *Cache) error {
+	return cache.start(context.Background())
 }

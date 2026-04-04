@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 )
@@ -28,6 +29,7 @@ func newServiceState(
 	cat catalog.Catalog,
 	metrics *Metrics,
 	stages []Stage,
+	bus eventx.BusRuntime,
 	queueSize int,
 ) *Service {
 	return &Service{
@@ -36,6 +38,7 @@ func newServiceState(
 		catalog:                cat,
 		metrics:                metrics,
 		stages:                 stages,
+		bus:                    bus,
 		tasks:                  make(chan Request, queueSize),
 		pending:                collectionx.NewSetWithCapacity[string](queueSize),
 		variantHits:            collectionx.NewMapWithCapacity[string, time.Time](queueSize),
@@ -53,10 +56,13 @@ func (s *Service) initializeMetrics(queueSize int) {
 	s.metrics.QueueLength.Set(0)
 }
 
-func (s *Service) start(_ context.Context, workers, queueSize int) error {
+func (s *Service) start(ctx context.Context, workers, queueSize int) error {
 	if !s.cfg.PipelineEnabled() {
 		s.logger.Info("Pipeline disabled")
 		return nil
+	}
+	if err := s.subscribeVariantServed(); err != nil {
+		return fmt.Errorf("subscribe variant served events: %w", err)
 	}
 	if strings.TrimSpace(s.cfg.CacheDir) == "" {
 		return nil
@@ -67,7 +73,7 @@ func (s *Service) start(_ context.Context, workers, queueSize int) error {
 
 	s.startWorkers(workers)
 	s.logWorkersStarted(workers, queueSize)
-	s.startCleanupIfNeeded()
+	s.startCleanupIfNeeded(ctx)
 	return nil
 }
 
@@ -93,7 +99,7 @@ func (s *Service) logWorkersStarted(workers, queueSize int) {
 	)
 }
 
-func (s *Service) startCleanupIfNeeded() {
+func (s *Service) startCleanupIfNeeded(ctx context.Context) {
 	if !s.cleanupEnabled() {
 		return
 	}
@@ -101,7 +107,7 @@ func (s *Service) startCleanupIfNeeded() {
 	interval := s.cfg.ParsedCleanupInterval()
 	s.cleanupStop = make(chan struct{})
 	s.cleanupDone = make(chan struct{})
-	go s.cleanupLoop(interval)
+	go s.cleanupLoop(ctx, interval)
 	s.logger.Info("Pipeline cleanup enabled",
 		slog.String("interval", interval.String()),
 		slog.String("max_age", s.cleanupDefaultMaxAge.String()),
@@ -116,6 +122,7 @@ func (s *Service) cleanupEnabled() bool {
 }
 
 func (s *Service) stop(ctx context.Context) error {
+	s.unsubscribeVariantServed()
 	if err := s.stopCleanup(ctx); err != nil {
 		return err
 	}

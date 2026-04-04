@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"cmp"
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
+	appEvent "github.com/daiyuang/spack/internal/event"
 )
 
 func requestKey(request Request) string {
@@ -85,9 +87,9 @@ type cleanupResult struct {
 	removedSizeBytes int64
 }
 
-func (s *Service) cleanupLoop(interval time.Duration) {
+func (s *Service) cleanupLoop(ctx context.Context, interval time.Duration) {
 	defer close(s.cleanupDone)
-	s.cleanupOnce()
+	s.cleanupOnce(ctx)
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -96,13 +98,13 @@ func (s *Service) cleanupLoop(interval time.Duration) {
 		case <-s.cleanupStop:
 			return
 		case <-ticker.C:
-			s.cleanupOnce()
+			s.cleanupOnce(ctx)
 		}
 	}
 }
 
-func (s *Service) cleanupOnce() {
-	result := s.cleanupArtifacts(time.Now())
+func (s *Service) cleanupOnce(ctx context.Context) {
+	result := s.cleanupArtifacts(ctx, time.Now())
 	if s.metrics != nil {
 		s.metrics.CleanupRunsTotal.Inc()
 		if result.removedTTL > 0 {
@@ -126,7 +128,7 @@ func (s *Service) cleanupOnce() {
 	}
 }
 
-func (s *Service) cleanupArtifacts(now time.Time) cleanupResult {
+func (s *Service) cleanupArtifacts(ctx context.Context, now time.Time) cleanupResult {
 	if strings.TrimSpace(s.cfg.CacheDir) == "" {
 		return cleanupResult{}
 	}
@@ -141,8 +143,8 @@ func (s *Service) cleanupArtifacts(now time.Time) cleanupResult {
 	}
 
 	result := s.prepareCleanupResult(files)
-	remaining := s.removeExpiredCleanupFiles(files, now, &result)
-	s.enforceCleanupCacheLimit(remaining, &result)
+	remaining := s.removeExpiredCleanupFiles(ctx, files, now, &result)
+	s.enforceCleanupCacheLimit(ctx, remaining, &result)
 	return result
 }
 
@@ -157,10 +159,15 @@ func (s *Service) prepareCleanupResult(files []cleanupFile) cleanupResult {
 	return result
 }
 
-func (s *Service) removeExpiredCleanupFiles(files []cleanupFile, now time.Time, result *cleanupResult) []cleanupFile {
+func (s *Service) removeExpiredCleanupFiles(
+	ctx context.Context,
+	files []cleanupFile,
+	now time.Time,
+	result *cleanupResult,
+) []cleanupFile {
 	remaining := files[:0]
 	for _, file := range files {
-		if s.shouldRemoveExpiredFile(file, now) && s.removeCleanupFile(file) {
+		if s.shouldRemoveExpiredFile(file, now) && s.removeCleanupFile(ctx, file, appEvent.VariantRemovalReasonTTL) {
 			recordExpiredCleanupRemoval(result, file.size)
 			continue
 		}
@@ -174,15 +181,7 @@ func (s *Service) shouldRemoveExpiredFile(file cleanupFile, now time.Time) bool 
 	return maxAge > 0 && now.Sub(file.lastUsed) > maxAge
 }
 
-func recordExpiredCleanupRemoval(result *cleanupResult, size int64) {
-	result.removed++
-	result.removedTTL++
-	result.removedBytes += size
-	result.removedTTLBytes += size
-	result.totalBytes -= size
-}
-
-func (s *Service) enforceCleanupCacheLimit(files []cleanupFile, result *cleanupResult) {
+func (s *Service) enforceCleanupCacheLimit(ctx context.Context, files []cleanupFile, result *cleanupResult) {
 	if s.cleanupMaxCacheBytes <= 0 || result.totalBytes <= s.cleanupMaxCacheBytes {
 		return
 	}
@@ -191,7 +190,7 @@ func (s *Service) enforceCleanupCacheLimit(files []cleanupFile, result *cleanupR
 		if result.totalBytes <= s.cleanupMaxCacheBytes {
 			return
 		}
-		if !s.removeCleanupFile(file) {
+		if !s.removeCleanupFile(ctx, file, appEvent.VariantRemovalReasonSize) {
 			continue
 		}
 		recordSizeCleanupRemoval(result, file.size)
@@ -204,15 +203,7 @@ func sortCleanupFilesByLastUsed(files []cleanupFile) []cleanupFile {
 	}).Values()
 }
 
-func recordSizeCleanupRemoval(result *cleanupResult, size int64) {
-	result.removed++
-	result.removedSize++
-	result.removedBytes += size
-	result.removedSizeBytes += size
-	result.totalBytes -= size
-}
-
-func (s *Service) removeCleanupFile(file cleanupFile) bool {
+func (s *Service) removeCleanupFile(ctx context.Context, file cleanupFile, reason appEvent.VariantRemovalReason) bool {
 	if err := os.Remove(file.path); err != nil {
 		if !os.IsNotExist(err) {
 			s.logger.Debug("Pipeline cache cleanup remove failed",
@@ -224,6 +215,7 @@ func (s *Service) removeCleanupFile(file cleanupFile) bool {
 	}
 	s.catalog.DeleteVariantByArtifactPath(file.path)
 	s.clearVariantHit(file.path)
+	s.publishVariantRemoved(ctx, file.path, reason)
 	return true
 }
 
@@ -261,12 +253,6 @@ func (s *Service) clearVariantHit(path string) {
 	s.hitMu.Lock()
 	s.variantHits.Delete(path)
 	s.hitMu.Unlock()
-}
-
-func (s *Service) updateQueueLengthMetric() {
-	if s.metrics != nil {
-		s.metrics.QueueLength.Set(float64(len(s.tasks)))
-	}
 }
 
 func collectCleanupFiles(root string) ([]cleanupFile, error) {

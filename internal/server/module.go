@@ -4,6 +4,7 @@ import (
 	"log/slog"
 
 	"github.com/DaiYuANg/arcgo/dix"
+	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/DaiYuANg/arcgo/observabilityx"
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"
@@ -15,7 +16,7 @@ import (
 
 var Module = dix.NewModule("server",
 	dix.WithModuleProviders(
-		dix.Provider4(newServerRuntimeDeps),
+		dix.Provider5(newServerRuntimeDeps),
 		dix.Provider4(newServerFromDeps),
 	),
 )
@@ -25,6 +26,7 @@ type serverRuntimeDeps struct {
 	assetResolver *resolver.Resolver
 	pipelineSvc   *pipeline.Service
 	obs           observabilityx.Observability
+	bus           eventx.BusRuntime
 }
 
 func newServerRuntimeDeps(
@@ -32,12 +34,14 @@ func newServerRuntimeDeps(
 	assetResolver *resolver.Resolver,
 	pipelineSvc *pipeline.Service,
 	obs observabilityx.Observability,
+	bus eventx.BusRuntime,
 ) serverRuntimeDeps {
 	return serverRuntimeDeps{
 		bodyCache:     bodyCache,
 		assetResolver: assetResolver,
 		pipelineSvc:   pipelineSvc,
 		obs:           obs,
+		bus:           bus,
 	}
 }
 
@@ -47,5 +51,5 @@ func newServerFromDeps(
 	cat catalog.Catalog,
 	deps serverRuntimeDeps,
 ) *fiber.App {
-	return newServer(cfg, logger, cat, deps.bodyCache, deps.assetResolver, deps.pipelineSvc, deps.obs)
+	return newServer(cfg, logger, cat, deps.bodyCache, deps.assetResolver, deps.pipelineSvc, deps.obs, deps.bus)
 }

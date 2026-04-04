@@ -1,10 +1,12 @@
 package pipeline
 
 import (
+	"context"
 	"log/slog"
 	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
@@ -42,7 +44,18 @@ func NormalizeRequestIntsForTest(values collectionx.List[int]) collectionx.List[
 
 // NewServiceForTest exposes service construction for external tests.
 func NewServiceForTest(cfg *config.Compression, logger *slog.Logger, cat catalog.Catalog, queueSize int) *Service {
-	return newServiceState(cfg, logger, cat, nil, nil, queueSize)
+	return newServiceState(cfg, logger, cat, nil, nil, nil, queueSize)
+}
+
+// NewServiceWithBusForTest exposes service construction with an event bus for external tests.
+func NewServiceWithBusForTest(
+	cfg *config.Compression,
+	logger *slog.Logger,
+	cat catalog.Catalog,
+	bus eventx.BusRuntime,
+	queueSize int,
+) *Service {
+	return newServiceState(cfg, logger, cat, nil, nil, bus, queueSize)
 }
 
 // PendingCountForTest exposes pending queue cardinality for external tests.
@@ -59,5 +72,10 @@ func QueuedCountForTest(s *Service) int {
 
 // CleanupRemovedForTest exposes cleanup execution for external tests.
 func CleanupRemovedForTest(s *Service, now time.Time) int {
-	return s.cleanupArtifacts(now).removed
+	return s.cleanupArtifacts(context.Background(), now).removed
+}
+
+// SubscribeVariantServedForTest exposes event subscription for external tests.
+func SubscribeVariantServedForTest(s *Service) error {
+	return s.subscribeVariantServed()
 }

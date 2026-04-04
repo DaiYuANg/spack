@@ -12,7 +12,7 @@ var Module = dix.NewModule("pipeline",
 		dix.Provider3(newImageStageFromDeps),
 		dix.Provider3(newCompressionStageFromDeps),
 		dix.Provider2(newStages),
-		dix.Provider5(newServiceFromDeps),
+		dix.Provider6(newServiceFromDeps),
 	),
 	dix.WithModuleHooks(
 		dix.OnStart(startServiceLifecycle),
