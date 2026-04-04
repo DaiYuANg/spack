@@ -10,6 +10,13 @@ func defaultConfig() Config {
 		HTTP: HTTP{
 			Port:      80,
 			LowMemory: true,
+			MemoryCache: MemoryCache{
+				Enable:      false,
+				Warmup:      false,
+				MaxEntries:  1024,
+				MaxFileSize: 64 * 1024,
+				TTL:         "5m",
+			},
 		},
 		Assets: Assets{
 			Path:     "/",

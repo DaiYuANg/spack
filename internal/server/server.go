@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
 	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/DaiYuANg/arcgo/observabilityx"
+	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/pipeline"
@@ -32,6 +32,7 @@ func newServer(
 	cfg *config.Config,
 	logger *slog.Logger,
 	cat catalog.Catalog,
+	bodyCache *assetcache.Cache,
 	assetResolver *resolver.Resolver,
 	pipelineSvc *pipeline.Service,
 	obs observabilityx.Observability,
@@ -45,10 +46,9 @@ func newServer(
 		ServerHeader:      buildServerHeader(),
 		ReduceMemoryUsage: cfg.HTTP.LowMemory,
 	})
-
 	registerMiddleware(app, cfg, logger, obs)
 	registerHealthRoutes(app, cat)
-	registerAssetRoute(app, cfg, logger, assetResolver, pipelineSvc)
+	registerAssetRoute(app, cfg, logger, assetResolver, pipelineSvc, bodyCache)
 	return app
 }
 
@@ -91,23 +91,24 @@ func registerAssetRoute(
 	logger *slog.Logger,
 	assetResolver *resolver.Resolver,
 	pipelineSvc *pipeline.Service,
+	bodyCache *assetcache.Cache,
 ) {
 	app.Use(routePattern(cfg.Assets.Path), func(c fiber.Ctx) error {
 		requestedFormat := normalizeImageFormat(c.Query("format"))
-		result, err := assetResolver.Resolve(buildResolverRequest(c, cfg.Assets.Path, requestedFormat))
+		request := buildResolverRequest(c, cfg.Assets.Path, requestedFormat)
+		result, err := assetResolver.Resolve(request)
 		if err != nil {
 			return fiber.ErrNotFound
 		}
 
 		enqueuePipelineResult(result, pipelineSvc)
-		body, err := readResolvedAsset(result, logger)
+		delivery, err := sendResolvedAsset(c, request, result, requestedFormat, logger, bodyCache)
 		if err != nil {
-			return fiber.ErrInternalServerError
+			return err
 		}
-
-		applyResolvedHeaders(c, result, requestedFormat)
+		setAssetDelivery(c, delivery)
 		markVariantHit(result, pipelineSvc)
-		return c.Send(body)
+		return nil
 	})
 }
 
@@ -133,18 +134,6 @@ func enqueuePipelineResult(result *resolver.Result, pipelineSvc *pipeline.Servic
 		PreferredWidths:    result.PreferredWidths,
 		PreferredFormats:   result.PreferredFormats,
 	})
-}
-
-func readResolvedAsset(result *resolver.Result, logger *slog.Logger) ([]byte, error) {
-	body, err := os.ReadFile(result.FilePath)
-	if err != nil {
-		logger.Error("Read asset failed",
-			slog.String("path", result.FilePath),
-			slog.String("err", err.Error()),
-		)
-		return nil, fmt.Errorf("read resolved asset: %w", err)
-	}
-	return body, nil
 }
 
 func applyResolvedHeaders(c fiber.Ctx, result *resolver.Result, requestedFormat string) {
@@ -173,21 +162,19 @@ func metricsMiddleware(obs observabilityx.Observability) fiber.Handler {
 	}
 
 	return func(c fiber.Ctx) error {
-		requestPath := c.Path()
-		method := c.Method()
-
 		startedAt := time.Now()
 		err := c.Next()
 		duration := time.Since(startedAt).Seconds()
-		status := strconv.Itoa(c.Response().StatusCode())
 
-		attrs := []observabilityx.Attribute{
-			observabilityx.String("method", method),
-			observabilityx.String("path", requestPath),
-			observabilityx.String("status", status),
+		requestAttrs := requestMetricsAttrs(c)
+		obs.AddCounter(context.Background(), "http_requests_total", 1, requestAttrs...)
+		obs.RecordHistogram(context.Background(), "http_request_duration_seconds", duration, requestAttrs...)
+
+		deliveryAttrs := assetDeliveryMetricsAttrs(c)
+		if len(deliveryAttrs) > 0 {
+			obs.AddCounter(context.Background(), "http_asset_delivery_total", 1, deliveryAttrs...)
+			obs.RecordHistogram(context.Background(), "http_asset_delivery_duration_seconds", duration, deliveryAttrs...)
 		}
-		obs.AddCounter(context.Background(), "http_requests_total", 1, attrs...)
-		obs.RecordHistogram(context.Background(), "http_request_duration_seconds", duration, attrs...)
 		if err != nil {
 			return fmt.Errorf("run metrics middleware chain: %w", err)
 		}
@@ -195,17 +182,27 @@ func metricsMiddleware(obs observabilityx.Observability) fiber.Handler {
 	}
 }
 
+func requestMetricsAttrs(c fiber.Ctx) []observabilityx.Attribute {
+	return []observabilityx.Attribute{
+		observabilityx.String("method", c.Method()),
+		observabilityx.String("path", c.Path()),
+		observabilityx.String("status", strconv.Itoa(c.Response().StatusCode())),
+	}
+}
+
+func assetDeliveryMetricsAttrs(c fiber.Ctx) []observabilityx.Attribute {
+	delivery := getAssetDelivery(c)
+	if delivery == "" {
+		return nil
+	}
+	return append(requestMetricsAttrs(c), observabilityx.String("delivery", delivery))
+}
+
 func requestLogMiddleware(logger *slog.Logger) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		startedAt := time.Now()
 		err := c.Next()
-		logger.Info("HTTP request",
-			slog.String("method", c.Method()),
-			slog.String("path", c.Path()),
-			slog.Int("status", c.Response().StatusCode()),
-			slog.Duration("duration", time.Since(startedAt)),
-			slog.String("request_id", c.GetRespHeader("Request-ID")),
-		)
+		logRequest(logger, c, startedAt)
 		if err != nil {
 			return fmt.Errorf("run request log middleware chain: %w", err)
 		}

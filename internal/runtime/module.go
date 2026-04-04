@@ -6,6 +6,7 @@ import (
 
 	"github.com/DaiYuANg/arcgo/dix"
 	obsprom "github.com/DaiYuANg/arcgo/observabilityx/prometheus"
+	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/pipeline"
@@ -21,6 +22,7 @@ var Module = dix.NewModule("runtime",
 				dix.TypedService[*config.Config](),
 				dix.TypedService[source.Source](),
 				dix.TypedService[catalog.Catalog](),
+				dix.TypedService[*assetcache.Cache](),
 				dix.TypedService[*pipeline.Service](),
 				dix.TypedService[*pipeline.Metrics](),
 				dix.TypedService[*slog.Logger](),
@@ -41,6 +43,10 @@ func setupRuntime(c *dix.Container, lc dix.Lifecycle) error {
 		return err
 	}
 	cat, err := dix.ResolveAs[catalog.Catalog](c)
+	if err != nil {
+		return err
+	}
+	bodyCache, err := dix.ResolveAs[*assetcache.Cache](c)
 	if err != nil {
 		return err
 	}
@@ -66,7 +72,7 @@ func setupRuntime(c *dix.Container, lc dix.Lifecycle) error {
 	}
 
 	logConfigLifecycle(lc, cfg, logger)
-	bootstrapCatalog(lc, cfg, src, cat, pipelineSvc, logger)
+	bootstrapCatalog(lc, cfg, src, cat, bodyCache, pipelineSvc, logger)
 	httpLifecycle(lc, app, cfg, cat, logger)
 	debugLifecycle(lc, cfg, logger, pipelineMetrics, metricsAdapter)
 	return nil

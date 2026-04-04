@@ -15,6 +15,7 @@ import (
 	"github.com/DaiYuANg/arcgo/dix"
 	obsprom "github.com/DaiYuANg/arcgo/observabilityx/prometheus"
 	"github.com/arl/statsviz"
+	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/pipeline"
@@ -29,24 +30,34 @@ func bootstrapCatalog(
 	cfg *config.Config,
 	src source.Source,
 	cat catalog.Catalog,
+	bodyCache *assetcache.Cache,
 	pipelineSvc *pipeline.Service,
 	logger *slog.Logger,
 ) {
 	lc.OnStart(func(ctx context.Context) error {
 		startedAt := time.Now()
-		totalBytes, err := scanCatalogAssets(src, cat)
-		if err != nil {
-			return err
+		totalBytes, scanErr := scanCatalogAssets(src, cat)
+		if scanErr != nil {
+			return scanErr
 		}
 
-		if err := pipelineSvc.Warm(ctx); err != nil {
-			return fmt.Errorf("warm pipeline: %w", err)
+		warmErr := pipelineSvc.Warm(ctx)
+		if warmErr != nil {
+			return fmt.Errorf("warm pipeline: %w", warmErr)
+		}
+		cacheStats, cacheErr := bodyCache.Warm(ctx, cat)
+		if cacheErr != nil {
+			return fmt.Errorf("warm asset memory cache: %w", cacheErr)
 		}
 
 		logger.Info("Catalog ready",
 			slog.Int("assets", cat.AssetCount()),
 			slog.Int("variants", cat.VariantCount()),
 			slog.Int64("bytes", totalBytes),
+			slog.Bool("memory_cache_enable", bodyCache.Enabled()),
+			slog.Bool("memory_cache_warmup", bodyCache.WarmupEnabled()),
+			slog.Int("memory_cache_entries", cacheStats.Entries),
+			slog.Int64("memory_cache_bytes", cacheStats.Bytes),
 			slog.String("compression_mode", cfg.Compression.NormalizedMode()),
 			slog.Duration("duration", time.Since(startedAt)),
 		)
@@ -99,6 +110,11 @@ func logConfigLifecycle(lc dix.Lifecycle, cfg *config.Config, logger *slog.Logge
 		logger.Info("Config loaded",
 			slog.Int("http_port", cfg.HTTP.Port),
 			slog.Bool("http_low_memory", cfg.HTTP.LowMemory),
+			slog.Bool("http_memory_cache_enable", cfg.HTTP.MemoryCache.Enabled()),
+			slog.Bool("http_memory_cache_warmup", cfg.HTTP.MemoryCache.WarmupEnabled()),
+			slog.Int("http_memory_cache_max_entries", cfg.HTTP.MemoryCache.MaxEntries),
+			slog.Int64("http_memory_cache_max_file_size", cfg.HTTP.MemoryCache.MaxFileSize),
+			slog.String("http_memory_cache_ttl", cfg.HTTP.MemoryCache.ParsedTTL().String()),
 			slog.String("assets_root", cfg.Assets.Root),
 			slog.String("assets_path", cfg.Assets.Path),
 			slog.String("assets_entry", cfg.Assets.Entry),

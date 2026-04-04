@@ -59,6 +59,7 @@ require (
 	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/DaiYuANg/arcgo/pkg/option v0.0.0-20260403112347-2ed2801ae2e6 // indirect
 	github.com/Djarvur/go-err113 v0.1.1 // indirect
+	github.com/DmitriyVTitov/size v1.5.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.31.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.55.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.55.0 // indirect
@@ -283,7 +284,9 @@ require (
 	github.com/ryanrolds/sqlclosecheck v0.6.0 // indirect
 	github.com/sajari/fuzzy v1.0.0 // indirect
 	github.com/samber/do/v2 v2.0.0 // indirect
+	github.com/samber/go-singleflightx v0.3.2 // indirect
 	github.com/samber/go-type-to-string v1.8.0 // indirect
+	github.com/samber/hot v0.13.0 // indirect
 	github.com/samber/mo v1.16.0 // indirect
 	github.com/samber/oops/loggers/zerolog v0.0.0-20260402170550-f43e94be84d4 // indirect
 	github.com/samber/slog-common v0.22.0 // indirect

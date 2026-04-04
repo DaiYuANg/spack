@@ -73,18 +73,28 @@ Important endpoints:
 
 ## Configuration
 
+See [`.env.example`](./.env.example) for a complete example.
+
 Required:
 
 - `SPACK_ASSETS_ROOT`
 
-Common:
+HTTP:
+
+- `SPACK_HTTP_PORT=80`
+- `SPACK_HTTP_LOW_MEMORY=true`
+- `SPACK_HTTP_MEMORY_CACHE_ENABLE=false`
+- `SPACK_HTTP_MEMORY_CACHE_WARMUP=false`
+- `SPACK_HTTP_MEMORY_CACHE_MAX_ENTRIES=1024`
+- `SPACK_HTTP_MEMORY_CACHE_MAX_FILE_SIZE=65536`
+- `SPACK_HTTP_MEMORY_CACHE_TTL=5m`
+
+Assets:
 
 - `SPACK_ASSETS_PATH=/`
 - `SPACK_ASSETS_ENTRY=index.html`
-- `SPACK_ASSETS_FALLBACK_ON=not_found`
+- `SPACK_ASSETS_FALLBACK_ON=not_found|forbidden`
 - `SPACK_ASSETS_FALLBACK_TARGET=index.html`
-- `SPACK_HTTP_PORT=80`
-- `SPACK_LOGGER_LEVEL=info`
 
 Compression:
 
@@ -99,6 +109,8 @@ Compression:
 - `SPACK_COMPRESSION_IMAGE_MAX_AGE=336h`
 - `SPACK_COMPRESSION_ENCODING_MAX_AGE=168h`
 - `SPACK_COMPRESSION_MAX_CACHE_BYTES=1073741824`
+- `SPACK_COMPRESSION_BROTLI_QUALITY=5`
+- `SPACK_COMPRESSION_GZIP_LEVEL=5`
 
 Images:
 
@@ -110,12 +122,27 @@ Images:
 - format can also be negotiated from `Accept: image/jpeg,image/png`
 - combine both as `?w=640&format=jpeg`
 
-Debug runtime:
+Debug and metrics:
 
 - `SPACK_DEBUG_ENABLE=true`
+- `SPACK_DEBUG_PPROF_PREFIX=/pprof`
 - `SPACK_DEBUG_LIVE_PORT=8080`
 - `SPACK_METRICS_PREFIX=/prometheus`
-- includes HTTP and pipeline runtime metrics (queue length, enqueue drop/dedupe, cleanup activity)
+- request logs include `delivery=memory_cache_hit|memory_cache_fill|sendfile|sendfile_range` for static asset responses
+- `/prometheus` includes HTTP request metrics
+- `/prometheus` includes asset delivery metrics labeled by delivery mode
+- `/prometheus` includes asset cache hit/miss/fill/warmup/eviction counters
+- `/prometheus` includes pipeline runtime metrics such as queue length, enqueue drop/dedupe, and cleanup activity
+
+Logger:
+
+- `SPACK_LOGGER_LEVEL=debug`
+- `SPACK_LOGGER_CONSOLE_ENABLED=true`
+- `SPACK_LOGGER_FILE_ENABLED=false`
+- `SPACK_LOGGER_FILE_PATH=<path>`
+- `SPACK_LOGGER_FILE_MAX_SIZE=<int>`
+- `SPACK_LOGGER_FILE_MAX_AGE=<int>`
+- `SPACK_LOGGER_FILE_MAX_FILES=<int>`
 
 ## Development
 
