@@ -5,7 +5,7 @@ SPACK is a container-first static asset runtime for SPA and frontend build outpu
 It is intentionally narrower than Nginx:
 
 - one process serves one asset mount
-- configuration is environment-variable driven
+- configuration can be loaded from dotenv, config files, environment variables, and CLI flags
 - optimized for container images and runtime base image usage
 - built-in asset optimization pipeline instead of generic web server features
 
@@ -64,6 +64,12 @@ Then run:
 go run .
 ```
 
+Or override configuration at startup:
+
+```powershell
+go run . --config .\spack.yaml --http.port=8080 --assets.root=.\dist
+```
+
 Important endpoints:
 
 - `/healthz`
@@ -74,6 +80,26 @@ Important endpoints:
 ## Configuration
 
 See [`.env.example`](./.env.example) for a complete example.
+
+Configuration sources are merged in this order:
+
+1. built-in defaults
+2. dotenv files: `.env`, `.env.local`
+3. config files passed by `--config`
+4. environment variables
+5. CLI flags
+
+Later sources override earlier ones.
+
+CLI flags use config-path names directly, for example:
+
+- `--http.port=8080`
+- `--assets.root=./dist`
+- `--assets.fallback.target=index.html`
+- `--compression.mode=warmup`
+- `--logger.level=info`
+
+You can pass `--config` multiple times. Later files override earlier ones.
 
 Required:
 
@@ -144,6 +170,19 @@ Logger:
 - `SPACK_LOGGER_FILE_MAX_AGE=<int>`
 - `SPACK_LOGGER_FILE_MAX_FILES=<int>`
 
+Example startup commands:
+
+```powershell
+# use environment variables / dotenv only
+go run .
+
+# load one config file and override a few values from CLI
+go run . --config .\spack.yaml --http.port=8080 --assets.root=.\dist
+
+# layer multiple config files
+go run . --config .\spack.yaml --config .\spack.local.yaml
+```
+
 ## Development
 
 Run tests:
@@ -158,6 +197,13 @@ Use the SPA fixture:
 pnpm -C test build
 $env:SPACK_ASSETS_ROOT = (Resolve-Path .\test\build\dist).Path
 go run .
+```
+
+Or run the fixture with CLI flags only:
+
+```powershell
+pnpm -C test build
+go run . --assets.root=./test/build/dist --assets.path=/ --assets.entry=index.html
 ```
 
 ## Next

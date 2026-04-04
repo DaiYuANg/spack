@@ -5,41 +5,41 @@ import (
 
 	"github.com/DaiYuANg/arcgo/configx"
 	"github.com/DaiYuANg/arcgo/dix"
-	"github.com/daiyuang/spack/internal/constant"
 	"github.com/samber/do/v2"
 )
 
-var Module = dix.NewModule("config",
-	dix.WithModuleProviders(
-		dix.RawProviderWithMetadata(registerConfigProvider, dix.ProviderMetadata{
-			Label:  "ConfigProvider",
-			Output: dix.TypedService[*Config](),
-			Raw:    true,
-		}),
-		dix.Provider1(func(cfg *Config) *Debug { return &cfg.Debug }),
-		dix.Provider1(func(cfg *Config) *Image { return &cfg.Image }),
-		dix.Provider1(func(cfg *Config) *Metrics { return &cfg.Metrics }),
-		dix.Provider1(func(cfg *Config) *Logger { return &cfg.Logger }),
-		dix.Provider1(func(cfg *Config) *HTTP { return &cfg.HTTP }),
-		dix.Provider1(func(cfg *Config) *Assets { return &cfg.Assets }),
-		dix.Provider1(func(cfg *Config) *Compression { return &cfg.Compression }),
-	),
-)
+var Module = NewModule(LoadOptions{})
 
-func registerConfigProvider(c *dix.Container) {
-	do.ProvideNamed(c.Raw(), dix.TypedService[*Config]().Name, func(do.Injector) (*Config, error) {
-		return loadConfig()
-	})
+func NewModule(loadOptions LoadOptions) dix.Module {
+	return dix.NewModule("config",
+		dix.WithModuleProviders(
+			dix.RawProviderWithMetadata(registerConfigProvider(loadOptions), dix.ProviderMetadata{
+				Label:  "ConfigProvider",
+				Output: dix.TypedService[*Config](),
+				Raw:    true,
+			}),
+			dix.Provider1(func(cfg *Config) *Debug { return &cfg.Debug }),
+			dix.Provider1(func(cfg *Config) *Image { return &cfg.Image }),
+			dix.Provider1(func(cfg *Config) *Metrics { return &cfg.Metrics }),
+			dix.Provider1(func(cfg *Config) *Logger { return &cfg.Logger }),
+			dix.Provider1(func(cfg *Config) *HTTP { return &cfg.HTTP }),
+			dix.Provider1(func(cfg *Config) *Assets { return &cfg.Assets }),
+			dix.Provider1(func(cfg *Config) *Compression { return &cfg.Compression }),
+		),
+	)
 }
 
-func loadConfig() (*Config, error) {
+func registerConfigProvider(loadOptions LoadOptions) func(*dix.Container) {
+	return func(c *dix.Container) {
+		do.ProvideNamed(c.Raw(), dix.TypedService[*Config]().Name, func(do.Injector) (*Config, error) {
+			return loadConfig(loadOptions)
+		})
+	}
+}
+
+func loadConfig(loadOptions LoadOptions) (*Config, error) {
 	loaded := defaultConfig()
-	err := configx.Load(
-		&loaded,
-		configx.WithEnvPrefix(constant.EnvPrefix),
-		configx.WithIgnoreDotenvError(true),
-		configx.WithDotenv(),
-	)
+	err := configx.Load(&loaded, loadOptions.configxOptions()...)
 	if err != nil {
 		return nil, fmt.Errorf("load config: %w", err)
 	}
@@ -47,5 +47,9 @@ func loadConfig() (*Config, error) {
 }
 
 func Load() (*Config, error) {
-	return loadConfig()
+	return loadConfig(LoadOptions{})
+}
+
+func LoadWithOptions(loadOptions LoadOptions) (*Config, error) {
+	return loadConfig(loadOptions)
 }

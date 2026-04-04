@@ -21,6 +21,7 @@ var rootCmd = &cobra.Command{
 	Use: "spack",
 	PreRun: func(cmd *cobra.Command, args []string) {
 		container = createContainer(
+			configLoadOptions(),
 			metrics.Module,
 			event.Module,
 			source.Module,

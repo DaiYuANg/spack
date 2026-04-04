@@ -2,6 +2,8 @@
 package cmd
 
 import (
+	"log/slog"
+
 	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
@@ -9,10 +11,10 @@ import (
 	"github.com/daiyuang/spack/internal/runtime"
 )
 
-func createContainer(userModules ...dix.Module) *dix.App {
+func createContainer(loadOptions config.LoadOptions, userModules ...dix.Module) *dix.App {
 	allModules := make([]dix.Module, 0, 4+len(userModules))
 	allModules = append(allModules,
-		config.Module,
+		config.NewModule(loadOptions),
 		logger.Module,
 		catalog.Module,
 	)
@@ -22,6 +24,8 @@ func createContainer(userModules ...dix.Module) *dix.App {
 	return dix.New(
 		"spack",
 		dix.WithModules(allModules...),
-		dix.WithLoggerFrom0(logger.BootstrapFromEnv),
+		dix.WithLoggerFrom0(func() *slog.Logger {
+			return logger.Bootstrap(loadOptions)
+		}),
 	)
 }

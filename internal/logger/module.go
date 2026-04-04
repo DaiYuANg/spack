@@ -44,12 +44,16 @@ func Build(cfg *config.Config) *slog.Logger {
 	return logger
 }
 
-func BootstrapFromEnv() *slog.Logger {
-	cfg, err := config.Load()
+func Bootstrap(loadOptions config.LoadOptions) *slog.Logger {
+	cfg, err := config.LoadWithOptions(loadOptions)
 	if err != nil {
 		fallback := slog.Default()
 		fallback.Error("config bootstrap failed, fallback to slog default", slog.String("err", err.Error()))
 		return fallback
 	}
 	return Build(cfg)
+}
+
+func BootstrapFromEnv() *slog.Logger {
+	return Bootstrap(config.LoadOptions{})
 }

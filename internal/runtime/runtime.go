@@ -154,7 +154,9 @@ func httpLifecycle(
 				slog.Int("assets", cat.AssetCount()),
 				slog.Int("variants", cat.VariantCount()),
 			)
-			if err := app.Listen(":" + cfg.HTTP.GetPort()); err != nil {
+			if err := app.Listen(":"+cfg.HTTP.GetPort(), fiber.ListenConfig{
+				DisableStartupMessage: true,
+			}); err != nil {
 				logger.Error("HTTP runtime stopped", slog.String("err", err.Error()))
 			}
 		}()

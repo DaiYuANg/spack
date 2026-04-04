@@ -7,6 +7,7 @@ import (
 
 	"github.com/DaiYuANg/arcgo/configx"
 	"github.com/daiyuang/spack/internal/config"
+	"github.com/spf13/pflag"
 )
 
 func TestLoadIntoDefaultConfigPreservesNestedDefaultsWithPartialDotenv(t *testing.T) {
@@ -43,5 +44,57 @@ func TestLoadIntoDefaultConfigPreservesNestedDefaultsWithPartialDotenv(t *testin
 	}
 	if cfg.Compression.Workers != 2 {
 		t.Fatalf("expected default compression workers 2, got %d", cfg.Compression.Workers)
+	}
+}
+
+func TestLoadWithOptions_PrioritizesFlagsOverEnvOverFiles(t *testing.T) {
+	t.Helper()
+
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "spack.yaml")
+	configBody := "" +
+		"http:\n" +
+		"  port: 7001\n" +
+		"assets:\n" +
+		"  path: /from-file\n" +
+		"  root: /file-root\n" +
+		"logger:\n" +
+		"  level: warn\n"
+	if err := os.WriteFile(configPath, []byte(configBody), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("SPACK_ASSETS_ROOT", "/env-root")
+
+	flags := pflag.NewFlagSet("spack-test", pflag.ContinueOnError)
+	flags.Int("http.port", 0, "")
+	flags.Bool("http.low_memory", true, "")
+	flags.String("logger.level", "", "")
+	if err := flags.Parse([]string{"--http.port=8088", "--http.low_memory=false", "--logger.level=debug"}); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.LoadWithOptions(config.LoadOptions{
+		Files:   []string{configPath},
+		FlagSet: flags,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if cfg.HTTP.Port != 8088 {
+		t.Fatalf("expected flag to override http.port to 8088, got %d", cfg.HTTP.Port)
+	}
+	if cfg.HTTP.LowMemory {
+		t.Fatal("expected flag to override http.low_memory to false")
+	}
+	if cfg.Assets.Path != "/from-file" {
+		t.Fatalf("expected config file to set assets.path, got %q", cfg.Assets.Path)
+	}
+	if cfg.Assets.Root != "/env-root" {
+		t.Fatalf("expected env to override assets.root, got %q", cfg.Assets.Root)
+	}
+	if cfg.Logger.Level != "debug" {
+		t.Fatalf("expected flag to override logger.level, got %q", cfg.Logger.Level)
 	}
 }
