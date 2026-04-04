@@ -105,12 +105,14 @@ func registerAssetRoute(
 		}
 
 		enqueuePipelineResult(result, pipelineSvc)
-		delivery, err := sendResolvedAsset(c, request, result, requestedFormat, logger, bodyCache)
+		delivery, err := sendResolvedAsset(c, cfg, request, result, requestedFormat, logger, bodyCache)
 		if err != nil {
 			return err
 		}
-		setAssetDelivery(c, delivery)
-		publishVariantServed(c.Context(), result, bus, logger)
+		if delivery != "" {
+			setAssetDelivery(c, delivery)
+			publishVariantServed(c.Context(), result, bus, logger)
+		}
 		return nil
 	})
 }
@@ -127,6 +129,9 @@ func buildResolverRequest(c fiber.Ctx, mountPath, requestedFormat string) resolv
 }
 
 func enqueuePipelineResult(result *resolver.Result, pipelineSvc *pipeline.Service) {
+	if pipelineSvc == nil || result == nil || result.Asset == nil {
+		return
+	}
 	if result.PreferredEncodings.Len() == 0 && result.PreferredWidths.Len() == 0 && result.PreferredFormats.Len() == 0 {
 		return
 	}
@@ -137,20 +142,6 @@ func enqueuePipelineResult(result *resolver.Result, pipelineSvc *pipeline.Servic
 		PreferredWidths:    result.PreferredWidths,
 		PreferredFormats:   result.PreferredFormats,
 	})
-}
-
-func applyResolvedHeaders(c fiber.Ctx, result *resolver.Result, requestedFormat string) {
-	c.Set(fiber.HeaderContentType, result.MediaType)
-	c.Append(fiber.HeaderVary, fiber.HeaderAcceptEncoding)
-	if shouldVaryAccept(result.Asset.MediaType, requestedFormat) {
-		c.Append(fiber.HeaderVary, fiber.HeaderAccept)
-	}
-	if result.ETag != "" {
-		c.Set(fiber.HeaderETag, result.ETag)
-	}
-	if result.ContentEncoding != "" {
-		c.Set(fiber.HeaderContentEncoding, result.ContentEncoding)
-	}
 }
 
 func metricsMiddleware(obs observabilityx.Observability) fiber.Handler {

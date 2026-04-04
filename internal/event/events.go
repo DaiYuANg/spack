@@ -3,8 +3,9 @@ package event
 import "time"
 
 const (
-	variantServedEventName  = "variant.served"
-	variantRemovedEventName = "variant.removed"
+	variantServedEventName    = "variant.served"
+	variantGeneratedEventName = "variant.generated"
+	variantRemovedEventName   = "variant.removed"
 )
 
 type VariantRemovalReason string
@@ -24,6 +25,18 @@ type VariantServed struct {
 
 func (VariantServed) Name() string {
 	return variantServedEventName
+}
+
+type VariantGenerated struct {
+	AssetPath    string
+	ArtifactPath string
+	Stage        string
+	Size         int64
+	GeneratedAt  time.Time
+}
+
+func (VariantGenerated) Name() string {
+	return variantGeneratedEventName
 }
 
 type VariantRemoved struct {

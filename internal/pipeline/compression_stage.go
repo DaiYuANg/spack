@@ -6,7 +6,9 @@ import (
 	"compress/gzip"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/andybalholm/brotli"
@@ -106,7 +108,8 @@ func (s *compressionStage) Execute(task Task, asset *catalog.Asset) (*catalog.Va
 		ETag:         fmt.Sprintf("\"%s-%s\"", asset.SourceHash, task.Encoding),
 		Encoding:     task.Encoding,
 		Metadata: map[string]string{
-			"stage": "compression",
+			"stage":      "compression",
+			"mtime_unix": strconv.FormatInt(time.Now().Unix(), 10),
 		},
 	}, nil
 }

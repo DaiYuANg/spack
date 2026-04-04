@@ -7,24 +7,31 @@ import (
 	"time"
 
 	"github.com/daiyuang/spack/internal/assetcache"
+	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/resolver"
 	"github.com/gofiber/fiber/v3"
 )
 
 func sendResolvedAsset(
 	c fiber.Ctx,
+	cfg *config.Config,
 	request resolver.Request,
 	result *resolver.Result,
 	requestedFormat string,
 	logger *slog.Logger,
 	bodyCache *assetcache.Cache,
 ) (string, error) {
+	applyResolvedHeaders(c, cfg, result, requestedFormat)
+	if shouldSendNotModified(c, request) {
+		c.Status(fiber.StatusNotModified)
+		return "", nil
+	}
+
 	if bodyCache.ShouldServe(resolvedAssetSize(result), request.RangeRequested) {
 		body, found, err := bodyCache.GetOrLoad(result.FilePath)
 		if err != nil {
 			return "", fiber.ErrInternalServerError
 		}
-		applyResolvedHeaders(c, result, requestedFormat)
 		if err := c.Send(body); err != nil {
 			return "", fmt.Errorf("send cached asset body: %w", err)
 		}
@@ -43,7 +50,7 @@ func sendResolvedAsset(
 	}
 
 	// Override Fiber's extension-derived headers so variant metadata stays authoritative.
-	applyResolvedHeaders(c, result, requestedFormat)
+	applyResolvedHeaders(c, cfg, result, requestedFormat)
 	if request.RangeRequested {
 		return deliverySendFileRange, nil
 	}

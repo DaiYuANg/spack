@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/DaiYuANg/arcgo/eventx"
+	"github.com/daiyuang/spack/internal/catalog"
 	appEvent "github.com/daiyuang/spack/internal/event"
 )
 
@@ -53,6 +54,47 @@ func (s *Service) publishVariantRemoved(ctx context.Context, path string, reason
 	s.logger.Debug("Publish variant removed event failed",
 		slog.String("path", path),
 		slog.String("reason", string(reason)),
+		slog.String("err", err.Error()),
+	)
+}
+
+func (s *Service) publishVariantGenerated(ctx context.Context, stage string, variant *catalog.Variant) {
+	if s == nil || s.bus == nil || variant == nil || strings.TrimSpace(variant.ArtifactPath) == "" {
+		return
+	}
+
+	event := appEvent.VariantGenerated{
+		AssetPath:    variant.AssetPath,
+		ArtifactPath: variant.ArtifactPath,
+		Stage:        strings.TrimSpace(stage),
+		Size:         variant.Size,
+		GeneratedAt:  time.Now(),
+	}
+	if err := s.bus.PublishAsync(ctx, event); err != nil {
+		if errors.Is(err, eventx.ErrAsyncRuntimeUnavailable) {
+			s.publishVariantGeneratedSync(ctx, event)
+			return
+		}
+		if errors.Is(err, eventx.ErrBusClosed) {
+			return
+		}
+		s.logger.Debug("Publish variant generated event failed",
+			slog.String("path", variant.ArtifactPath),
+			slog.String("stage", stage),
+			slog.String("err", err.Error()),
+		)
+	}
+}
+
+func (s *Service) publishVariantGeneratedSync(ctx context.Context, event appEvent.VariantGenerated) {
+	err := s.bus.Publish(ctx, event)
+	if err == nil || errors.Is(err, eventx.ErrBusClosed) {
+		return
+	}
+
+	s.logger.Debug("Publish variant generated event sync fallback failed",
+		slog.String("path", event.ArtifactPath),
+		slog.String("stage", event.Stage),
 		slog.String("err", err.Error()),
 	)
 }

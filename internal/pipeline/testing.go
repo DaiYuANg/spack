@@ -58,6 +58,22 @@ func NewServiceWithBusForTest(
 	return newServiceState(cfg, logger, cat, nil, nil, bus, queueSize)
 }
 
+type testStage struct {
+	name string
+}
+
+func (s testStage) Name() string {
+	return s.name
+}
+
+func (testStage) Plan(_ *catalog.Asset, _ Request) []Task {
+	return nil
+}
+
+func (testStage) Execute(_ Task, _ *catalog.Asset) (*catalog.Variant, error) {
+	return nil, ErrVariantSkipped
+}
+
 // PendingCountForTest exposes pending queue cardinality for external tests.
 func PendingCountForTest(s *Service) int {
 	s.pendingMu.Lock()
@@ -78,4 +94,9 @@ func CleanupRemovedForTest(s *Service, now time.Time) int {
 // SubscribeVariantServedForTest exposes event subscription for external tests.
 func SubscribeVariantServedForTest(s *Service) error {
 	return s.subscribeVariantServed()
+}
+
+// UpsertStageVariantForTest exposes catalog upsert and side effects for external tests.
+func UpsertStageVariantForTest(s *Service, stageName string, asset *catalog.Asset, variant *catalog.Variant) {
+	s.upsertStageVariant(context.Background(), testStage{name: stageName}, asset, variant)
 }

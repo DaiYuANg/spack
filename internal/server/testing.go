@@ -6,6 +6,10 @@ import (
 
 	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/DaiYuANg/arcgo/observabilityx"
+	"github.com/daiyuang/spack/internal/assetcache"
+	"github.com/daiyuang/spack/internal/catalog"
+	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/pipeline"
 	"github.com/daiyuang/spack/internal/resolver"
 	"github.com/gofiber/fiber/v3"
 )
@@ -33,4 +37,17 @@ func PublishVariantServedForTest(
 	logger *slog.Logger,
 ) {
 	publishVariantServed(ctx, result, bus, logger)
+}
+
+// NewAppForTest exposes server construction for external tests.
+func NewAppForTest(
+	cfg *config.Config,
+	logger *slog.Logger,
+	cat catalog.Catalog,
+	bodyCache *assetcache.Cache,
+	assetResolver *resolver.Resolver,
+	pipelineSvc *pipeline.Service,
+	bus eventx.BusRuntime,
+) *fiber.App {
+	return newServer(cfg, logger, cat, bodyCache, assetResolver, pipelineSvc, nil, bus)
 }

@@ -121,7 +121,7 @@ func (s *Service) Warm(ctx context.Context) error {
 		default:
 		}
 
-		s.process(Request{AssetPath: asset.Path})
+		s.process(ctx, Request{AssetPath: asset.Path})
 		return true
 	})
 	if ctx.Err() != nil {
@@ -130,7 +130,7 @@ func (s *Service) Warm(ctx context.Context) error {
 	return nil
 }
 
-func (s *Service) process(request Request) {
+func (s *Service) process(ctx context.Context, request Request) {
 	asset, ok := s.catalog.FindAsset(request.AssetPath)
 	if !ok {
 		return
@@ -139,7 +139,7 @@ func (s *Service) process(request Request) {
 	for _, stage := range s.stages {
 		for _, task := range stage.Plan(asset, request) {
 			if variant := s.executeStageTask(stage, asset, task); variant != nil {
-				s.upsertStageVariant(stage, asset, variant)
+				s.upsertStageVariant(ctx, stage, asset, variant)
 			}
 		}
 	}

@@ -23,6 +23,13 @@ type Asset struct {
 	Metadata   map[string]string `json:"metadata,omitempty"`
 }
 
+func (a *Asset) GetMetadata() map[string]string {
+	if a == nil {
+		return nil
+	}
+	return a.Metadata
+}
+
 type Variant struct {
 	ID           string            `json:"id"`
 	AssetPath    string            `json:"asset_path"`
@@ -35,6 +42,13 @@ type Variant struct {
 	Format       string            `json:"format,omitempty"`
 	Width        int               `json:"width,omitempty"`
 	Metadata     map[string]string `json:"metadata,omitempty"`
+}
+
+func (v *Variant) GetMetadata() map[string]string {
+	if v == nil {
+		return nil
+	}
+	return v.Metadata
 }
 
 type Entry struct {

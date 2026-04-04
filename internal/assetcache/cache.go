@@ -38,7 +38,8 @@ type Cache struct {
 	cache       *hot.HotCache[string, []byte]
 	bus         eventx.BusRuntime
 
-	variantRemovedUnsubscribe func()
+	variantRemovedUnsubscribe   func()
+	variantGeneratedUnsubscribe func()
 }
 
 type WarmStats struct {
@@ -200,8 +201,10 @@ func (c *Cache) preloadPath(path string, size int64, stats *WarmStats) error {
 	}
 
 	c.cache.Set(path, body)
-	stats.Entries++
-	stats.Bytes += int64(len(body))
+	if stats != nil {
+		stats.Entries++
+		stats.Bytes += int64(len(body))
+	}
 	return nil
 }
 

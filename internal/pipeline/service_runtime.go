@@ -71,19 +71,19 @@ func (s *Service) start(ctx context.Context, workers, queueSize int) error {
 		return fmt.Errorf("create pipeline cache directory: %w", err)
 	}
 
-	s.startWorkers(workers)
+	s.startWorkers(ctx, workers)
 	s.logWorkersStarted(workers, queueSize)
 	s.startCleanupIfNeeded(ctx)
 	return nil
 }
 
-func (s *Service) startWorkers(workers int) {
+func (s *Service) startWorkers(ctx context.Context, workers int) {
 	for range workers {
 		s.wg.Go(func() {
 			for request := range s.tasks {
 				key := requestKey(request)
 				s.updateQueueLengthMetric()
-				s.process(request)
+				s.process(ctx, request)
 				s.finishRequest(key)
 			}
 		})
@@ -190,12 +190,14 @@ func (s *Service) logStageFailure(stage Stage, asset *catalog.Asset, err error) 
 	)
 }
 
-func (s *Service) upsertStageVariant(stage Stage, asset *catalog.Asset, variant *catalog.Variant) {
+func (s *Service) upsertStageVariant(ctx context.Context, stage Stage, asset *catalog.Asset, variant *catalog.Variant) {
 	if err := s.catalog.UpsertVariant(variant); err != nil {
 		s.logger.Error("Catalog variant upsert failed",
 			slog.String("stage", stage.Name()),
 			slog.String("asset", asset.Path),
 			slog.String("err", err.Error()),
 		)
+		return
 	}
+	s.publishVariantGenerated(ctx, stage.Name(), variant)
 }

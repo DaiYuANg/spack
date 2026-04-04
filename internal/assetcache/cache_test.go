@@ -165,6 +165,41 @@ func TestVariantRemovedEventInvalidatesCacheEntry(t *testing.T) {
 	}
 }
 
+func TestVariantGeneratedEventPreloadsCacheEntry(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "asset.js.br")
+	payload := []byte("br")
+	if err := os.WriteFile(path, payload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	bus := eventx.New()
+	cache := assetcache.NewCacheWithBusForTest(config.MemoryCache{
+		Enable:      true,
+		MaxEntries:  16,
+		MaxFileSize: 64 * 1024,
+		TTL:         "5m",
+	}, slog.New(slog.DiscardHandler), nil, bus)
+	if err := assetcache.StartForTest(cache); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bus.Publish(context.Background(), appEvent.VariantGenerated{
+		AssetPath:    "asset.js",
+		ArtifactPath: path,
+		Stage:        "compression",
+		Size:         int64(len(payload)),
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, found, err := cache.GetOrLoad(path); err != nil {
+		t.Fatal(err)
+	} else if !found {
+		t.Fatal("expected first load after generated event to hit memory cache")
+	}
+}
+
 func writeAssetFile(t *testing.T, path string, body []byte) {
 	t.Helper()
 

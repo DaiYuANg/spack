@@ -6,7 +6,9 @@ import (
 	"image"
 	"image/jpeg"
 	"image/png"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/daiyuang/spack/internal/artifact"
@@ -96,7 +98,8 @@ func (s *imageStage) Execute(task Task, asset *catalog.Asset) (*catalog.Variant,
 		Format:       targetFormat,
 		Width:        outputWidth,
 		Metadata: map[string]string{
-			"stage": "image",
+			"stage":      "image",
+			"mtime_unix": strconv.FormatInt(time.Now().Unix(), 10),
 		},
 	}, nil
 }
