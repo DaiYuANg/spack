@@ -16,6 +16,10 @@ Current scope:
 - runtime asset catalog
 - `gzip` and `brotli` variant generation
 - on-demand image width/format variants via query or `Accept` negotiation
+- in-memory hot asset cache for small files with optional startup warmup
+- `sendfile` delivery for disk-backed assets and range requests
+- conditional HTTP caching with `ETag`, `Last-Modified`, `Cache-Control`, `Expires`, and `304 Not Modified`
+- event-driven variant lifecycle for cache warming, invalidation, and hit tracking
 - lazy or warmup compression modes
 - debug and metrics endpoints for container diagnostics
 
@@ -27,20 +31,73 @@ Out of scope:
 - scripting plugins
 - Nginx-style complex `location` semantics
 
-## Runtime Model
+## Architecture
 
-The current architecture is:
+The current runtime is composed of:
 
 1. `source`
    Reads files from the mounted asset directory.
 2. `catalog`
-   Stores assets and generated variants as runtime metadata.
+   Stores scanned assets and generated variants as runtime metadata.
 3. `pipeline`
-   Generates optimized variants such as compressed assets.
+   Generates compressed and image variants in lazy or warmup mode.
 4. `resolver`
    Maps an HTTP request to the best asset or variant.
-5. `server`
-   Handles HTTP, headers, fallback, and observability.
+5. `assetcache`
+   Keeps small hot responses in memory and supports warmup/invalidation.
+6. `server`
+   Handles HTTP, fallback, delivery, and observability.
+7. `event`
+   Decouples variant lifecycle notifications between server, pipeline, and cache.
+8. `runtime`
+   Boots scanning, warmup, HTTP serving, and debug endpoints through `dix` lifecycle hooks.
+
+```mermaid
+flowchart TB
+    subgraph Config["Configuration Sources"]
+        Defaults["Built-in defaults"]
+        Dotenv[".env / .env.local"]
+        Files["--config files"]
+        Env["Environment variables"]
+        Flags["CLI flags"]
+    end
+
+    Config --> Loader["configx loader"]
+    Loader --> CLI["Cobra + dix container"]
+
+    CLI --> Runtime["runtime lifecycle"]
+    Runtime --> Source["source"]
+    Source --> Catalog["catalog"]
+    Runtime --> Pipeline["pipeline"]
+    Runtime --> AssetCache["assetcache"]
+    Runtime --> HTTP["Fiber HTTP server"]
+    Runtime --> Debug["debug runtime"]
+
+    Pipeline --> ArtifactStore["artifact store"]
+    ArtifactStore --> Catalog
+
+    HTTP --> Resolver["resolver"]
+    Resolver --> Catalog
+    HTTP --> Delivery["delivery: memory cache or sendfile"]
+    AssetCache --> Delivery
+
+    HTTP -->|VariantServed| EventBus["event bus"]
+    Pipeline -->|VariantGenerated / VariantRemoved| EventBus
+    EventBus --> Pipeline
+    EventBus --> AssetCache
+
+    Debug --> Metrics["/prometheus"]
+    Debug --> Statsviz["/debug/statsviz"]
+```
+
+Request flow at a high level:
+
+1. The runtime scans `SPACK_ASSETS_ROOT` into the catalog.
+2. The pipeline optionally warms compressed/image variants.
+3. The memory cache can optionally preload small hot assets and generated variants.
+4. For each request, the resolver chooses the best asset or variant.
+5. Delivery uses memory cache for eligible small files, otherwise Fiber `SendFile`.
+6. Served/generated/removed variants are propagated through the event bus for decoupled cache and pipeline updates.
 
 ## Quick Start
 
@@ -76,6 +133,15 @@ Important endpoints:
 - `/catalog`
 - `/prometheus` when debug runtime is enabled
 - `/debug/statsviz` on the debug runtime port
+
+Response behavior:
+
+- small eligible files can be served from the in-memory asset cache
+- large files and range requests are delivered through Fiber `SendFile`
+- static asset logs include `delivery=memory_cache_hit|memory_cache_fill|sendfile|sendfile_range`
+- responses include `ETag`, `Last-Modified`, `Cache-Control`, and `Expires`
+- conditional requests support `304 Not Modified`
+- `HEAD` requests reuse the same header selection logic without sending a response body
 
 ## Configuration
 
@@ -208,7 +274,9 @@ go run . --assets.root=./test/build/dist --assets.path=/ --assets.entry=index.ht
 
 ## Next
 
-The pipeline abstraction is in place for future stages such as:
+The current architecture leaves room for:
 
-- responsive image variants
-- additional cache policy strategies (beyond TTL and max-size eviction)
+- additional image formats beyond `jpeg` and `png`
+- alternate source backends beyond the local asset tree
+- richer cache policy strategies beyond TTL and max-size eviction
+- more pipeline stages built on the same artifact/catalog/runtime model
