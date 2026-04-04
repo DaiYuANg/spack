@@ -10,6 +10,7 @@ import (
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/mediax"
 )
 
 var ErrNotFound = errors.New("asset not found")
@@ -71,7 +72,7 @@ func (r *Resolver) Resolve(request Request) (*Result, error) {
 	}
 
 	encodings := parseAcceptEncoding(request.AcceptEncoding)
-	requestedFormat := normalizeImageFormat(request.Format)
+	requestedFormat := mediax.NormalizeImageFormat(request.Format)
 	preferredImageFormats := preferredImageFormats(request.Accept, requestedFormat, asset.MediaType)
 	if request.Width > 0 || preferredImageFormats.Len() > 0 {
 		if variant := r.pickImageVariant(asset, request.Width, preferredImageFormats); variant != nil {
@@ -150,7 +151,7 @@ func (r *Resolver) pickVariant(asset *catalog.Asset, encodings collectionx.List[
 }
 
 func (r *Resolver) pickImageVariant(asset *catalog.Asset, width int, formats collectionx.List[string]) *catalog.Variant {
-	sourceFormat := imageFormat(asset.MediaType)
+	sourceFormat := mediax.ImageFormat(asset.MediaType)
 	candidates := imageCandidates(r.catalog.ListVariants(asset.Path), asset.SourceHash)
 	if candidates.IsEmpty() {
 		return nil

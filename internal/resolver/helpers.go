@@ -6,17 +6,14 @@ import (
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/daiyuang/spack/internal/catalog"
+	"github.com/daiyuang/spack/internal/mediax"
 )
 
 func uniqueStrings(values collectionx.List[string]) collectionx.List[string] {
-	ordered := collectionx.NewOrderedSetWithCapacity[string](values.Len())
-	values.Each(func(_ int, value string) {
-		if value == "" {
-			return
-		}
-		ordered.Add(value)
+	filtered := collectionx.FilterMapList(values, func(_ int, value string) (string, bool) {
+		return value, value != ""
 	})
-	return collectionx.NewList(ordered.Values()...)
+	return collectionx.NewList(collectionx.NewOrderedSet(filtered.Values()...).Values()...)
 }
 
 func isUsableVariant(variant *catalog.Variant, assetSourceHash string) bool {
@@ -59,34 +56,8 @@ func preferredImageFormats(acceptHeader, explicitFormat, sourceMediaType string)
 	if explicitFormat != "" {
 		return collectionx.NewList(explicitFormat)
 	}
-	if !isImageMediaType(sourceMediaType) {
+	if !mediax.IsImageMediaType(sourceMediaType) {
 		return collectionx.NewList[string]()
 	}
-	return parseAcceptImageFormats(acceptHeader, imageFormat(sourceMediaType))
-}
-
-func normalizeImageFormat(format string) string {
-	switch strings.ToLower(strings.TrimSpace(format)) {
-	case "jpg", "jpeg":
-		return "jpeg"
-	case "png":
-		return "png"
-	default:
-		return ""
-	}
-}
-
-func imageFormat(mediaType string) string {
-	switch strings.ToLower(strings.TrimSpace(mediaType)) {
-	case "image/jpeg":
-		return "jpeg"
-	case "image/png":
-		return "png"
-	default:
-		return ""
-	}
-}
-
-func isImageMediaType(mediaType string) bool {
-	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(mediaType)), "image/")
+	return parseAcceptImageFormats(acceptHeader, mediax.ImageFormat(sourceMediaType))
 }

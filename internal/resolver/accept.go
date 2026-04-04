@@ -43,16 +43,10 @@ func parseAcceptImageFormats(header, sourceFormat string) collectionx.List[strin
 	return buildImageCandidates(collectImagePreferences(parseAcceptEntries(header)), sourceFormat)
 }
 
-func parseAcceptEntries(header string) []acceptEntry {
-	entries := make([]acceptEntry, 0, 4)
-	for rawPart := range strings.SplitSeq(header, ",") {
-		entry, ok := parseAcceptEntry(rawPart)
-		if !ok {
-			continue
-		}
-		entries = append(entries, entry)
-	}
-	return entries
+func parseAcceptEntries(header string) collectionx.List[acceptEntry] {
+	return collectionx.FilterMapList(collectionx.NewList(strings.Split(header, ",")...), func(_ int, rawPart string) (acceptEntry, bool) {
+		return parseAcceptEntry(rawPart)
+	})
 }
 
 func parseAcceptEntry(rawPart string) (acceptEntry, bool) {
@@ -98,20 +92,20 @@ func clampAcceptQuality(raw string) float64 {
 	return parsed
 }
 
-func collectEncodingPreferences(entries []acceptEntry) encodingPreferences {
+func collectEncodingPreferences(entries collectionx.List[acceptEntry]) encodingPreferences {
 	prefs := encodingPreferences{
 		explicit: collectionx.NewMapWithCapacity[string, float64](4),
 	}
-	for _, entry := range entries {
+	entries.Each(func(_ int, entry acceptEntry) {
 		if entry.token == "*" {
 			prefs.hasWildcard = true
 			prefs.wildcardQ = entry.q
-			continue
+			return
 		}
-		if oldQ, ok := prefs.explicit.Get(entry.token); !ok || entry.q > oldQ {
+		if entry.q > prefs.explicit.GetOrDefault(entry.token, -1) {
 			prefs.explicit.Set(entry.token, entry.q)
 		}
-	}
+	})
 	return prefs
 }
 
@@ -123,18 +117,16 @@ func buildEncodingCandidates(prefs encodingPreferences) collectionx.List[string]
 	}
 
 	supported := collectionx.NewList("br", "gzip")
-	choices := collectionx.NewListWithCapacity[candidate](supported.Len())
-	supported.Range(func(index int, encoding string) bool {
+	choices := collectionx.FilterMapList(supported, func(index int, encoding string) (candidate, bool) {
 		q, ok := encodingQuality(prefs, encoding)
 		if !ok {
-			return true
+			return candidate{}, false
 		}
-		choices.Add(candidate{
+		return candidate{
 			encoding: encoding,
 			q:        q,
 			priority: index,
-		})
-		return true
+		}, true
 	})
 
 	choices.Sort(func(left, right candidate) int {
@@ -162,13 +154,13 @@ func encodingQuality(prefs encodingPreferences, encoding string) (float64, bool)
 	return prefs.wildcardQ, true
 }
 
-func collectImagePreferences(entries []acceptEntry) imagePreferences {
+func collectImagePreferences(entries collectionx.List[acceptEntry]) imagePreferences {
 	prefs := imagePreferences{
 		explicit: collectionx.NewMapWithCapacity[string, float64](4),
 	}
-	for _, entry := range entries {
+	entries.Each(func(_ int, entry acceptEntry) {
 		applyImagePreference(&prefs, entry)
-	}
+	})
 	return prefs
 }
 
@@ -188,7 +180,7 @@ func applyImagePreference(prefs *imagePreferences, entry acceptEntry) {
 }
 
 func setMaxQuality(values collectionx.Map[string, float64], key string, q float64) {
-	if oldQ, ok := values.Get(key); ok && q <= oldQ {
+	if q <= values.GetOrDefault(key, -1) {
 		return
 	}
 	values.Set(key, q)
@@ -202,18 +194,16 @@ func buildImageCandidates(prefs imagePreferences, sourceFormat string) collectio
 	}
 
 	supported := collectionx.NewList("jpeg", "png")
-	candidates := collectionx.NewListWithCapacity[candidate](supported.Len())
-	supported.Range(func(index int, format string) bool {
+	candidates := collectionx.FilterMapList(supported, func(index int, format string) (candidate, bool) {
 		q := imageQualityForFormat(prefs, format)
 		if q <= 0 {
-			return true
+			return candidate{}, false
 		}
-		candidates.Add(candidate{
+		return candidate{
 			format:   format,
 			q:        q,
 			priority: imagePriority(index, format, sourceFormat),
-		})
-		return true
+		}, true
 	})
 
 	candidates.Sort(func(left, right candidate) int {

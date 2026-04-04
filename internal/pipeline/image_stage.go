@@ -14,6 +14,7 @@ import (
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/mediax"
 )
 
 type imageStage struct {
@@ -105,17 +106,12 @@ func (s *imageStage) Execute(task Task, asset *catalog.Asset) (*catalog.Variant,
 }
 
 func isResizableImage(asset *catalog.Asset) bool {
-	switch strings.ToLower(strings.TrimSpace(asset.MediaType)) {
-	case "image/jpeg", "image/png":
-		return true
-	default:
-		return false
-	}
+	return mediax.ImageFormat(asset.MediaType) != ""
 }
 
 func encodeImage(img image.Image, format string, jpegQuality int) ([]byte, string, string, error) {
 	var buf bytes.Buffer
-	switch normalizeImageFormat(format) {
+	switch mediax.NormalizeImageFormat(format) {
 	case "jpeg":
 		if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: jpegQuality}); err != nil {
 			return nil, "", "", fmt.Errorf("encode jpeg image: %w", err)
@@ -142,42 +138,8 @@ func clampJPEGQuality(quality int) int {
 	return quality
 }
 
-func imageFormat(mediaType string) string {
-	switch strings.ToLower(strings.TrimSpace(mediaType)) {
-	case "image/jpeg":
-		return "jpeg"
-	case "image/png":
-		return "png"
-	default:
-		return ""
-	}
-}
-
 func normalizeImageFormats(formats collectionx.List[string]) collectionx.List[string] {
-	if formats.IsEmpty() {
-		return collectionx.NewList[string]()
-	}
-
-	ordered := collectionx.NewOrderedSetWithCapacity[string](formats.Len())
-	formats.Each(func(_ int, format string) {
-		normalized := normalizeImageFormat(format)
-		if normalized == "" {
-			return
-		}
-		ordered.Add(normalized)
-	})
-	return collectionx.NewList(ordered.Values()...)
-}
-
-func normalizeImageFormat(format string) string {
-	switch strings.ToLower(strings.TrimSpace(format)) {
-	case "jpg", "jpeg":
-		return "jpeg"
-	case "png":
-		return "png"
-	default:
-		return ""
-	}
+	return mediax.NormalizeImageFormats(formats)
 }
 
 func imageVariantSuffix(width int, format, ext string) string {
