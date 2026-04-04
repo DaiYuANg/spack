@@ -12,11 +12,15 @@ import (
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/resolver"
 	"github.com/gofiber/fiber/v3"
+	"github.com/pquerna/cachecontrol/cacheobject"
 )
 
 const cacheControlRevalidate = "public, max-age=0, must-revalidate"
 
 func applyResolvedHeaders(c fiber.Ctx, cfg *config.Config, result *resolver.Result, requestedFormat string) {
+	lastModified, hasLastModified := resolvedLastModified(result)
+	cacheControl := cacheControlForResult(cfg, result)
+
 	c.Set(fiber.HeaderContentType, result.MediaType)
 	c.Append(fiber.HeaderVary, fiber.HeaderAcceptEncoding)
 	if shouldVaryAccept(result.Asset.MediaType, requestedFormat) {
@@ -28,10 +32,11 @@ func applyResolvedHeaders(c fiber.Ctx, cfg *config.Config, result *resolver.Resu
 	if result.ContentEncoding != "" {
 		c.Set(fiber.HeaderContentEncoding, result.ContentEncoding)
 	}
-	if lastModified, ok := resolvedLastModified(result); ok {
+	if hasLastModified {
 		c.Set(fiber.HeaderLastModified, lastModified.UTC().Format(http.TimeFormat))
 	}
-	c.Set(fiber.HeaderCacheControl, cacheControlForResult(cfg, result))
+	c.Set(fiber.HeaderCacheControl, cacheControl)
+	applyExpiresHeader(c, cacheControl, lastModified, hasLastModified)
 }
 
 func shouldSendNotModified(c fiber.Ctx, request resolver.Request) bool {
@@ -51,6 +56,29 @@ func cacheControlForResult(cfg *config.Config, result *resolver.Result) string {
 		return cacheControlRevalidate
 	}
 	return fmt.Sprintf("public, max-age=%d, immutable", int(maxAge.Seconds()))
+}
+
+func applyExpiresHeader(c fiber.Ctx, cacheControl string, lastModified time.Time, hasLastModified bool) {
+	expiresAt, ok := resolveExpiresAt(cacheControl, lastModified, hasLastModified)
+	if !ok {
+		c.Response().Header.Del(fiber.HeaderExpires)
+		return
+	}
+	c.Set(fiber.HeaderExpires, expiresAt.UTC().Format(http.TimeFormat))
+}
+
+func resolveExpiresAt(cacheControl string, lastModified time.Time, hasLastModified bool) (time.Time, bool) {
+	headers := make(http.Header, 2)
+	headers.Set(fiber.HeaderCacheControl, cacheControl)
+	if hasLastModified {
+		headers.Set(fiber.HeaderLastModified, lastModified.UTC().Format(http.TimeFormat))
+	}
+
+	_, expiresAt, err := cacheobject.UsingRequestResponse(nil, http.StatusOK, headers, false)
+	if err != nil || expiresAt.IsZero() {
+		return time.Time{}, false
+	}
+	return expiresAt, true
 }
 
 func variantMaxAge(cfg config.Compression, variant *catalog.Variant) time.Duration {

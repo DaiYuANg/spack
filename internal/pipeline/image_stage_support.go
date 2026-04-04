@@ -6,9 +6,10 @@ import (
 	"os"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/anthonynsimon/bild/imgio"
+	"github.com/anthonynsimon/bild/transform"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/mediax"
-	"golang.org/x/image/draw"
 )
 
 func (s *imageStage) planFormats(asset *catalog.Asset, request Request) collectionx.List[string] {
@@ -73,20 +74,9 @@ func resolveTargetFormat(task Task, asset *catalog.Asset) (string, error) {
 }
 
 func loadSourceImage(path string) (image.Image, int, int, error) {
-	// #nosec G304 -- image paths come from the scanned local asset tree.
-	file, err := os.Open(path)
+	srcImage, err := imgio.Open(path)
 	if err != nil {
 		return nil, 0, 0, fmt.Errorf("open source image: %w", err)
-	}
-	defer func() {
-		if closeErr := file.Close(); closeErr != nil {
-			return
-		}
-	}()
-
-	srcImage, _, err := image.Decode(file)
-	if err != nil {
-		return nil, 0, 0, fmt.Errorf("decode source image: %w", err)
 	}
 
 	bounds := srcImage.Bounds()
@@ -99,9 +89,7 @@ func resizeImage(srcImage image.Image, srcWidth, srcHeight, targetWidth int) (im
 	}
 
 	targetHeight := max(1, srcHeight*targetWidth/srcWidth)
-	dst := image.NewRGBA(image.Rect(0, 0, targetWidth, targetHeight))
-	draw.CatmullRom.Scale(dst, dst.Bounds(), srcImage, srcImage.Bounds(), draw.Over, nil)
-	return dst, targetWidth
+	return transform.Resize(srcImage, targetWidth, targetHeight, transform.CatmullRom), targetWidth
 }
 
 func shouldSkipImageArtifact(asset *catalog.Asset, srcWidth, outputWidth int, mediaType string, payloadSize int) bool {

@@ -77,6 +77,7 @@ func TestAssetRouteReturnsNotModifiedForFreshValidator(t *testing.T) {
 	if response.Header.Get("Cache-Control") != "public, max-age=0, must-revalidate" {
 		t.Fatalf("expected revalidate cache-control, got %q", response.Header.Get("Cache-Control"))
 	}
+	assertParseableExpiresHeader(t, response)
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		t.Fatal(err)
@@ -108,6 +109,10 @@ func TestVariantRouteSetsCacheHeadersAndHeadHasNoBody(t *testing.T) {
 	}
 	if response.Header.Get("Last-Modified") != time.Unix(1_720_000_100, 0).UTC().Format(http.TimeFormat) {
 		t.Fatalf("unexpected last-modified header %q", response.Header.Get("Last-Modified"))
+	}
+	expiresAt := assertParseableExpiresHeader(t, response)
+	if expiresAt.Before(time.Now().Add(6 * 24 * time.Hour)) {
+		t.Fatalf("expected variant expires to be about a week out, got %s", expiresAt)
 	}
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
@@ -189,4 +194,14 @@ func closeHTTPBody(t *testing.T, response *http.Response) {
 	if err := response.Body.Close(); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func assertParseableExpiresHeader(t *testing.T, response *http.Response) time.Time {
+	t.Helper()
+
+	expiresAt, parseErr := http.ParseTime(response.Header.Get("Expires"))
+	if parseErr != nil {
+		t.Fatalf("expected parseable expires header, got %q: %v", response.Header.Get("Expires"), parseErr)
+	}
+	return expiresAt
 }

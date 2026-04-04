@@ -4,13 +4,12 @@ import (
 	"bytes"
 	"fmt"
 	"image"
-	"image/jpeg"
-	"image/png"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/anthonynsimon/bild/imgio"
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
@@ -111,15 +110,17 @@ func isResizableImage(asset *catalog.Asset) bool {
 
 func encodeImage(img image.Image, format string, jpegQuality int) ([]byte, string, string, error) {
 	var buf bytes.Buffer
+	var encoder imgio.Encoder
 	switch mediax.NormalizeImageFormat(format) {
 	case "jpeg":
-		if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: jpegQuality}); err != nil {
+		encoder = imgio.JPEGEncoder(jpegQuality)
+		if err := encoder(&buf, img); err != nil {
 			return nil, "", "", fmt.Errorf("encode jpeg image: %w", err)
 		}
 		return buf.Bytes(), ".jpg", "image/jpeg", nil
 	case "png":
-		encoder := png.Encoder{CompressionLevel: png.BestCompression}
-		if err := encoder.Encode(&buf, img); err != nil {
+		encoder = imgio.PNGEncoder()
+		if err := encoder(&buf, img); err != nil {
 			return nil, "", "", fmt.Errorf("encode png image: %w", err)
 		}
 		return buf.Bytes(), ".png", "image/png", nil

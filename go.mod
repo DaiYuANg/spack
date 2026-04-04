@@ -17,17 +17,20 @@ require (
 	github.com/DaiYuANg/arcgo/logx v0.1.0
 	github.com/DaiYuANg/arcgo/observabilityx v0.1.0
 	github.com/andybalholm/brotli v1.2.1
+	github.com/anthonynsimon/bild v0.14.0
 	github.com/arl/statsviz v0.8.0
 	github.com/gabriel-vasile/mimetype v1.4.13
 	github.com/gofiber/fiber/v3 v3.1.0
 	github.com/gofiber/template/html/v2 v2.1.3
 	github.com/joho/godotenv v1.5.1
+	github.com/pquerna/cachecontrol v0.2.0
 	github.com/prometheus/client_golang v1.23.2
+	github.com/samber/do/v2 v2.0.0
 	github.com/samber/hot v0.13.0
 	github.com/samber/lo v1.53.0
 	github.com/samber/oops v1.21.0
 	github.com/spf13/cobra v1.10.2
-	golang.org/x/image v0.38.0
+	github.com/spf13/pflag v1.0.10
 	golang.org/x/sync v0.20.0
 )
 
@@ -284,7 +287,6 @@ require (
 	github.com/ryancurrah/gomodguard v1.4.1 // indirect
 	github.com/ryanrolds/sqlclosecheck v0.6.0 // indirect
 	github.com/sajari/fuzzy v1.0.0 // indirect
-	github.com/samber/do/v2 v2.0.0 // indirect
 	github.com/samber/go-singleflightx v0.3.2 // indirect
 	github.com/samber/go-type-to-string v1.8.0 // indirect
 	github.com/samber/mo v1.16.0 // indirect
@@ -303,7 +305,6 @@ require (
 	github.com/spf13/afero v1.15.0 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
-	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/spf13/viper v1.12.0 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
 	github.com/ssgreg/nlreturn/v2 v2.2.1 // indirect
@@ -354,6 +355,7 @@ require (
 	golang.org/x/crypto v0.49.0 // indirect
 	golang.org/x/exp v0.0.0-20260112195511-716be5621a96 // indirect
 	golang.org/x/exp/typeparams v0.0.0-20260312153236-7ab1446f8b90 // indirect
+	golang.org/x/image v0.38.0 // indirect
 	golang.org/x/mod v0.34.0 // indirect
 	golang.org/x/net v0.52.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
