@@ -11,6 +11,7 @@ import (
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/eventx"
+	"github.com/daiyuang/spack/internal/cachepolicy"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 )
@@ -33,18 +34,16 @@ func newServiceState(
 	queueSize int,
 ) *Service {
 	return &Service{
-		cfg:                    cfg,
-		logger:                 logger,
-		catalog:                cat,
-		metrics:                metrics,
-		stages:                 stages,
-		bus:                    bus,
-		tasks:                  make(chan Request, queueSize),
-		pending:                collectionx.NewSetWithCapacity[string](queueSize),
-		variantHits:            collectionx.NewMapWithCapacity[string, time.Time](queueSize),
-		cleanupDefaultMaxAge:   cfg.ParsedMaxAge(),
-		cleanupNamespaceMaxAge: cfg.NamespaceMaxAges(),
-		cleanupMaxCacheBytes:   cfg.MaxCacheBytes,
+		cfg:            cfg,
+		logger:         logger,
+		catalog:        cat,
+		metrics:        metrics,
+		stages:         stages,
+		bus:            bus,
+		tasks:          make(chan Request, queueSize),
+		pending:        collectionx.NewSetWithCapacity[string](queueSize),
+		variantHits:    collectionx.NewMapWithCapacity[string, time.Time](queueSize),
+		artifactPolicy: cachepolicy.NewArtifactPolicy(cfg),
 	}
 }
 
@@ -110,15 +109,15 @@ func (s *Service) startCleanupIfNeeded(ctx context.Context) {
 	go s.cleanupLoop(ctx, interval)
 	s.logger.Info("Pipeline cleanup enabled",
 		slog.String("interval", interval.String()),
-		slog.String("max_age", s.cleanupDefaultMaxAge.String()),
-		slog.String("encoding_max_age", s.cleanupNamespaceMaxAge.GetOrDefault("encoding", 0).String()),
-		slog.String("image_max_age", s.cleanupNamespaceMaxAge.GetOrDefault("image", 0).String()),
-		slog.Int64("max_cache_bytes", s.cleanupMaxCacheBytes),
+		slog.String("max_age", s.artifactPolicy.DefaultMaxAge().String()),
+		slog.String("encoding_max_age", s.artifactPolicy.MaxAge("encoding").String()),
+		slog.String("image_max_age", s.artifactPolicy.MaxAge("image").String()),
+		slog.Int64("max_cache_bytes", s.artifactPolicy.MaxCacheBytes()),
 	)
 }
 
 func (s *Service) cleanupEnabled() bool {
-	return s.cleanupDefaultMaxAge > 0 || s.cleanupNamespaceMaxAge.Len() > 0 || s.cleanupMaxCacheBytes > 0
+	return s.artifactPolicy != nil && s.artifactPolicy.Enabled()
 }
 
 func (s *Service) stop(ctx context.Context) error {

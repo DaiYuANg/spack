@@ -10,6 +10,7 @@ import (
 	"github.com/anthonynsimon/bild/transform"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/mediax"
+	"github.com/samber/lo"
 )
 
 func (s *imageStage) planFormats(asset *catalog.Asset, request Request) collectionx.List[string] {
@@ -32,21 +33,18 @@ func (s *imageStage) planWidths(request Request) collectionx.List[int] {
 
 func (s *imageStage) planTasks(asset *catalog.Asset, formats collectionx.List[string], widths collectionx.List[int]) []Task {
 	existing := s.catalog.ListVariants(asset.Path)
-	tasks := make([]Task, 0, widths.Len()*formats.Len())
-	formats.Range(func(_ int, format string) bool {
-		widths.Range(func(_ int, width int) bool {
-			if shouldCreateImageTask(asset, existing, width, format) {
-				tasks = append(tasks, Task{
-					AssetPath: asset.Path,
-					Format:    format,
-					Width:     width,
-				})
+	return lo.FlatMap(formats.Values(), func(format string, _ int) []Task {
+		return lo.FilterMap(widths.Values(), func(width int, _ int) (Task, bool) {
+			if !shouldCreateImageTask(asset, existing, width, format) {
+				return Task{}, false
 			}
-			return true
+			return Task{
+				AssetPath: asset.Path,
+				Format:    format,
+				Width:     width,
+			}, true
 		})
-		return true
 	})
-	return tasks
 }
 
 func shouldCreateImageTask(asset *catalog.Asset, variants collectionx.List[*catalog.Variant], width int, format string) bool {

@@ -36,7 +36,7 @@ Out of scope:
 The current runtime is composed of:
 
 1. `source`
-   Reads files from the mounted asset directory.
+   Reads files from the configured asset backend, currently local filesystem.
 2. `catalog`
    Stores scanned assets and generated variants as runtime metadata.
 3. `pipeline`
@@ -161,6 +161,7 @@ CLI flags use config-path names directly, for example:
 
 - `--http.port=8080`
 - `--assets.root=./dist`
+- `--assets.backend=local`
 - `--assets.fallback.target=index.html`
 - `--compression.mode=warmup`
 - `--logger.level=info`
@@ -183,6 +184,7 @@ HTTP:
 
 Assets:
 
+- `SPACK_ASSETS_BACKEND=local`
 - `SPACK_ASSETS_PATH=/`
 - `SPACK_ASSETS_ENTRY=index.html`
 - `SPACK_ASSETS_FALLBACK_ON=not_found|forbidden`

@@ -19,6 +19,7 @@ func defaultConfig() Config {
 			},
 		},
 		Assets: Assets{
+			Backend:  SourceBackendLocal,
 			Path:     "/",
 			Entry:    "index.html",
 			Fallback: Fallback{On: FallbackOnNotFound, Target: "index.html"},

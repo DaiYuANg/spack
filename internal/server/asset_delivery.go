@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/resolver"
@@ -71,15 +72,15 @@ func resolvedAssetSize(result *resolver.Result) int64 {
 }
 
 func logRequest(logger *slog.Logger, c fiber.Ctx, startedAt time.Time) {
-	attrs := []slog.Attr{
+	attrs := collectionx.NewList(
 		slog.String("method", c.Method()),
 		slog.String("path", c.Path()),
 		slog.Int("status", c.Response().StatusCode()),
 		slog.Duration("duration", time.Since(startedAt)),
 		slog.String("request_id", c.GetRespHeader("Request-ID")),
-	}
+	)
 	if delivery := getAssetDelivery(c); delivery != "" {
-		attrs = append(attrs, slog.String("delivery", delivery))
+		attrs.Add(slog.String("delivery", delivery))
 	}
-	logger.LogAttrs(context.Background(), slog.LevelInfo, "HTTP request", attrs...)
+	logger.LogAttrs(context.Background(), slog.LevelInfo, "HTTP request", attrs.Values()...)
 }

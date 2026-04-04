@@ -7,6 +7,7 @@ import (
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/mediax"
+	"github.com/samber/lo"
 )
 
 func uniqueStrings(values collectionx.List[string]) collectionx.List[string] {
@@ -37,12 +38,9 @@ func variantFormat(variant *catalog.Variant, sourceFormat string) string {
 }
 
 func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return value
-		}
-	}
-	return ""
+	return lo.FindOrElse(values, "", func(value string) bool {
+		return strings.TrimSpace(value) != ""
+	})
 }
 
 func preferredWidths(width int) collectionx.List[int] {

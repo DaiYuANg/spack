@@ -10,6 +10,7 @@ import (
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/eventx"
+	"github.com/daiyuang/spack/internal/cachepolicy"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"golang.org/x/sync/singleflight"
@@ -36,9 +37,7 @@ type Service struct {
 	hitMu       sync.Mutex
 	variantHits collectionx.Map[string, time.Time]
 
-	cleanupDefaultMaxAge   time.Duration
-	cleanupNamespaceMaxAge collectionx.Map[string, time.Duration]
-	cleanupMaxCacheBytes   int64
+	artifactPolicy cachepolicy.ArtifactPolicy
 
 	variantServedUnsubscribe func()
 }

@@ -54,6 +54,7 @@ func bindHTTPFlags(flags *pflag.FlagSet, defaults config.HTTP) {
 }
 
 func bindAssetFlags(flags *pflag.FlagSet, defaults config.Assets) {
+	flags.String("assets.backend", string(defaults.NormalizedBackend()), "Asset source backend.")
 	flags.String("assets.path", defaults.Path, "HTTP mount path for assets.")
 	flags.String("assets.root", defaults.Root, "Filesystem root containing static assets.")
 	flags.String("assets.entry", defaults.Entry, "Default entry file for directory requests.")

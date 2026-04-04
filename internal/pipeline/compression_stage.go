@@ -15,6 +15,7 @@ import (
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
+	"github.com/samber/lo"
 )
 
 type compressionStage struct {
@@ -56,20 +57,15 @@ func (s *compressionStage) Plan(asset *catalog.Asset, request Request) []Task {
 	}
 
 	existing := s.catalog.ListVariants(asset.Path)
-	tasks := make([]Task, 0, encodings.Len())
-	encodings.Range(func(_ int, encoding string) bool {
+	return lo.FilterMap(encodings.Values(), func(encoding string, _ int) (Task, bool) {
 		if hasEncodingVariant(existing, asset.SourceHash, encoding) {
-			return true
+			return Task{}, false
 		}
-
-		tasks = append(tasks, Task{
+		return Task{
 			AssetPath: asset.Path,
 			Encoding:  encoding,
-		})
-		return true
+		}, true
 	})
-
-	return tasks
 }
 
 func (s *compressionStage) Execute(task Task, asset *catalog.Asset) (*catalog.Variant, error) {

@@ -32,6 +32,6 @@ func registerSourceProvider(c *dix.Container) {
 		if err != nil {
 			return nil, err
 		}
-		return newLocalFS(cfg, logger)
+		return newSourceFromConfig(cfg, logger)
 	})
 }

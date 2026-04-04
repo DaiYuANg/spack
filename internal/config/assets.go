@@ -1,8 +1,24 @@
 // Package config loads and exposes runtime configuration.
 package config
 
+import (
+	"strings"
+
+	"github.com/DaiYuANg/arcgo/collectionx"
+)
+
 // FallbackOn defines the condition under which a fallback file is served.
 type FallbackOn string
+
+// SourceBackend defines the asset source backend type.
+type SourceBackend string
+
+const (
+	// SourceBackendLocal serves assets from a local filesystem root.
+	SourceBackendLocal SourceBackend = "local"
+)
+
+var supportedSourceBackends = collectionx.NewList(SourceBackendLocal)
 
 const (
 	// FallbackOnNotFound indicates that the fallback target
@@ -35,6 +51,14 @@ type Assets struct {
 	// This path is matched before any filesystem lookup occurs.
 	Path string `koanf:"path"`
 
+	// Backend selects the source backend implementation.
+	//
+	// Supported values:
+	//   - "local": scan assets from a local filesystem root
+	//
+	// Unknown values are rejected during source initialization.
+	Backend SourceBackend `koanf:"backend"`
+
 	// Root is the filesystem directory used as the source of static assets.
 	//
 	// All files under this directory will be scanned at startup
@@ -64,6 +88,38 @@ type Assets struct {
 	// If no fallback behavior is desired, this field should be left
 	// empty in the configuration.
 	Fallback Fallback `koanf:"fallback"`
+}
+
+func NormalizeSourceBackend(raw SourceBackend) SourceBackend {
+	normalized := SourceBackend(strings.ToLower(strings.TrimSpace(string(raw))))
+	switch normalized {
+	case "", SourceBackendLocal:
+		return SourceBackendLocal
+	default:
+		return normalized
+	}
+}
+
+func SupportedSourceBackends() collectionx.List[SourceBackend] {
+	return collectionx.NewList(supportedSourceBackends.Values()...)
+}
+
+func SupportedSourceBackendNames() collectionx.List[string] {
+	return collectionx.MapList(SupportedSourceBackends(), func(_ int, backend SourceBackend) string {
+		return string(backend)
+	})
+}
+
+func IsSupportedSourceBackend(backend SourceBackend) bool {
+	_, ok := supportedSourceBackends.FirstWhere(func(_ int, candidate SourceBackend) bool {
+		return candidate == backend
+	}).Get()
+	return ok
+}
+
+// NormalizedBackend returns the effective source backend name.
+func (a Assets) NormalizedBackend() SourceBackend {
+	return NormalizeSourceBackend(a.Backend)
 }
 
 // Fallback defines the rules for serving a fallback asset

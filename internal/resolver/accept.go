@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/daiyuang/spack/internal/mediax"
+	"github.com/samber/lo"
 )
 
 type acceptEntry struct {
@@ -67,15 +69,13 @@ func parseAcceptEntry(rawPart string) (acceptEntry, bool) {
 }
 
 func parseAcceptQuality(params []string) float64 {
-	q := 1.0
-	for _, rawParam := range params {
+	return lo.Reduce(params, func(q float64, rawParam string, _ int) float64 {
 		param := strings.TrimSpace(rawParam)
 		if !strings.HasPrefix(strings.ToLower(param), "q=") {
-			continue
+			return q
 		}
-		q = clampAcceptQuality(strings.TrimSpace(strings.TrimPrefix(strings.ToLower(param), "q=")))
-	}
-	return q
+		return clampAcceptQuality(strings.TrimSpace(strings.TrimPrefix(strings.ToLower(param), "q=")))
+	}, 1.0)
 }
 
 func clampAcceptQuality(raw string) float64 {
@@ -93,20 +93,19 @@ func clampAcceptQuality(raw string) float64 {
 }
 
 func collectEncodingPreferences(entries collectionx.List[acceptEntry]) encodingPreferences {
-	prefs := encodingPreferences{
-		explicit: collectionx.NewMapWithCapacity[string, float64](4),
-	}
-	entries.Each(func(_ int, entry acceptEntry) {
+	return lo.Reduce(entries.Values(), func(prefs encodingPreferences, entry acceptEntry, _ int) encodingPreferences {
 		if entry.token == "*" {
 			prefs.hasWildcard = true
 			prefs.wildcardQ = entry.q
-			return
+			return prefs
 		}
 		if entry.q > prefs.explicit.GetOrDefault(entry.token, -1) {
 			prefs.explicit.Set(entry.token, entry.q)
 		}
+		return prefs
+	}, encodingPreferences{
+		explicit: collectionx.NewMapWithCapacity[string, float64](4),
 	})
-	return prefs
 }
 
 func buildEncodingCandidates(prefs encodingPreferences) collectionx.List[string] {
@@ -155,13 +154,12 @@ func encodingQuality(prefs encodingPreferences, encoding string) (float64, bool)
 }
 
 func collectImagePreferences(entries collectionx.List[acceptEntry]) imagePreferences {
-	prefs := imagePreferences{
-		explicit: collectionx.NewMapWithCapacity[string, float64](4),
-	}
-	entries.Each(func(_ int, entry acceptEntry) {
+	return lo.Reduce(entries.Values(), func(prefs imagePreferences, entry acceptEntry, _ int) imagePreferences {
 		applyImagePreference(&prefs, entry)
+		return prefs
+	}, imagePreferences{
+		explicit: collectionx.NewMapWithCapacity[string, float64](4),
 	})
-	return prefs
 }
 
 func applyImagePreference(prefs *imagePreferences, entry acceptEntry) {
@@ -172,10 +170,10 @@ func applyImagePreference(prefs *imagePreferences, entry acceptEntry) {
 	case "*/*":
 		prefs.hasWildcardAny = true
 		prefs.wildcardAnyQ = entry.q
-	case "image/jpeg", "image/jpg":
-		setMaxQuality(prefs.explicit, "jpeg", entry.q)
-	case "image/png":
-		setMaxQuality(prefs.explicit, "png", entry.q)
+	default:
+		if capability, ok := mediax.LookupImageCapabilityByAcceptToken(entry.token); ok {
+			setMaxQuality(prefs.explicit, capability.Name, entry.q)
+		}
 	}
 }
 
@@ -193,7 +191,7 @@ func buildImageCandidates(prefs imagePreferences, sourceFormat string) collectio
 		priority int
 	}
 
-	supported := collectionx.NewList("jpeg", "png")
+	supported := mediax.SupportedImageFormats()
 	candidates := collectionx.FilterMapList(supported, func(index int, format string) (candidate, bool) {
 		q := imageQualityForFormat(prefs, format)
 		if q <= 0 {

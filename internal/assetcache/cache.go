@@ -12,6 +12,7 @@ import (
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/DaiYuANg/arcgo/observabilityx"
+	"github.com/daiyuang/spack/internal/cachepolicy"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/samber/hot"
@@ -31,12 +32,12 @@ const (
 )
 
 type Cache struct {
-	logger      *slog.Logger
-	obs         observabilityx.Observability
-	maxFileSize int64
-	warmup      bool
-	cache       *hot.HotCache[string, []byte]
-	bus         eventx.BusRuntime
+	logger *slog.Logger
+	obs    observabilityx.Observability
+	policy cachepolicy.MemoryPolicy
+	warmup bool
+	cache  *hot.HotCache[string, []byte]
+	bus    eventx.BusRuntime
 
 	variantRemovedUnsubscribe   func()
 	variantGeneratedUnsubscribe func()
@@ -50,11 +51,11 @@ type WarmStats struct {
 func newCache(cfg *config.HTTP, logger *slog.Logger, obs observabilityx.Observability, bus eventx.BusRuntime) *Cache {
 	cacheCfg := cfg.MemoryCache
 	cache := &Cache{
-		logger:      logger,
-		obs:         observabilityx.Normalize(obs, logger),
-		maxFileSize: cacheCfg.MaxFileSize,
-		warmup:      cacheCfg.WarmupEnabled(),
-		bus:         bus,
+		logger: logger,
+		obs:    observabilityx.Normalize(obs, logger),
+		policy: cachepolicy.NewMemoryPolicy(cacheCfg),
+		warmup: cacheCfg.WarmupEnabled(),
+		bus:    bus,
 	}
 	if !cacheCfg.Enabled() {
 		return cache
@@ -77,10 +78,10 @@ func (c *Cache) WarmupEnabled() bool {
 }
 
 func (c *Cache) ShouldServe(size int64, rangeRequested bool) bool {
-	if !c.Enabled() || rangeRequested {
+	if !c.Enabled() || c.policy == nil {
 		return false
 	}
-	return size >= 0 && size <= c.maxFileSize
+	return c.policy.ShouldServe(size, rangeRequested)
 }
 
 func (c *Cache) GetOrLoad(path string) ([]byte, bool, error) {
@@ -94,13 +95,12 @@ func (c *Cache) GetOrLoad(path string) ([]byte, bool, error) {
 	}
 	c.addCounter(metricAssetCacheMisses, 1)
 
-	body, err := c.readFile(path)
+	body, err := c.readAndCachePath(path)
 	if err != nil {
 		c.addCounter(metricAssetCacheLoadErrors, 1)
 		return nil, false, err
 	}
 
-	c.cache.Set(path, body)
 	c.addCounter(metricAssetCacheFills, 1)
 	c.addCounter(metricAssetCacheFillBytes, int64(len(body)))
 	return body, false, nil
@@ -128,12 +128,9 @@ func (c *Cache) Warm(ctx context.Context, cat catalog.Catalog) (WarmStats, error
 }
 
 func (c *Cache) warmAssets(ctx context.Context, cat catalog.Catalog, stats *WarmStats) error {
-	var warmErr error
-	cat.AllAssets().Range(func(_ int, asset *catalog.Asset) bool {
-		warmErr = c.warmAsset(ctx, cat, asset, stats)
-		return warmErr == nil
+	return warmList(ctx, cat.AllAssets(), stats, func(ctx context.Context, asset *catalog.Asset, stats *WarmStats) error {
+		return c.warmAsset(ctx, cat, asset, stats)
 	})
-	return pickWarmError(ctx, warmErr)
 }
 
 func (c *Cache) warmAsset(
@@ -156,9 +153,20 @@ func (c *Cache) warmVariants(
 	variants collectionx.List[*catalog.Variant],
 	stats *WarmStats,
 ) error {
+	return warmList(ctx, variants, stats, func(ctx context.Context, variant *catalog.Variant, stats *WarmStats) error {
+		return c.warmVariant(ctx, variant, stats)
+	})
+}
+
+func warmList[T any](
+	ctx context.Context,
+	values collectionx.List[T],
+	stats *WarmStats,
+	warm func(context.Context, T, *WarmStats) error,
+) error {
 	var warmErr error
-	variants.Range(func(_ int, variant *catalog.Variant) bool {
-		warmErr = c.warmVariant(ctx, variant, stats)
+	values.Range(func(_ int, value T) bool {
+		warmErr = warm(ctx, value, stats)
 		return warmErr == nil
 	})
 	return pickWarmError(ctx, warmErr)
@@ -195,17 +203,26 @@ func (c *Cache) preloadPath(path string, size int64, stats *WarmStats) error {
 		return nil
 	}
 
-	body, err := c.readFile(path)
+	body, err := c.readAndCachePath(path)
 	if err != nil {
 		return err
 	}
 
-	c.cache.Set(path, body)
 	if stats != nil {
 		stats.Entries++
 		stats.Bytes += int64(len(body))
 	}
 	return nil
+}
+
+func (c *Cache) readAndCachePath(path string) ([]byte, error) {
+	body, err := c.readFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	c.cache.Set(path, body)
+	return body, nil
 }
 
 func (c *Cache) readFile(path string) ([]byte, error) {

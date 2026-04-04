@@ -177,17 +177,20 @@ func (s *Service) removeExpiredCleanupFiles(
 }
 
 func (s *Service) shouldRemoveExpiredFile(file cleanupFile, now time.Time) bool {
-	maxAge := s.cleanupMaxAgeForNamespace(file.namespace)
-	return maxAge > 0 && now.Sub(file.lastUsed) > maxAge
+	return s.artifactPolicy != nil && s.artifactPolicy.ShouldRemoveExpired(file.namespace, file.lastUsed, now)
 }
 
 func (s *Service) enforceCleanupCacheLimit(ctx context.Context, files []cleanupFile, result *cleanupResult) {
-	if s.cleanupMaxCacheBytes <= 0 || result.totalBytes <= s.cleanupMaxCacheBytes {
+	maxCacheBytes := int64(0)
+	if s.artifactPolicy != nil {
+		maxCacheBytes = s.artifactPolicy.MaxCacheBytes()
+	}
+	if maxCacheBytes <= 0 || result.totalBytes <= maxCacheBytes {
 		return
 	}
 
 	for _, file := range sortCleanupFilesByLastUsed(files) {
-		if result.totalBytes <= s.cleanupMaxCacheBytes {
+		if result.totalBytes <= maxCacheBytes {
 			return
 		}
 		if !s.removeCleanupFile(ctx, file, appEvent.VariantRemovalReasonSize) {
@@ -230,13 +233,6 @@ func cleanupNamespace(path, root string) string {
 		return ""
 	}
 	return strings.TrimSpace(parts[0])
-}
-
-func (s *Service) cleanupMaxAgeForNamespace(namespace string) time.Duration {
-	if maxAge, ok := s.cleanupNamespaceMaxAge.Get(namespace); ok && maxAge > 0 {
-		return maxAge
-	}
-	return s.cleanupDefaultMaxAge
 }
 
 func (s *Service) effectiveLastUsed(path string, modTime time.Time) time.Time {

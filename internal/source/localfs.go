@@ -32,7 +32,10 @@ func newLocalFS(cfg *config.Assets, logger *slog.Logger) (Source, error) {
 		return nil, fmt.Errorf("assets root must be a directory: %s", root)
 	}
 
-	logger.Info("Source configured", slog.String("root", cfg.Root))
+	logger.Info("Source configured",
+		slog.String("backend", string(cfg.NormalizedBackend())),
+		slog.String("root", cfg.Root),
+	)
 	return &localFS{
 		root:   root,
 		logger: logger,

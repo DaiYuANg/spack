@@ -11,7 +11,8 @@ var Module = dix.NewModule("pipeline",
 		dix.Provider0(newMetrics),
 		dix.Provider3(newImageStageFromDeps),
 		dix.Provider3(newCompressionStageFromDeps),
-		dix.Provider2(newStages),
+		dix.Provider2(newStageRegistrations),
+		dix.Provider1(newStages),
 		dix.Provider6(newServiceFromDeps),
 	),
 	dix.WithModuleHooks(
@@ -22,8 +23,15 @@ var Module = dix.NewModule("pipeline",
 	),
 )
 
-func newStages(image *imageStage, compression *compressionStage) []Stage {
-	return []Stage{image, compression}
+func newStageRegistrations(image *imageStage, compression *compressionStage) []stageRegistration {
+	return []stageRegistration{
+		newStageRegistration(100, image),
+		newStageRegistration(200, compression),
+	}
+}
+
+func newStages(registrations []stageRegistration) []Stage {
+	return buildStages(registrations)
 }
 
 func startServiceLifecycle(ctx context.Context, svc *Service) error {

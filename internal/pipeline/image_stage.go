@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/anthonynsimon/bild/imgio"
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
@@ -105,28 +104,22 @@ func (s *imageStage) Execute(task Task, asset *catalog.Asset) (*catalog.Variant,
 }
 
 func isResizableImage(asset *catalog.Asset) bool {
-	return mediax.ImageFormat(asset.MediaType) != ""
+	_, ok := mediax.LookupImageCapabilityByMediaType(asset.MediaType)
+	return ok
 }
 
 func encodeImage(img image.Image, format string, jpegQuality int) ([]byte, string, string, error) {
 	var buf bytes.Buffer
-	var encoder imgio.Encoder
-	switch mediax.NormalizeImageFormat(format) {
-	case "jpeg":
-		encoder = imgio.JPEGEncoder(jpegQuality)
-		if err := encoder(&buf, img); err != nil {
-			return nil, "", "", fmt.Errorf("encode jpeg image: %w", err)
-		}
-		return buf.Bytes(), ".jpg", "image/jpeg", nil
-	case "png":
-		encoder = imgio.PNGEncoder()
-		if err := encoder(&buf, img); err != nil {
-			return nil, "", "", fmt.Errorf("encode png image: %w", err)
-		}
-		return buf.Bytes(), ".png", "image/png", nil
-	default:
+	capability, ok := mediax.LookupImageCapability(mediax.NormalizeImageFormat(format))
+	if !ok {
 		return nil, "", "", fmt.Errorf("unsupported image format: %s", format)
 	}
+
+	encoder := capability.Encoder(jpegQuality)
+	if err := encoder(&buf, img); err != nil {
+		return nil, "", "", fmt.Errorf("encode %s image: %w", capability.Name, err)
+	}
+	return buf.Bytes(), capability.Extension, capability.MediaType, nil
 }
 
 func clampJPEGQuality(quality int) int {
