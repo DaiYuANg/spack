@@ -23,6 +23,7 @@ require (
 	github.com/gofiber/template/html/v2 v2.1.3
 	github.com/joho/godotenv v1.5.1
 	github.com/prometheus/client_golang v1.23.2
+	github.com/samber/hot v0.13.0
 	github.com/samber/lo v1.53.0
 	github.com/samber/oops v1.21.0
 	github.com/spf13/cobra v1.10.2
@@ -286,7 +287,6 @@ require (
 	github.com/samber/do/v2 v2.0.0 // indirect
 	github.com/samber/go-singleflightx v0.3.2 // indirect
 	github.com/samber/go-type-to-string v1.8.0 // indirect
-	github.com/samber/hot v0.13.0 // indirect
 	github.com/samber/mo v1.16.0 // indirect
 	github.com/samber/oops/loggers/zerolog v0.0.0-20260402170550-f43e94be84d4 // indirect
 	github.com/samber/slog-common v0.22.0 // indirect

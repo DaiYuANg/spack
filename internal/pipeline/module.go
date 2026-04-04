@@ -1,11 +1,9 @@
 package pipeline
 
 import (
-	"log/slog"
+	"context"
 
 	"github.com/DaiYuANg/arcgo/dix"
-	"github.com/daiyuang/spack/internal/catalog"
-	"github.com/daiyuang/spack/internal/config"
 )
 
 var Module = dix.NewModule("pipeline",
@@ -14,21 +12,12 @@ var Module = dix.NewModule("pipeline",
 		dix.Provider3(newImageStageFromDeps),
 		dix.Provider3(newCompressionStageFromDeps),
 		dix.Provider2(newStages),
+		dix.Provider5(newServiceFromDeps),
 	),
-	dix.WithModuleSetups(
-		dix.SetupWithMetadata(setupService, dix.SetupMetadata{
-			Label: "SetupService",
-			Dependencies: dix.ServiceRefs(
-				dix.TypedService[*config.Compression](),
-				dix.TypedService[*slog.Logger](),
-				dix.TypedService[catalog.Catalog](),
-				dix.TypedService[*Metrics](),
-				dix.TypedService[[]Stage](),
-			),
-			Provides: dix.ServiceRefs(
-				dix.TypedService[*Service](),
-			),
-			GraphMutation: true,
+	dix.WithModuleHooks(
+		dix.OnStart(startServiceLifecycle),
+		dix.OnStop(func(ctx context.Context, svc *Service) error {
+			return svc.stop(ctx)
 		}),
 	),
 )
@@ -37,28 +26,7 @@ func newStages(image *imageStage, compression *compressionStage) []Stage {
 	return []Stage{image, compression}
 }
 
-func setupService(c *dix.Container, lc dix.Lifecycle) error {
-	cfg, err := dix.ResolveAs[*config.Compression](c)
-	if err != nil {
-		return err
-	}
-	logger, err := dix.ResolveAs[*slog.Logger](c)
-	if err != nil {
-		return err
-	}
-	cat, err := dix.ResolveAs[catalog.Catalog](c)
-	if err != nil {
-		return err
-	}
-	metrics, err := dix.ResolveAs[*Metrics](c)
-	if err != nil {
-		return err
-	}
-	stages, err := dix.ResolveAs[[]Stage](c)
-	if err != nil {
-		return err
-	}
-
-	dix.ProvideValueT(c, newService(lc, cfg, logger, cat, metrics, stages))
-	return nil
+func startServiceLifecycle(ctx context.Context, svc *Service) error {
+	workers := max(svc.cfg.Workers, 1)
+	return svc.start(ctx, workers, cap(svc.tasks))
 }

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 )
@@ -52,15 +51,6 @@ func (s *Service) initializeMetrics(queueSize int) {
 	}
 	s.metrics.QueueCapacity.Set(float64(queueSize))
 	s.metrics.QueueLength.Set(0)
-}
-
-func (s *Service) registerLifecycle(lc dix.Lifecycle, workers, queueSize int) {
-	lc.OnStart(func(ctx context.Context) error {
-		return s.start(ctx, workers, queueSize)
-	})
-	lc.OnStop(func(ctx context.Context) error {
-		return s.stop(ctx)
-	})
 }
 
 func (s *Service) start(_ context.Context, workers, queueSize int) error {

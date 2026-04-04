@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"golang.org/x/sync/singleflight"
@@ -40,8 +39,7 @@ type Service struct {
 	cleanupMaxCacheBytes   int64
 }
 
-func newService(
-	lc dix.Lifecycle,
+func newServiceFromDeps(
 	cfg *config.Compression,
 	logger *slog.Logger,
 	cat catalog.Catalog,
@@ -53,7 +51,6 @@ func newService(
 
 	svc := newServiceState(cfg, logger, cat, metrics, stages, queueSize)
 	svc.initializeMetrics(queueSize)
-	svc.registerLifecycle(lc, workers, queueSize)
 	return svc
 }
 

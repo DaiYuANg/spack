@@ -5,38 +5,33 @@ import (
 
 	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/daiyuang/spack/internal/config"
+	"github.com/samber/do/v2"
 )
 
 var Module = dix.NewModule("source",
-	dix.WithModuleSetups(
-		dix.SetupWithMetadata(setupSource, dix.SetupMetadata{
-			Label: "SetupSource",
+	dix.WithModuleProviders(
+		dix.RawProviderWithMetadata(registerSourceProvider, dix.ProviderMetadata{
+			Label:  "SourceProvider",
+			Output: dix.TypedService[Source](),
 			Dependencies: dix.ServiceRefs(
 				dix.TypedService[*config.Assets](),
 				dix.TypedService[*slog.Logger](),
 			),
-			Provides: dix.ServiceRefs(
-				dix.TypedService[Source](),
-			),
-			GraphMutation: true,
+			Raw: true,
 		}),
 	),
 )
 
-func setupSource(c *dix.Container, _ dix.Lifecycle) error {
-	cfg, err := dix.ResolveAs[*config.Assets](c)
-	if err != nil {
-		return err
-	}
-	logger, err := dix.ResolveAs[*slog.Logger](c)
-	if err != nil {
-		return err
-	}
-
-	src, err := newLocalFS(cfg, logger)
-	if err != nil {
-		return err
-	}
-	dix.ProvideValueT[Source](c, src)
-	return nil
+func registerSourceProvider(c *dix.Container) {
+	do.ProvideNamed(c.Raw(), dix.TypedService[Source]().Name, func(i do.Injector) (Source, error) {
+		cfg, err := do.InvokeNamed[*config.Assets](i, dix.TypedService[*config.Assets]().Name)
+		if err != nil {
+			return nil, err
+		}
+		logger, err := do.InvokeNamed[*slog.Logger](i, dix.TypedService[*slog.Logger]().Name)
+		if err != nil {
+			return nil, err
+		}
+		return newLocalFS(cfg, logger)
+	})
 }

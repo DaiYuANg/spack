@@ -34,42 +34,15 @@ var Module = dix.NewModule("runtime",
 )
 
 func setupRuntime(c *dix.Container, lc dix.Lifecycle) error {
-	cfg, err := dix.ResolveAs[*config.Config](c)
-	if err != nil {
-		return err
-	}
-	src, err := dix.ResolveAs[source.Source](c)
-	if err != nil {
-		return err
-	}
-	cat, err := dix.ResolveAs[catalog.Catalog](c)
-	if err != nil {
-		return err
-	}
-	bodyCache, err := dix.ResolveAs[*assetcache.Cache](c)
-	if err != nil {
-		return err
-	}
-	pipelineSvc, err := dix.ResolveAs[*pipeline.Service](c)
-	if err != nil {
-		return err
-	}
-	pipelineMetrics, err := dix.ResolveAs[*pipeline.Metrics](c)
-	if err != nil {
-		return err
-	}
-	logger, err := dix.ResolveAs[*slog.Logger](c)
-	if err != nil {
-		return err
-	}
-	app, err := dix.ResolveAs[*fiber.App](c)
-	if err != nil {
-		return err
-	}
-	metricsAdapter, err := dix.ResolveAs[*obsprom.Adapter](c)
-	if err != nil {
-		return err
-	}
+	cfg := dix.MustResolveAs[*config.Config](c)
+	src := dix.MustResolveAs[source.Source](c)
+	cat := dix.MustResolveAs[catalog.Catalog](c)
+	bodyCache := dix.MustResolveAs[*assetcache.Cache](c)
+	pipelineSvc := dix.MustResolveAs[*pipeline.Service](c)
+	pipelineMetrics := dix.MustResolveAs[*pipeline.Metrics](c)
+	logger := dix.MustResolveAs[*slog.Logger](c)
+	app := dix.MustResolveAs[*fiber.App](c)
+	metricsAdapter := dix.MustResolveAs[*obsprom.Adapter](c)
 
 	logConfigLifecycle(lc, cfg, logger)
 	bootstrapCatalog(lc, cfg, src, cat, bodyCache, pipelineSvc, logger)

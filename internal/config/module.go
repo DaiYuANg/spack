@@ -6,43 +6,30 @@ import (
 	"github.com/DaiYuANg/arcgo/configx"
 	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/daiyuang/spack/internal/constant"
+	"github.com/samber/do/v2"
 )
 
 var Module = dix.NewModule("config",
-	dix.WithModuleSetups(
-		dix.SetupWithMetadata(setupConfig, dix.SetupMetadata{
-			Label: "SetupConfig",
-			Provides: dix.ServiceRefs(
-				dix.TypedService[*Config](),
-				dix.TypedService[*Debug](),
-				dix.TypedService[*Image](),
-				dix.TypedService[*Metrics](),
-				dix.TypedService[*Logger](),
-				dix.TypedService[*HTTP](),
-				dix.TypedService[*Assets](),
-				dix.TypedService[*Compression](),
-			),
-			GraphMutation: true,
+	dix.WithModuleProviders(
+		dix.RawProviderWithMetadata(registerConfigProvider, dix.ProviderMetadata{
+			Label:  "ConfigProvider",
+			Output: dix.TypedService[*Config](),
+			Raw:    true,
 		}),
+		dix.Provider1(func(cfg *Config) *Debug { return &cfg.Debug }),
+		dix.Provider1(func(cfg *Config) *Image { return &cfg.Image }),
+		dix.Provider1(func(cfg *Config) *Metrics { return &cfg.Metrics }),
+		dix.Provider1(func(cfg *Config) *Logger { return &cfg.Logger }),
+		dix.Provider1(func(cfg *Config) *HTTP { return &cfg.HTTP }),
+		dix.Provider1(func(cfg *Config) *Assets { return &cfg.Assets }),
+		dix.Provider1(func(cfg *Config) *Compression { return &cfg.Compression }),
 	),
 )
 
-func setupConfig(c *dix.Container, _ dix.Lifecycle) error {
-	cfg, err := loadConfig()
-	if err != nil {
-		return err
-	}
-
-	dix.ProvideValueT(c, cfg)
-	dix.ProvideValueT(c, &cfg.Debug)
-	dix.ProvideValueT(c, &cfg.Image)
-	dix.ProvideValueT(c, &cfg.Metrics)
-	dix.ProvideValueT(c, &cfg.Logger)
-	dix.ProvideValueT(c, &cfg.HTTP)
-	dix.ProvideValueT(c, &cfg.Assets)
-	dix.ProvideValueT(c, &cfg.Compression)
-
-	return nil
+func registerConfigProvider(c *dix.Container) {
+	do.ProvideNamed(c.Raw(), dix.TypedService[*Config]().Name, func(do.Injector) (*Config, error) {
+		return loadConfig()
+	})
 }
 
 func loadConfig() (*Config, error) {
