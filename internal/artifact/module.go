@@ -1,3 +1,4 @@
+// Package artifact manages generated artifact storage.
 package artifact
 
 import (

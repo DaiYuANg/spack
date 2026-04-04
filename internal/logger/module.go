@@ -1,3 +1,4 @@
+// Package logger configures structured logging.
 package logger
 
 import (

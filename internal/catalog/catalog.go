@@ -1,3 +1,4 @@
+// Package catalog stores asset and variant metadata in memory.
 package catalog
 
 import (

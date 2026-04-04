@@ -4,9 +4,7 @@ import (
 	"cmp"
 	"errors"
 	"log/slog"
-	"os"
 	"path"
-	"strconv"
 	"strings"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
@@ -153,12 +151,7 @@ func (r *Resolver) pickVariant(asset *catalog.Asset, encodings collectionx.List[
 
 func (r *Resolver) pickImageVariant(asset *catalog.Asset, width int, formats collectionx.List[string]) *catalog.Variant {
 	sourceFormat := imageFormat(asset.MediaType)
-	candidates := r.catalog.ListVariants(asset.Path).Where(func(_ int, variant *catalog.Variant) bool {
-		if variant.Width <= 0 && variant.Format == "" {
-			return false
-		}
-		return isUsableVariant(variant, asset.SourceHash)
-	})
+	candidates := imageCandidates(r.catalog.ListVariants(asset.Path), asset.SourceHash)
 	if candidates.IsEmpty() {
 		return nil
 	}
@@ -169,34 +162,51 @@ func (r *Resolver) pickImageVariant(asset *catalog.Asset, width int, formats col
 
 	var picked *catalog.Variant
 	formats.Range(func(_ int, format string) bool {
-		byFormat := candidates.Where(func(_ int, candidate *catalog.Variant) bool {
-			return format == "" || variantFormat(candidate, sourceFormat) == format
-		})
-		if byFormat.IsEmpty() {
-			return true
-		}
-
-		if width <= 0 {
-			picked, _ = byFormat.FirstWhere(func(_ int, candidate *catalog.Variant) bool {
-				return candidate.Width == 0
-			}).Get()
-			return picked == nil
-		}
-
-		byFormat.Sort(func(left, right *catalog.Variant) int {
-			return cmp.Compare(left.Width, right.Width)
-		})
-		picked, _ = byFormat.FirstWhere(func(_ int, candidate *catalog.Variant) bool {
-			return candidate.Width >= width
-		}).Get()
-		if picked != nil {
-			return false
-		}
-
-		picked, _ = byFormat.GetLast()
+		picked = pickImageVariantForFormat(candidates, format, sourceFormat, width)
 		return picked == nil
 	})
 	return picked
+}
+
+func imageCandidates(variants collectionx.List[*catalog.Variant], sourceHash string) collectionx.List[*catalog.Variant] {
+	return variants.Where(func(_ int, variant *catalog.Variant) bool {
+		if variant.Width <= 0 && variant.Format == "" {
+			return false
+		}
+		return isUsableVariant(variant, sourceHash)
+	})
+}
+
+func pickImageVariantForFormat(
+	candidates collectionx.List[*catalog.Variant],
+	format string,
+	sourceFormat string,
+	width int,
+) *catalog.Variant {
+	byFormat := candidates.Where(func(_ int, candidate *catalog.Variant) bool {
+		return format == "" || variantFormat(candidate, sourceFormat) == format
+	})
+	if byFormat.IsEmpty() {
+		return nil
+	}
+	if width <= 0 {
+		variant, _ := byFormat.FirstWhere(func(_ int, candidate *catalog.Variant) bool {
+			return candidate.Width == 0
+		}).Get()
+		return variant
+	}
+
+	byFormat.Sort(func(left, right *catalog.Variant) int {
+		return cmp.Compare(left.Width, right.Width)
+	})
+	if variant, ok := byFormat.FirstWhere(func(_ int, candidate *catalog.Variant) bool {
+		return candidate.Width >= width
+	}).Get(); ok {
+		return variant
+	}
+
+	variant, _ := byFormat.GetLast()
+	return variant
 }
 
 func candidates(requestPath, entry string) collectionx.List[string] {
@@ -224,287 +234,4 @@ func normalizeAssetPath(raw string) string {
 	}
 
 	return strings.TrimPrefix(clean, "/")
-}
-
-func parseAcceptEncoding(header string) collectionx.List[string] {
-	if strings.TrimSpace(header) == "" {
-		return collectionx.NewList[string]()
-	}
-
-	explicit := collectionx.NewMapWithCapacity[string, float64](4)
-	wildcardQ := 0.0
-	hasWildcard := false
-	for _, rawPart := range strings.Split(header, ",") {
-		part := strings.TrimSpace(rawPart)
-		if part == "" {
-			continue
-		}
-		pieces := strings.Split(part, ";")
-		encoding := strings.ToLower(strings.TrimSpace(pieces[0]))
-		if encoding == "" {
-			continue
-		}
-
-		q := 1.0
-		for _, rawParam := range pieces[1:] {
-			param := strings.TrimSpace(rawParam)
-			if !strings.HasPrefix(strings.ToLower(param), "q=") {
-				continue
-			}
-			value := strings.TrimSpace(strings.TrimPrefix(strings.ToLower(param), "q="))
-			parsed, err := strconv.ParseFloat(value, 64)
-			if err != nil {
-				continue
-			}
-			if parsed < 0 {
-				parsed = 0
-			}
-			if parsed > 1 {
-				parsed = 1
-			}
-			q = parsed
-		}
-
-		if encoding == "*" {
-			hasWildcard = true
-			wildcardQ = q
-			continue
-		}
-		if oldQ, ok := explicit.Get(encoding); !ok || q > oldQ {
-			explicit.Set(encoding, q)
-		}
-	}
-
-	type candidate struct {
-		encoding string
-		q        float64
-		priority int
-	}
-
-	supported := collectionx.NewList("br", "gzip")
-	choices := collectionx.NewListWithCapacity[candidate](supported.Len())
-	supported.Range(func(index int, encoding string) bool {
-		q, ok := explicit.Get(encoding)
-		if !ok {
-			if !hasWildcard {
-				return true
-			}
-			q = wildcardQ
-		}
-		if q <= 0 {
-			return true
-		}
-		choices.Add(candidate{
-			encoding: encoding,
-			q:        q,
-			priority: index,
-		})
-		return true
-	})
-
-	choices.Sort(func(left, right candidate) int {
-		if left.q == right.q {
-			return cmp.Compare(left.priority, right.priority)
-		}
-		if left.q > right.q {
-			return -1
-		}
-		return 1
-	})
-
-	return collectionx.MapList(choices, func(_ int, choice candidate) string {
-		return choice.encoding
-	})
-}
-
-func uniqueStrings(values collectionx.List[string]) collectionx.List[string] {
-	ordered := collectionx.NewOrderedSetWithCapacity[string](values.Len())
-	values.Each(func(_ int, value string) {
-		if value == "" {
-			return
-		}
-		ordered.Add(value)
-	})
-	return collectionx.NewList(ordered.Values()...)
-}
-
-func isUsableVariant(variant *catalog.Variant, assetSourceHash string) bool {
-	if variant == nil || strings.TrimSpace(variant.ArtifactPath) == "" {
-		return false
-	}
-	if assetSourceHash != "" && variant.SourceHash != "" && variant.SourceHash != assetSourceHash {
-		return false
-	}
-	if _, err := os.Stat(variant.ArtifactPath); err != nil {
-		return false
-	}
-	return true
-}
-
-func variantFormat(variant *catalog.Variant, sourceFormat string) string {
-	if variant == nil || strings.TrimSpace(variant.Format) == "" {
-		return sourceFormat
-	}
-	return variant.Format
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return value
-		}
-	}
-	return ""
-}
-
-func preferredWidths(width int) collectionx.List[int] {
-	if width <= 0 {
-		return collectionx.NewList[int]()
-	}
-	return collectionx.NewList(width)
-}
-
-func preferredImageFormats(acceptHeader string, explicitFormat string, sourceMediaType string) collectionx.List[string] {
-	if explicitFormat != "" {
-		return collectionx.NewList(explicitFormat)
-	}
-	if !isImageMediaType(sourceMediaType) {
-		return collectionx.NewList[string]()
-	}
-	return parseAcceptImageFormats(acceptHeader, imageFormat(sourceMediaType))
-}
-
-func normalizeImageFormat(format string) string {
-	switch strings.ToLower(strings.TrimSpace(format)) {
-	case "jpg", "jpeg":
-		return "jpeg"
-	case "png":
-		return "png"
-	default:
-		return ""
-	}
-}
-
-func imageFormat(mediaType string) string {
-	switch strings.ToLower(strings.TrimSpace(mediaType)) {
-	case "image/jpeg":
-		return "jpeg"
-	case "image/png":
-		return "png"
-	default:
-		return ""
-	}
-}
-
-func isImageMediaType(mediaType string) bool {
-	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(mediaType)), "image/")
-}
-
-func parseAcceptImageFormats(header string, sourceFormat string) collectionx.List[string] {
-	if strings.TrimSpace(header) == "" {
-		return collectionx.NewList[string]()
-	}
-
-	explicit := collectionx.NewMapWithCapacity[string, float64](4)
-	wildcardImageQ := 0.0
-	hasWildcardImage := false
-	wildcardAnyQ := 0.0
-	hasWildcardAny := false
-
-	for _, rawPart := range strings.Split(header, ",") {
-		part := strings.TrimSpace(rawPart)
-		if part == "" {
-			continue
-		}
-		pieces := strings.Split(part, ";")
-		mediaType := strings.ToLower(strings.TrimSpace(pieces[0]))
-		if mediaType == "" {
-			continue
-		}
-
-		q := 1.0
-		for _, rawParam := range pieces[1:] {
-			param := strings.TrimSpace(rawParam)
-			if !strings.HasPrefix(strings.ToLower(param), "q=") {
-				continue
-			}
-			value := strings.TrimSpace(strings.TrimPrefix(strings.ToLower(param), "q="))
-			parsed, err := strconv.ParseFloat(value, 64)
-			if err != nil {
-				continue
-			}
-			if parsed < 0 {
-				parsed = 0
-			}
-			if parsed > 1 {
-				parsed = 1
-			}
-			q = parsed
-		}
-
-		switch mediaType {
-		case "image/*":
-			hasWildcardImage = true
-			wildcardImageQ = q
-		case "*/*":
-			hasWildcardAny = true
-			wildcardAnyQ = q
-		case "image/jpeg", "image/jpg":
-			if oldQ, ok := explicit.Get("jpeg"); !ok || q > oldQ {
-				explicit.Set("jpeg", q)
-			}
-		case "image/png":
-			if oldQ, ok := explicit.Get("png"); !ok || q > oldQ {
-				explicit.Set("png", q)
-			}
-		}
-	}
-
-	type candidate struct {
-		format   string
-		q        float64
-		priority int
-	}
-
-	supported := collectionx.NewList("jpeg", "png")
-	candidates := collectionx.NewListWithCapacity[candidate](supported.Len())
-	supported.Range(func(index int, format string) bool {
-		q, ok := explicit.Get(format)
-		if !ok {
-			if hasWildcardImage {
-				q = wildcardImageQ
-			} else if hasWildcardAny {
-				q = wildcardAnyQ
-			} else {
-				q = 0
-			}
-		}
-		if q <= 0 {
-			return true
-		}
-		priority := index
-		if format == sourceFormat {
-			priority = -1
-		}
-		candidates.Add(candidate{
-			format:   format,
-			q:        q,
-			priority: priority,
-		})
-		return true
-	})
-
-	candidates.Sort(func(left, right candidate) int {
-		if left.q == right.q {
-			return cmp.Compare(left.priority, right.priority)
-		}
-		if left.q > right.q {
-			return -1
-		}
-		return 1
-	})
-
-	return collectionx.MapList(candidates, func(_ int, candidate candidate) string {
-		return candidate.format
-	})
 }

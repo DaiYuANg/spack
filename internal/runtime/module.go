@@ -1,3 +1,4 @@
+// Package runtime wires startup lifecycle and long-running services.
 package runtime
 
 import (

@@ -1,3 +1,4 @@
+// Package resolver maps requests to source assets or generated variants.
 package resolver
 
 import "github.com/DaiYuANg/arcgo/dix"

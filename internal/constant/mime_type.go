@@ -9,9 +9,9 @@ const (
 	Jpeg MimeType = "image/jpeg"
 	Jpg  MimeType = "image/jpg"
 
-	Html MimeType = "text/html"
-	Css  MimeType = "text/css"
-	Json MimeType = "application/json"
+	HTML MimeType = "text/html"
+	CSS  MimeType = "text/css"
+	JSON MimeType = "application/json"
 
 	ApplicationJavascript MimeType = "application/javascript"
 	TextJavascript        MimeType = "text/javascript"

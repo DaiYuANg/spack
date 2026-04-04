@@ -1,3 +1,4 @@
+// Package metrics exposes metrics-related services.
 package metrics
 
 import (

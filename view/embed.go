@@ -1,3 +1,4 @@
+// Package view embeds HTML templates used by the server.
 package view
 
 import "embed"

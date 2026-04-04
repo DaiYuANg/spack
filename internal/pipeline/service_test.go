@@ -1,7 +1,6 @@
-package pipeline
+package pipeline_test
 
 import (
-	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -11,59 +10,50 @@ import (
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/pipeline"
 )
 
 func TestEnqueueDeduplicatesRequests(t *testing.T) {
-	svc := &Service{
-		cfg: &config.Compression{
-			Enable: true,
-			Mode:   config.CompressionModeLazy,
-		},
-		logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
-		tasks:   make(chan Request, 2),
-		pending: collectionx.NewSet[string](),
-	}
+	svc := pipeline.NewServiceForTest(&config.Compression{
+		Enable: true,
+		Mode:   config.CompressionModeLazy,
+	}, slog.New(slog.DiscardHandler), catalog.NewInMemoryCatalog(), 2)
 
-	svc.Enqueue(Request{
+	svc.Enqueue(pipeline.Request{
 		AssetPath:          "hero.png",
 		PreferredEncodings: collectionx.NewList("gzip", "br"),
 		PreferredFormats:   collectionx.NewList("jpeg", "png"),
 		PreferredWidths:    collectionx.NewList(1280, 640),
 	})
-	svc.Enqueue(Request{
+	svc.Enqueue(pipeline.Request{
 		AssetPath:          "hero.png",
 		PreferredEncodings: collectionx.NewList("br", "gzip"),
 		PreferredFormats:   collectionx.NewList("png", "jpeg"),
 		PreferredWidths:    collectionx.NewList(640, 1280),
 	})
 
-	if len(svc.tasks) != 1 {
-		t.Fatalf("expected one queued request, got %d", len(svc.tasks))
+	if pipeline.QueuedCountForTest(svc) != 1 {
+		t.Fatalf("expected one queued request, got %d", pipeline.QueuedCountForTest(svc))
 	}
-	if pendingCount(svc) != 1 {
-		t.Fatalf("expected one pending request, got %d", pendingCount(svc))
+	if pipeline.PendingCountForTest(svc) != 1 {
+		t.Fatalf("expected one pending request, got %d", pipeline.PendingCountForTest(svc))
 	}
 }
 
 func TestEnqueueDropsWhenQueueFull(t *testing.T) {
-	svc := &Service{
-		cfg: &config.Compression{
-			Enable: true,
-			Mode:   config.CompressionModeLazy,
-		},
-		logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
-		tasks:   make(chan Request, 1),
-		pending: collectionx.NewSet[string](),
-	}
+	svc := pipeline.NewServiceForTest(&config.Compression{
+		Enable: true,
+		Mode:   config.CompressionModeLazy,
+	}, slog.New(slog.DiscardHandler), catalog.NewInMemoryCatalog(), 1)
 
-	svc.Enqueue(Request{AssetPath: "a.js"})
-	svc.Enqueue(Request{AssetPath: "b.js"})
+	svc.Enqueue(pipeline.Request{AssetPath: "a.js"})
+	svc.Enqueue(pipeline.Request{AssetPath: "b.js"})
 
-	if len(svc.tasks) != 1 {
-		t.Fatalf("expected one queued request, got %d", len(svc.tasks))
+	if pipeline.QueuedCountForTest(svc) != 1 {
+		t.Fatalf("expected one queued request, got %d", pipeline.QueuedCountForTest(svc))
 	}
-	if pendingCount(svc) != 1 {
-		t.Fatalf("expected one pending request, got %d", pendingCount(svc))
+	if pipeline.PendingCountForTest(svc) != 1 {
+		t.Fatalf("expected one pending request, got %d", pipeline.PendingCountForTest(svc))
 	}
 }
 
@@ -88,21 +78,13 @@ func TestCleanupArtifactsRemovesExpiredVariants(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	svc := &Service{
-		cfg: &config.Compression{
-			CacheDir: root,
-		},
-		logger:                 slog.New(slog.NewTextHandler(io.Discard, nil)),
-		catalog:                cat,
-		cleanupDefaultMaxAge:   time.Hour,
-		cleanupMaxCacheBytes:   0,
-		cleanupNamespaceMaxAge: collectionx.NewMap[string, time.Duration](),
-		variantHits:            collectionx.NewMap[string, time.Time](),
-	}
+	svc := pipeline.NewServiceForTest(&config.Compression{
+		CacheDir: root,
+		MaxAge:   "1h",
+	}, slog.New(slog.DiscardHandler), cat, 1)
 
-	result := svc.cleanupArtifacts(time.Now())
-	if result.removed != 1 {
-		t.Fatalf("expected one removed file, got %d", result.removed)
+	if removed := pipeline.CleanupRemovedForTest(svc, time.Now()); removed != 1 {
+		t.Fatalf("expected one removed file, got %d", removed)
 	}
 	if _, err := os.Stat(expiredPath); !os.IsNotExist(err) {
 		t.Fatalf("expected expired file removed, err=%v", err)
@@ -147,21 +129,13 @@ func TestCleanupArtifactsEnforcesMaxCacheBytes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	svc := &Service{
-		cfg: &config.Compression{
-			CacheDir: root,
-		},
-		logger:                 slog.New(slog.NewTextHandler(io.Discard, nil)),
-		catalog:                cat,
-		cleanupDefaultMaxAge:   0,
-		cleanupMaxCacheBytes:   16,
-		cleanupNamespaceMaxAge: collectionx.NewMap[string, time.Duration](),
-		variantHits:            collectionx.NewMap[string, time.Time](),
-	}
+	svc := pipeline.NewServiceForTest(&config.Compression{
+		CacheDir:      root,
+		MaxCacheBytes: 16,
+	}, slog.New(slog.DiscardHandler), cat, 1)
 
-	result := svc.cleanupArtifacts(time.Now())
-	if result.removed != 1 {
-		t.Fatalf("expected one removed file, got %d", result.removed)
+	if removed := pipeline.CleanupRemovedForTest(svc, time.Now()); removed != 1 {
+		t.Fatalf("expected one removed file, got %d", removed)
 	}
 	if _, err := os.Stat(oldPath); !os.IsNotExist(err) {
 		t.Fatalf("expected oldest file removed, err=%v", err)
@@ -197,22 +171,14 @@ func TestCleanupArtifactsUsesNamespaceMaxAge(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	svc := &Service{
-		cfg: &config.Compression{
-			CacheDir: root,
-		},
-		logger:               slog.New(slog.NewTextHandler(io.Discard, nil)),
-		catalog:              cat,
-		cleanupDefaultMaxAge: 24 * time.Hour,
-		cleanupNamespaceMaxAge: collectionx.NewMapFrom(map[string]time.Duration{
-			"image": time.Hour,
-		}),
-		variantHits: collectionx.NewMap[string, time.Time](),
-	}
+	svc := pipeline.NewServiceForTest(&config.Compression{
+		CacheDir:    root,
+		MaxAge:      "24h",
+		ImageMaxAge: "1h",
+	}, slog.New(slog.DiscardHandler), cat, 1)
 
-	result := svc.cleanupArtifacts(time.Now())
-	if result.removed != 1 {
-		t.Fatalf("expected one removed file, got %d", result.removed)
+	if removed := pipeline.CleanupRemovedForTest(svc, time.Now()); removed != 1 {
+		t.Fatalf("expected one removed file, got %d", removed)
 	}
 	if _, err := os.Stat(oldImage); !os.IsNotExist(err) {
 		t.Fatalf("expected old image file removed, err=%v", err)
@@ -240,35 +206,21 @@ func TestCleanupArtifactsKeepsHotVariant(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	svc := &Service{
-		cfg: &config.Compression{
-			CacheDir: root,
-		},
-		logger:               slog.New(slog.NewTextHandler(io.Discard, nil)),
-		catalog:              cat,
-		cleanupDefaultMaxAge: time.Hour,
-		variantHits: collectionx.NewMapFrom(map[string]time.Time{
-			oldPath: time.Now(),
-		}),
-		cleanupNamespaceMaxAge: collectionx.NewMap[string, time.Duration](),
-	}
+	svc := pipeline.NewServiceForTest(&config.Compression{
+		CacheDir: root,
+		MaxAge:   "1h",
+	}, slog.New(slog.DiscardHandler), cat, 1)
+	svc.MarkVariantHit(oldPath)
 
-	result := svc.cleanupArtifacts(time.Now())
-	if result.removed != 0 {
-		t.Fatalf("expected no removed files for hot variant, got %d", result.removed)
+	if removed := pipeline.CleanupRemovedForTest(svc, time.Now()); removed != 0 {
+		t.Fatalf("expected no removed files for hot variant, got %d", removed)
 	}
 	if _, err := os.Stat(oldPath); err != nil {
 		t.Fatalf("expected hot variant retained, err=%v", err)
 	}
 }
 
-func pendingCount(svc *Service) int {
-	svc.pendingMu.Lock()
-	defer svc.pendingMu.Unlock()
-	return svc.pending.Len()
-}
-
-func addAsset(t *testing.T, cat catalog.Catalog, path string, mediaType string, sourceHash string) {
+func addAsset(t *testing.T, cat catalog.Catalog, path, mediaType, sourceHash string) {
 	t.Helper()
 	if err := cat.UpsertAsset(&catalog.Asset{
 		Path:       path,
@@ -283,10 +235,10 @@ func addAsset(t *testing.T, cat catalog.Catalog, path string, mediaType string, 
 
 func writeArtifact(t *testing.T, path string, payload []byte) {
 	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, payload, 0o644); err != nil {
+	if err := os.WriteFile(path, payload, 0o600); err != nil {
 		t.Fatal(err)
 	}
 }

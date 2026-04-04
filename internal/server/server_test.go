@@ -1,6 +1,10 @@
-package server
+package server_test
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/daiyuang/spack/internal/server"
+)
 
 func TestShouldVaryAccept(t *testing.T) {
 	tests := []struct {
@@ -36,9 +40,8 @@ func TestShouldVaryAccept(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			got := shouldVaryAccept(tt.sourceMediaType, tt.explicitFormat)
+			got := server.ShouldVaryAcceptForTest(tt.sourceMediaType, tt.explicitFormat)
 			if got != tt.expected {
 				t.Fatalf("expected %v, got %v", tt.expected, got)
 			}

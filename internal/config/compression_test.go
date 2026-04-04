@@ -1,12 +1,14 @@
-package config
+package config_test
 
 import (
 	"testing"
 	"time"
+
+	"github.com/daiyuang/spack/internal/config"
 )
 
 func TestCompressionQueueCapacity(t *testing.T) {
-	cfg := Compression{Workers: 2}
+	cfg := config.Compression{Workers: 2}
 	if got := cfg.QueueCapacity(); got != 128 {
 		t.Fatalf("expected queue capacity 128, got %d", got)
 	}
@@ -18,7 +20,7 @@ func TestCompressionQueueCapacity(t *testing.T) {
 }
 
 func TestCompressionParsedCleanupInterval(t *testing.T) {
-	cfg := Compression{CleanupEvery: "10m"}
+	cfg := config.Compression{CleanupEvery: "10m"}
 	if got := cfg.ParsedCleanupInterval(); got != 10*time.Minute {
 		t.Fatalf("expected 10m, got %s", got)
 	}
@@ -30,7 +32,7 @@ func TestCompressionParsedCleanupInterval(t *testing.T) {
 }
 
 func TestCompressionParsedMaxAge(t *testing.T) {
-	cfg := Compression{MaxAge: "72h"}
+	cfg := config.Compression{MaxAge: "72h"}
 	if got := cfg.ParsedMaxAge(); got != 72*time.Hour {
 		t.Fatalf("expected 72h, got %s", got)
 	}
@@ -47,7 +49,7 @@ func TestCompressionParsedMaxAge(t *testing.T) {
 }
 
 func TestCompressionNamespaceMaxAges(t *testing.T) {
-	cfg := Compression{
+	cfg := config.Compression{
 		EncodingMaxAge: "24h",
 		ImageMaxAge:    "72h",
 	}
@@ -61,7 +63,7 @@ func TestCompressionNamespaceMaxAges(t *testing.T) {
 		t.Fatalf("expected image max age 72h, got %s", imageMaxAge)
 	}
 
-	cfg = Compression{
+	cfg = config.Compression{
 		EncodingMaxAge: "bad",
 		ImageMaxAge:    "0",
 	}

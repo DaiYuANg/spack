@@ -1,6 +1,8 @@
+// Package source provides asset source implementations.
 package source
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -19,7 +21,7 @@ type localFS struct {
 func newLocalFS(cfg *config.Assets, logger *slog.Logger) (Source, error) {
 	root := strings.TrimSpace(cfg.Root)
 	if root == "" {
-		return nil, fmt.Errorf("assets root is required")
+		return nil, errors.New("assets root is required")
 	}
 
 	info, err := os.Stat(root)
@@ -38,7 +40,7 @@ func newLocalFS(cfg *config.Assets, logger *slog.Logger) (Source, error) {
 }
 
 func (s *localFS) Walk(walkFn func(File) error) error {
-	return filepath.Walk(s.root, func(fullPath string, info os.FileInfo, err error) error {
+	if err := filepath.Walk(s.root, func(fullPath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return oops.Wrap(err)
 		}
@@ -55,5 +57,8 @@ func (s *localFS) Walk(walkFn func(File) error) error {
 			IsDir:    info.IsDir(),
 			ModTime:  info.ModTime(),
 		})
-	})
+	}); err != nil {
+		return oops.Wrap(err)
+	}
+	return nil
 }

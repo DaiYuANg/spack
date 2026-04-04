@@ -11,53 +11,74 @@ import (
 )
 
 func DetectMIME(filePath string) constant.MimeType {
-	ext := strings.ToLower(path.Ext(filePath))
-
-	// 1. Web 语义优先修正（强规则）
-	switch ext {
-	case ".js":
-		return constant.ApplicationJavascript
-	case ".css":
-		return constant.Css
-	case ".html", ".htm":
-		return constant.Html
-	case ".json":
-		return constant.Json
-	case ".svg":
-		return constant.Svg
+	if detected, ok := detectMIMEByExtension(filePath); ok {
+		return detected
 	}
-
-	// 2. 内容嗅探（主要用于二进制类型）
-	if f, err := os.Open(filePath); err == nil {
-		defer f.Close()
-
-		if mtype, err := mimetype.DetectReader(f); err == nil && mtype != nil {
-			mt := mtype.String()
-
-			// 去掉 charset 等参数
-			if idx := strings.Index(mt, ";"); idx > 0 {
-				mt = mt[:idx]
-			}
-
-			switch constant.MimeType(mt) {
-			case constant.Png:
-				return constant.Png
-			case constant.Jpeg:
-				return constant.Jpeg
-			case constant.Svg:
-				return constant.Svg
-			}
-		}
+	if detected, ok := detectMIMEByContent(filePath); ok {
+		return detected
 	}
-
-	// 3. fallback：Go 标准库（再 normalize 一次）
-	if mt := mime.TypeByExtension(ext); mt != "" {
-		if idx := strings.Index(mt, ";"); idx > 0 {
-			mt = mt[:idx]
-		}
-		return constant.MimeType(mt)
+	if detected, ok := detectMIMEByStdlib(filePath); ok {
+		return detected
 	}
-
-	// 4. 兜底
 	return constant.OctetStream
+}
+
+func detectMIMEByExtension(filePath string) (constant.MimeType, bool) {
+	switch strings.ToLower(path.Ext(filePath)) {
+	case ".js":
+		return constant.ApplicationJavascript, true
+	case ".css":
+		return constant.CSS, true
+	case ".html", ".htm":
+		return constant.HTML, true
+	case ".json":
+		return constant.JSON, true
+	case ".svg":
+		return constant.Svg, true
+	default:
+		return "", false
+	}
+}
+
+func detectMIMEByContent(filePath string) (constant.MimeType, bool) {
+	// #nosec G304 -- MIME detection is performed on local asset files only.
+	f, err := os.Open(filePath)
+	if err != nil {
+		return "", false
+	}
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil {
+			return
+		}
+	}()
+
+	mtype, err := mimetype.DetectReader(f)
+	if err != nil || mtype == nil {
+		return "", false
+	}
+
+	return detectKnownBinaryMIME(normalizeMIME(mtype.String()))
+}
+
+func detectKnownBinaryMIME(raw string) (constant.MimeType, bool) {
+	detected := constant.MimeType(raw)
+	if detected == constant.Png || detected == constant.Jpeg || detected == constant.Svg {
+		return detected, true
+	}
+	return "", false
+}
+
+func detectMIMEByStdlib(filePath string) (constant.MimeType, bool) {
+	normalized := normalizeMIME(mime.TypeByExtension(strings.ToLower(path.Ext(filePath))))
+	if normalized == "" {
+		return "", false
+	}
+	return constant.MimeType(normalized), true
+}
+
+func normalizeMIME(raw string) string {
+	if idx := strings.Index(raw, ";"); idx > 0 {
+		return raw[:idx]
+	}
+	return raw
 }

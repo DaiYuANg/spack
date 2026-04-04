@@ -1,16 +1,16 @@
-package source
+package source_test
 
 import (
-	"io"
 	"log/slog"
 	"os"
 	"testing"
 
 	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/source"
 )
 
 func TestNewLocalFSRequiresRoot(t *testing.T) {
-	_, err := newLocalFS(&config.Assets{}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	_, err := source.NewLocalFSForTest(&config.Assets{}, slog.New(slog.DiscardHandler))
 	if err == nil {
 		t.Fatal("expected error for empty root")
 	}
@@ -21,9 +21,13 @@ func TestNewLocalFSRequiresDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			t.Fatal(closeErr)
+		}
+	}()
 
-	_, err = newLocalFS(&config.Assets{Root: file.Name()}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	_, err = source.NewLocalFSForTest(&config.Assets{Root: file.Name()}, slog.New(slog.DiscardHandler))
 	if err == nil {
 		t.Fatal("expected error for file root")
 	}

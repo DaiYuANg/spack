@@ -1,3 +1,4 @@
+// Package main starts the spack CLI application.
 package main
 
 import (

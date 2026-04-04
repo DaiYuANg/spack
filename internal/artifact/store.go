@@ -1,6 +1,8 @@
 package artifact
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -37,17 +39,19 @@ func (s *LocalStore) PathFor(assetPath, sourceHash, namespace, suffix string) st
 }
 
 func (s *LocalStore) Write(path string, data []byte) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		return fmt.Errorf("create artifact directory: %w", err)
 	}
 
 	tmpPath := path + ".tmp-" + strconv.FormatInt(time.Now().UnixNano(), 10)
-	if err := os.WriteFile(tmpPath, data, 0o644); err != nil {
-		return err
+	if err := os.WriteFile(tmpPath, data, 0o600); err != nil {
+		return fmt.Errorf("write artifact temp file: %w", err)
 	}
 	if err := os.Rename(tmpPath, path); err != nil {
-		_ = os.Remove(tmpPath)
-		return err
+		if removeErr := os.Remove(tmpPath); removeErr != nil && !os.IsNotExist(removeErr) {
+			return errors.Join(fmt.Errorf("rename artifact temp file: %w", err), fmt.Errorf("cleanup artifact temp file: %w", removeErr))
+		}
+		return fmt.Errorf("rename artifact temp file: %w", err)
 	}
 
 	return nil

@@ -1,3 +1,4 @@
+// Package pipeline plans and executes derived asset generation.
 package pipeline
 
 import (
@@ -26,7 +27,7 @@ type compressionStageIn struct {
 	Catalog catalog.Catalog
 }
 
-func newCompressionStage(in compressionStageIn) Stage {
+func newCompressionStage(in compressionStageIn) *compressionStage {
 	return &compressionStage{
 		cfg:     in.Config,
 		store:   in.Store,
@@ -35,11 +36,7 @@ func newCompressionStage(in compressionStageIn) Stage {
 }
 
 func newCompressionStageFromDeps(cfg *config.Compression, store artifact.Store, cat catalog.Catalog) *compressionStage {
-	return newCompressionStage(compressionStageIn{
-		Config:  cfg,
-		Store:   store,
-		Catalog: cat,
-	}).(*compressionStage)
+	return newCompressionStage(compressionStageIn{Config: cfg, Store: store, Catalog: cat})
 }
 
 func (s *compressionStage) Name() string {
@@ -80,23 +77,23 @@ func (s *compressionStage) Execute(task Task, asset *catalog.Asset) (*catalog.Va
 
 	raw, err := os.ReadFile(asset.FullPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("read asset payload: %w", err)
 	}
 	if int64(len(raw)) < s.cfg.MinSize {
-		return nil, nil
+		return nil, ErrVariantSkipped
 	}
 
 	compressed, suffix, err := s.compress(raw, task.Encoding)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("compress asset payload: %w", err)
 	}
 	if len(compressed) >= len(raw) {
-		return nil, nil
+		return nil, ErrVariantSkipped
 	}
 
 	targetPath := s.store.PathFor(asset.Path, asset.SourceHash, "encoding", suffix)
 	if err := s.store.Write(targetPath, compressed); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("write compressed artifact: %w", err)
 	}
 
 	return &catalog.Variant{
@@ -117,31 +114,39 @@ func (s *compressionStage) Execute(task Task, asset *catalog.Asset) (*catalog.Va
 func (s *compressionStage) compress(raw []byte, encoding string) ([]byte, string, error) {
 	switch encoding {
 	case "br":
-		var buf bytes.Buffer
-		writer := brotli.NewWriterLevel(&buf, clampBrotliQuality(s.cfg.BrotliQuality))
-		if _, err := writer.Write(raw); err != nil {
-			return nil, "", err
-		}
-		if err := writer.Close(); err != nil {
-			return nil, "", err
-		}
-		return buf.Bytes(), ".br", nil
+		return s.compressBrotli(raw)
 	case "gzip":
-		var buf bytes.Buffer
-		writer, err := gzip.NewWriterLevel(&buf, clampGzipLevel(s.cfg.GzipLevel))
-		if err != nil {
-			return nil, "", err
-		}
-		if _, err := writer.Write(raw); err != nil {
-			return nil, "", err
-		}
-		if err := writer.Close(); err != nil {
-			return nil, "", err
-		}
-		return buf.Bytes(), ".gz", nil
+		return s.compressGzip(raw)
 	default:
 		return nil, "", fmt.Errorf("unsupported compression encoding: %s", encoding)
 	}
+}
+
+func (s *compressionStage) compressBrotli(raw []byte) ([]byte, string, error) {
+	var buf bytes.Buffer
+	writer := brotli.NewWriterLevel(&buf, clampBrotliQuality(s.cfg.BrotliQuality))
+	if _, err := writer.Write(raw); err != nil {
+		return nil, "", fmt.Errorf("write brotli payload: %w", err)
+	}
+	if err := writer.Close(); err != nil {
+		return nil, "", fmt.Errorf("close brotli writer: %w", err)
+	}
+	return buf.Bytes(), ".br", nil
+}
+
+func (s *compressionStage) compressGzip(raw []byte) ([]byte, string, error) {
+	var buf bytes.Buffer
+	writer, err := gzip.NewWriterLevel(&buf, clampGzipLevel(s.cfg.GzipLevel))
+	if err != nil {
+		return nil, "", fmt.Errorf("create gzip writer: %w", err)
+	}
+	if _, err := writer.Write(raw); err != nil {
+		return nil, "", fmt.Errorf("write gzip payload: %w", err)
+	}
+	if err := writer.Close(); err != nil {
+		return nil, "", fmt.Errorf("close gzip writer: %w", err)
+	}
+	return buf.Bytes(), ".gz", nil
 }
 
 func hasEncodingVariant(variants collectionx.List[*catalog.Variant], sourceHash, encoding string) bool {
@@ -167,21 +172,29 @@ func hasEncodingVariant(variants collectionx.List[*catalog.Variant], sourceHash,
 
 func isCompressible(asset *catalog.Asset) bool {
 	mime := strings.ToLower(strings.TrimSpace(asset.MediaType))
-	if mime == "" {
+	switch {
+	case mime == "":
 		return false
+	case strings.HasPrefix(mime, "text/"):
+		return true
+	case isNonCompressibleMediaType(mime):
+		return false
+	default:
+		return isKnownCompressibleType(mime)
 	}
-	if strings.HasPrefix(mime, "text/") {
+}
+
+func isNonCompressibleMediaType(mime string) bool {
+	if strings.HasPrefix(mime, "image/") && mime != "image/svg+xml" {
 		return true
 	}
-	if strings.HasPrefix(mime, "image/") && mime != "image/svg+xml" {
-		return false
-	}
 	if strings.HasPrefix(mime, "audio/") || strings.HasPrefix(mime, "video/") {
-		return false
+		return true
 	}
-	if strings.Contains(mime, "zip") || strings.Contains(mime, "gzip") {
-		return false
-	}
+	return strings.Contains(mime, "zip") || strings.Contains(mime, "gzip")
+}
+
+func isKnownCompressibleType(mime string) bool {
 	switch mime {
 	case "application/javascript",
 		"application/json",

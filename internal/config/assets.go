@@ -1,3 +1,4 @@
+// Package config loads and exposes runtime configuration.
 package config
 
 // FallbackOn defines the condition under which a fallback file is served.

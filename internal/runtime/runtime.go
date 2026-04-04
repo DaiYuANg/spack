@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/DaiYuANg/arcgo/dix"
@@ -33,37 +34,13 @@ func bootstrapCatalog(
 ) {
 	lc.OnStart(func(ctx context.Context) error {
 		startedAt := time.Now()
-		totalBytes := int64(0)
-
-		if err := src.Walk(func(file source.File) error {
-			if file.IsDir {
-				return nil
-			}
-
-			sourceHash, err := hashFile(file.FullPath)
-			if err != nil {
-				return err
-			}
-
-			asset := &catalog.Asset{
-				Path:       file.Path,
-				FullPath:   file.FullPath,
-				Size:       file.Size,
-				MediaType:  string(pkg.DetectMIME(file.FullPath)),
-				SourceHash: sourceHash,
-				ETag:       fmt.Sprintf("\"%s\"", sourceHash),
-				Metadata: map[string]string{
-					"mtime_unix": fmt.Sprintf("%d", file.ModTime.Unix()),
-				},
-			}
-			totalBytes += file.Size
-			return cat.UpsertAsset(asset)
-		}); err != nil {
+		totalBytes, err := scanCatalogAssets(src, cat)
+		if err != nil {
 			return err
 		}
 
 		if err := pipelineSvc.Warm(ctx); err != nil {
-			return err
+			return fmt.Errorf("warm pipeline: %w", err)
 		}
 
 		logger.Info("Catalog ready",
@@ -77,11 +54,51 @@ func bootstrapCatalog(
 	})
 }
 
+func scanCatalogAssets(src source.Source, cat catalog.Catalog) (int64, error) {
+	totalBytes := int64(0)
+	if err := src.Walk(func(file source.File) error {
+		if file.IsDir {
+			return nil
+		}
+
+		asset, err := buildCatalogAsset(file)
+		if err != nil {
+			return err
+		}
+		totalBytes += file.Size
+		if err := cat.UpsertAsset(asset); err != nil {
+			return fmt.Errorf("upsert asset %s: %w", file.Path, err)
+		}
+		return nil
+	}); err != nil {
+		return 0, fmt.Errorf("walk source assets: %w", err)
+	}
+	return totalBytes, nil
+}
+
+func buildCatalogAsset(file source.File) (*catalog.Asset, error) {
+	sourceHash, err := hashFile(file.FullPath)
+	if err != nil {
+		return nil, fmt.Errorf("hash asset %s: %w", file.Path, err)
+	}
+	return &catalog.Asset{
+		Path:       file.Path,
+		FullPath:   file.FullPath,
+		Size:       file.Size,
+		MediaType:  string(pkg.DetectMIME(file.FullPath)),
+		SourceHash: sourceHash,
+		ETag:       fmt.Sprintf("%q", sourceHash),
+		Metadata: map[string]string{
+			"mtime_unix": strconv.FormatInt(file.ModTime.Unix(), 10),
+		},
+	}, nil
+}
+
 func logConfigLifecycle(lc dix.Lifecycle, cfg *config.Config, logger *slog.Logger) {
 	lc.OnStart(func(_ context.Context) error {
 		logger.Info("Config loaded",
-			slog.Int("http_port", cfg.Http.Port),
-			slog.Bool("http_low_memory", cfg.Http.LowMemory),
+			slog.Int("http_port", cfg.HTTP.Port),
+			slog.Bool("http_low_memory", cfg.HTTP.LowMemory),
 			slog.String("assets_root", cfg.Assets.Root),
 			slog.String("assets_path", cfg.Assets.Path),
 			slog.String("assets_entry", cfg.Assets.Entry),
@@ -114,14 +131,14 @@ func httpLifecycle(
 ) {
 	lc.OnStart(func(ctx context.Context) error {
 		go func() {
-			address := "127.0.0.1:" + cfg.Http.GetPort()
+			address := "127.0.0.1:" + cfg.HTTP.GetPort()
 			logger.Info("HTTP runtime listening",
 				slog.String("address", "http://"+address),
 				slog.String("mount_path", cfg.Assets.Path),
 				slog.Int("assets", cat.AssetCount()),
 				slog.Int("variants", cat.VariantCount()),
 			)
-			if err := app.Listen(":" + cfg.Http.GetPort()); err != nil {
+			if err := app.Listen(":" + cfg.HTTP.GetPort()); err != nil {
 				logger.Error("HTTP runtime stopped", slog.String("err", err.Error()))
 			}
 		}()
@@ -155,8 +172,9 @@ func debugLifecycle(
 	}
 
 	server := &http.Server{
-		Addr:    fmt.Sprintf("127.0.0.1:%d", cfg.Debug.LivePort),
-		Handler: mux,
+		Addr:              fmt.Sprintf("127.0.0.1:%d", cfg.Debug.LivePort),
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
 	}
 
 	lc.OnStart(func(ctx context.Context) error {
@@ -179,15 +197,20 @@ func debugLifecycle(
 }
 
 func hashFile(path string) (string, error) {
+	// #nosec G304 -- paths come from the scanned local asset tree.
 	file, err := os.Open(path)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("open file for hashing: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			return
+		}
+	}()
 
 	hasher := sha256.New()
 	if _, err := io.Copy(hasher, file); err != nil {
-		return "", err
+		return "", fmt.Errorf("copy file into hasher: %w", err)
 	}
 	return hex.EncodeToString(hasher.Sum(nil)), nil
 }

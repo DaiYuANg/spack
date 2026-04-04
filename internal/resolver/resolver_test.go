@@ -1,7 +1,6 @@
-package resolver
+package resolver_test
 
 import (
-	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -10,75 +9,47 @@ import (
 
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/resolver"
 )
 
+const testSourceHash = "hash-1"
+
 func TestParseAcceptEncodingPriority(t *testing.T) {
-	got := parseAcceptEncoding("gzip;q=0.8, br;q=1.0")
+	got := resolver.ParseAcceptEncodingForTest("gzip;q=0.8, br;q=1.0")
 	if !slices.Equal(got.Values(), []string{"br", "gzip"}) {
 		t.Fatalf("unexpected encodings: %#v", got)
 	}
 }
 
 func TestParseAcceptEncodingWildcard(t *testing.T) {
-	got := parseAcceptEncoding("gzip;q=0, *;q=0.5")
+	got := resolver.ParseAcceptEncodingForTest("gzip;q=0, *;q=0.5")
 	if !slices.Equal(got.Values(), []string{"br"}) {
 		t.Fatalf("unexpected encodings: %#v", got)
 	}
 }
 
 func TestParseAcceptImageFormatsPriority(t *testing.T) {
-	got := parseAcceptImageFormats("image/png;q=1,image/jpeg;q=0.6,*/*;q=0.1", "jpeg")
+	got := resolver.ParseAcceptImageFormatsForTest("image/png;q=1,image/jpeg;q=0.6,*/*;q=0.1", "jpeg")
 	if !slices.Equal(got.Values(), []string{"png", "jpeg"}) {
 		t.Fatalf("unexpected image formats: %#v", got)
 	}
 }
 
 func TestResolverSelectsCompressedVariant(t *testing.T) {
-	dir := t.TempDir()
-	sourcePath := filepath.Join(dir, "index.html")
-	variantPath := filepath.Join(dir, "index.html.br")
-	if err := os.WriteFile(sourcePath, []byte("<html>origin</html>"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(variantPath, []byte("compressed"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	cat := catalog.NewInMemoryCatalog()
-	if err := cat.UpsertAsset(&catalog.Asset{
-		Path:       "index.html",
-		FullPath:   sourcePath,
-		MediaType:  "text/html; charset=utf-8",
-		SourceHash: "hash-1",
-		ETag:       "\"hash-1\"",
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if err := cat.UpsertVariant(&catalog.Variant{
+	sourcePath, cat, assetResolver := newResolverFixture(t, "index.html", "text/html; charset=utf-8", []byte("<html>origin</html>"), spaAssetsConfig())
+	variantPath := filepath.Join(filepath.Dir(sourcePath), "index.html.br")
+	writeTestFile(t, variantPath, []byte("compressed"))
+	upsertTestVariant(t, cat, &catalog.Variant{
 		ID:           "index.html.br",
 		AssetPath:    "index.html",
 		ArtifactPath: variantPath,
 		MediaType:    "text/html; charset=utf-8",
-		SourceHash:   "hash-1",
+		SourceHash:   testSourceHash,
 		ETag:         "\"hash-1-br\"",
 		Encoding:     "br",
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	resolver := newResolver(resolverIn{
-		Config: &config.Assets{
-			Entry: "index.html",
-			Fallback: config.Fallback{
-				On:     config.FallbackOnNotFound,
-				Target: "index.html",
-			},
-		},
-		Catalog: cat,
-		Logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
 
-	result, err := resolver.Resolve(Request{
+	result, err := assetResolver.Resolve(resolver.Request{
 		Path:           "index.html",
 		AcceptEncoding: "br,gzip",
 	})
@@ -94,36 +65,8 @@ func TestResolverSelectsCompressedVariant(t *testing.T) {
 }
 
 func TestResolverFallsBackForSPAPath(t *testing.T) {
-	dir := t.TempDir()
-	sourcePath := filepath.Join(dir, "index.html")
-	if err := os.WriteFile(sourcePath, []byte("<html>origin</html>"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	cat := catalog.NewInMemoryCatalog()
-	if err := cat.UpsertAsset(&catalog.Asset{
-		Path:       "index.html",
-		FullPath:   sourcePath,
-		MediaType:  "text/html; charset=utf-8",
-		SourceHash: "hash-1",
-		ETag:       "\"hash-1\"",
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	resolver := newResolver(resolverIn{
-		Config: &config.Assets{
-			Entry: "index.html",
-			Fallback: config.Fallback{
-				On:     config.FallbackOnNotFound,
-				Target: "index.html",
-			},
-		},
-		Catalog: cat,
-		Logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
-	})
-
-	result, err := resolver.Resolve(Request{Path: "docs"})
+	sourcePath, _, assetResolver := newResolverFixture(t, "index.html", "text/html; charset=utf-8", []byte("<html>origin</html>"), spaAssetsConfig())
+	result, err := assetResolver.Resolve(resolver.Request{Path: "docs"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,36 +79,8 @@ func TestResolverFallsBackForSPAPath(t *testing.T) {
 }
 
 func TestResolverResolvesRootToEntry(t *testing.T) {
-	dir := t.TempDir()
-	sourcePath := filepath.Join(dir, "index.html")
-	if err := os.WriteFile(sourcePath, []byte("<html>origin</html>"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	cat := catalog.NewInMemoryCatalog()
-	if err := cat.UpsertAsset(&catalog.Asset{
-		Path:       "index.html",
-		FullPath:   sourcePath,
-		MediaType:  "text/html; charset=utf-8",
-		SourceHash: "hash-1",
-		ETag:       "\"hash-1\"",
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	resolver := newResolver(resolverIn{
-		Config: &config.Assets{
-			Entry: "index.html",
-			Fallback: config.Fallback{
-				On:     config.FallbackOnNotFound,
-				Target: "index.html",
-			},
-		},
-		Catalog: cat,
-		Logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
-	})
-
-	result, err := resolver.Resolve(Request{Path: "/"})
+	sourcePath, _, assetResolver := newResolverFixture(t, "index.html", "text/html; charset=utf-8", []byte("<html>origin</html>"), spaAssetsConfig())
+	result, err := assetResolver.Resolve(resolver.Request{Path: "/"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,45 +96,20 @@ func TestResolverResolvesRootToEntry(t *testing.T) {
 }
 
 func TestResolverSelectsWidthVariant(t *testing.T) {
-	dir := t.TempDir()
-	sourcePath := filepath.Join(dir, "hero.jpg")
-	variantPath := filepath.Join(dir, "hero.w640.jpg")
-	if err := os.WriteFile(sourcePath, []byte("origin"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(variantPath, []byte("scaled"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	cat := catalog.NewInMemoryCatalog()
-	if err := cat.UpsertAsset(&catalog.Asset{
-		Path:       "hero.jpg",
-		FullPath:   sourcePath,
-		MediaType:  "image/jpeg",
-		SourceHash: "hash-1",
-		ETag:       "\"hash-1\"",
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if err := cat.UpsertVariant(&catalog.Variant{
+	sourcePath, cat, assetResolver := newResolverFixture(t, "hero.jpg", "image/jpeg", []byte("origin"), baseAssetsConfig())
+	variantPath := filepath.Join(filepath.Dir(sourcePath), "hero.w640.jpg")
+	writeTestFile(t, variantPath, []byte("scaled"))
+	upsertTestVariant(t, cat, &catalog.Variant{
 		ID:           "hero.jpg|width=640",
 		AssetPath:    "hero.jpg",
 		ArtifactPath: variantPath,
 		MediaType:    "image/jpeg",
-		SourceHash:   "hash-1",
+		SourceHash:   testSourceHash,
 		ETag:         "\"hash-1-w640\"",
 		Width:        640,
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	resolver := newResolver(resolverIn{
-		Config:  &config.Assets{Entry: "index.html"},
-		Catalog: cat,
-		Logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
 
-	result, err := resolver.Resolve(Request{Path: "hero.jpg", Width: 320})
+	result, err := assetResolver.Resolve(resolver.Request{Path: "hero.jpg", Width: 320})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -229,30 +119,8 @@ func TestResolverSelectsWidthVariant(t *testing.T) {
 }
 
 func TestResolverRequestsWidthGenerationWhenMissing(t *testing.T) {
-	dir := t.TempDir()
-	sourcePath := filepath.Join(dir, "hero.jpg")
-	if err := os.WriteFile(sourcePath, []byte("origin"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	cat := catalog.NewInMemoryCatalog()
-	if err := cat.UpsertAsset(&catalog.Asset{
-		Path:       "hero.jpg",
-		FullPath:   sourcePath,
-		MediaType:  "image/jpeg",
-		SourceHash: "hash-1",
-		ETag:       "\"hash-1\"",
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	resolver := newResolver(resolverIn{
-		Config:  &config.Assets{Entry: "index.html"},
-		Catalog: cat,
-		Logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
-	})
-
-	result, err := resolver.Resolve(Request{Path: "hero.jpg", Width: 640})
+	_, _, assetResolver := newResolverFixture(t, "hero.jpg", "image/jpeg", []byte("origin"), baseAssetsConfig())
+	result, err := assetResolver.Resolve(resolver.Request{Path: "hero.jpg", Width: 640})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -262,46 +130,12 @@ func TestResolverRequestsWidthGenerationWhenMissing(t *testing.T) {
 }
 
 func TestResolverSelectsFormatVariant(t *testing.T) {
-	dir := t.TempDir()
-	sourcePath := filepath.Join(dir, "hero.png")
-	variantPath := filepath.Join(dir, "hero.fjpeg.jpg")
-	if err := os.WriteFile(sourcePath, []byte("origin"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(variantPath, []byte("converted"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	sourcePath, cat, assetResolver := newResolverFixture(t, "hero.png", "image/png", []byte("origin"), baseAssetsConfig())
+	variantPath := filepath.Join(filepath.Dir(sourcePath), "hero.fjpeg.jpg")
+	writeTestFile(t, variantPath, []byte("converted"))
+	upsertFormatVariant(t, cat, "hero.png", variantPath)
 
-	cat := catalog.NewInMemoryCatalog()
-	if err := cat.UpsertAsset(&catalog.Asset{
-		Path:       "hero.png",
-		FullPath:   sourcePath,
-		MediaType:  "image/png",
-		SourceHash: "hash-1",
-		ETag:       "\"hash-1\"",
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if err := cat.UpsertVariant(&catalog.Variant{
-		ID:           "hero.png|format=jpeg",
-		AssetPath:    "hero.png",
-		ArtifactPath: variantPath,
-		MediaType:    "image/jpeg",
-		SourceHash:   "hash-1",
-		ETag:         "\"hash-1-jpeg\"",
-		Format:       "jpeg",
-		Width:        0,
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	resolver := newResolver(resolverIn{
-		Config:  &config.Assets{Entry: "index.html"},
-		Catalog: cat,
-		Logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
-	})
-
-	result, err := resolver.Resolve(Request{Path: "hero.png", Format: "jpeg"})
+	result, err := assetResolver.Resolve(resolver.Request{Path: "hero.png", Format: "jpeg"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -311,30 +145,8 @@ func TestResolverSelectsFormatVariant(t *testing.T) {
 }
 
 func TestResolverRequestsFormatGenerationWhenMissing(t *testing.T) {
-	dir := t.TempDir()
-	sourcePath := filepath.Join(dir, "hero.png")
-	if err := os.WriteFile(sourcePath, []byte("origin"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	cat := catalog.NewInMemoryCatalog()
-	if err := cat.UpsertAsset(&catalog.Asset{
-		Path:       "hero.png",
-		FullPath:   sourcePath,
-		MediaType:  "image/png",
-		SourceHash: "hash-1",
-		ETag:       "\"hash-1\"",
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	resolver := newResolver(resolverIn{
-		Config:  &config.Assets{Entry: "index.html"},
-		Catalog: cat,
-		Logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
-	})
-
-	result, err := resolver.Resolve(Request{Path: "hero.png", Format: "jpeg"})
+	_, _, assetResolver := newResolverFixture(t, "hero.png", "image/png", []byte("origin"), baseAssetsConfig())
+	result, err := assetResolver.Resolve(resolver.Request{Path: "hero.png", Format: "jpeg"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -344,46 +156,12 @@ func TestResolverRequestsFormatGenerationWhenMissing(t *testing.T) {
 }
 
 func TestResolverSelectsFormatVariantFromAccept(t *testing.T) {
-	dir := t.TempDir()
-	sourcePath := filepath.Join(dir, "hero.png")
-	variantPath := filepath.Join(dir, "hero.fjpeg.jpg")
-	if err := os.WriteFile(sourcePath, []byte("origin"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(variantPath, []byte("converted"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	sourcePath, cat, assetResolver := newResolverFixture(t, "hero.png", "image/png", []byte("origin"), baseAssetsConfig())
+	variantPath := filepath.Join(filepath.Dir(sourcePath), "hero.fjpeg.jpg")
+	writeTestFile(t, variantPath, []byte("converted"))
+	upsertFormatVariant(t, cat, "hero.png", variantPath)
 
-	cat := catalog.NewInMemoryCatalog()
-	if err := cat.UpsertAsset(&catalog.Asset{
-		Path:       "hero.png",
-		FullPath:   sourcePath,
-		MediaType:  "image/png",
-		SourceHash: "hash-1",
-		ETag:       "\"hash-1\"",
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if err := cat.UpsertVariant(&catalog.Variant{
-		ID:           "hero.png|format=jpeg",
-		AssetPath:    "hero.png",
-		ArtifactPath: variantPath,
-		MediaType:    "image/jpeg",
-		SourceHash:   "hash-1",
-		ETag:         "\"hash-1-jpeg\"",
-		Format:       "jpeg",
-		Width:        0,
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	resolver := newResolver(resolverIn{
-		Config:  &config.Assets{Entry: "index.html"},
-		Catalog: cat,
-		Logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
-	})
-
-	result, err := resolver.Resolve(Request{
+	result, err := assetResolver.Resolve(resolver.Request{
 		Path:   "hero.png",
 		Accept: "image/jpeg,image/png;q=0.5",
 	})
@@ -396,30 +174,8 @@ func TestResolverSelectsFormatVariantFromAccept(t *testing.T) {
 }
 
 func TestResolverRequestsFormatGenerationFromAcceptWhenMissing(t *testing.T) {
-	dir := t.TempDir()
-	sourcePath := filepath.Join(dir, "hero.png")
-	if err := os.WriteFile(sourcePath, []byte("origin"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	cat := catalog.NewInMemoryCatalog()
-	if err := cat.UpsertAsset(&catalog.Asset{
-		Path:       "hero.png",
-		FullPath:   sourcePath,
-		MediaType:  "image/png",
-		SourceHash: "hash-1",
-		ETag:       "\"hash-1\"",
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	resolver := newResolver(resolverIn{
-		Config:  &config.Assets{Entry: "index.html"},
-		Catalog: cat,
-		Logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
-	})
-
-	result, err := resolver.Resolve(Request{
+	_, _, assetResolver := newResolverFixture(t, "hero.png", "image/png", []byte("origin"), baseAssetsConfig())
+	result, err := assetResolver.Resolve(resolver.Request{
 		Path:   "hero.png",
 		Accept: "image/jpeg,image/png;q=0.5",
 	})
@@ -429,5 +185,85 @@ func TestResolverRequestsFormatGenerationFromAcceptWhenMissing(t *testing.T) {
 	first, ok := result.PreferredFormats.GetFirst()
 	if !ok || first != "jpeg" {
 		t.Fatalf("expected format generation request from accept, got %#v", result.PreferredFormats)
+	}
+}
+
+func baseAssetsConfig() *config.Assets {
+	return &config.Assets{Entry: "index.html"}
+}
+
+func spaAssetsConfig() *config.Assets {
+	return &config.Assets{
+		Entry: "index.html",
+		Fallback: config.Fallback{
+			On:     config.FallbackOnNotFound,
+			Target: "index.html",
+		},
+	}
+}
+
+func newResolverFixture(
+	t *testing.T,
+	assetPath string,
+	mediaType string,
+	body []byte,
+	cfg *config.Assets,
+) (string, catalog.Catalog, *resolver.Resolver) {
+	t.Helper()
+
+	sourcePath := filepath.Join(t.TempDir(), assetPath)
+	writeTestFile(t, sourcePath, body)
+
+	cat := catalog.NewInMemoryCatalog()
+	upsertTestAsset(t, cat, assetPath, sourcePath, mediaType)
+
+	return sourcePath, cat, newTestResolver(cfg, cat)
+}
+
+func newTestResolver(cfg *config.Assets, cat catalog.Catalog) *resolver.Resolver {
+	return resolver.NewResolverForTest(cfg, cat, slog.New(slog.DiscardHandler))
+}
+
+func upsertTestAsset(t *testing.T, cat catalog.Catalog, assetPath, sourcePath, mediaType string) {
+	t.Helper()
+	if err := cat.UpsertAsset(&catalog.Asset{
+		Path:       assetPath,
+		FullPath:   sourcePath,
+		MediaType:  mediaType,
+		SourceHash: testSourceHash,
+		ETag:       "\"hash-1\"",
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func upsertFormatVariant(t *testing.T, cat catalog.Catalog, assetPath, variantPath string) {
+	t.Helper()
+	upsertTestVariant(t, cat, &catalog.Variant{
+		ID:           assetPath + "|format=jpeg",
+		AssetPath:    assetPath,
+		ArtifactPath: variantPath,
+		MediaType:    "image/jpeg",
+		SourceHash:   testSourceHash,
+		ETag:         "\"hash-1-jpeg\"",
+		Format:       "jpeg",
+		Width:        0,
+	})
+}
+
+func upsertTestVariant(t *testing.T, cat catalog.Catalog, variant *catalog.Variant) {
+	t.Helper()
+	if err := cat.UpsertVariant(variant); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeTestFile(t *testing.T, path string, body []byte) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, body, 0o600); err != nil {
+		t.Fatal(err)
 	}
 }

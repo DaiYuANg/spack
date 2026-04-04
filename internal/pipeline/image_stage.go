@@ -6,14 +6,12 @@ import (
 	"image"
 	"image/jpeg"
 	"image/png"
-	"os"
 	"strings"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
-	"golang.org/x/image/draw"
 )
 
 type imageStage struct {
@@ -28,7 +26,7 @@ type imageStageIn struct {
 	Catalog catalog.Catalog
 }
 
-func newImageStage(in imageStageIn) Stage {
+func newImageStage(in imageStageIn) *imageStage {
 	return &imageStage{
 		cfg:     in.Config,
 		store:   in.Store,
@@ -37,11 +35,7 @@ func newImageStage(in imageStageIn) Stage {
 }
 
 func newImageStageFromDeps(cfg *config.Image, store artifact.Store, cat catalog.Catalog) *imageStage {
-	return newImageStage(imageStageIn{
-		Config:  cfg,
-		Store:   store,
-		Catalog: cat,
-	}).(*imageStage)
+	return newImageStage(imageStageIn{Config: cfg, Store: store, Catalog: cat})
 }
 
 func (s *imageStage) Name() string {
@@ -53,97 +47,42 @@ func (s *imageStage) Plan(asset *catalog.Asset, request Request) []Task {
 		return nil
 	}
 
-	formats := normalizeImageFormats(request.PreferredFormats)
-	if formats.IsEmpty() {
-		formats = collectionx.NewList(imageFormat(asset.MediaType))
-	}
-
-	widths := request.PreferredWidths
-	if widths.IsEmpty() {
-		if request.PreferredFormats.Len() > 0 {
-			widths = collectionx.NewList(0)
-		} else {
-			widths = s.cfg.ParsedWidths()
-		}
-	}
+	formats := s.planFormats(asset, request)
+	widths := s.planWidths(request)
 	if widths.IsEmpty() {
 		return nil
 	}
 
-	existing := s.catalog.ListVariants(asset.Path)
-	tasks := make([]Task, 0, widths.Len()*formats.Len())
-	formats.Range(func(_ int, format string) bool {
-		widths.Range(func(_ int, width int) bool {
-			if width == 0 && format == imageFormat(asset.MediaType) {
-				return true
-			}
-			if width < 0 || hasImageVariant(existing, asset.SourceHash, width, format) {
-				return true
-			}
-
-			tasks = append(tasks, Task{
-				AssetPath: asset.Path,
-				Format:    format,
-				Width:     width,
-			})
-			return true
-		})
-		return true
-	})
-	return tasks
+	return s.planTasks(asset, formats, widths)
 }
 
 func (s *imageStage) Execute(task Task, asset *catalog.Asset) (*catalog.Variant, error) {
-	targetFormat := task.Format
-	if targetFormat == "" {
-		targetFormat = imageFormat(asset.MediaType)
-	}
-	if task.Width < 0 {
-		return nil, nil
-	}
-	if task.Width == 0 && targetFormat == imageFormat(asset.MediaType) {
-		return nil, nil
-	}
-
-	file, err := os.Open(asset.FullPath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	srcImage, _, err := image.Decode(file)
+	targetFormat, err := resolveTargetFormat(task, asset)
 	if err != nil {
 		return nil, err
 	}
 
-	bounds := srcImage.Bounds()
-	srcWidth := bounds.Dx()
-	srcHeight := bounds.Dy()
+	srcImage, srcWidth, srcHeight, err := loadSourceImage(asset.FullPath)
+	if err != nil {
+		return nil, err
+	}
 	if srcWidth <= 0 || srcHeight <= 0 {
-		return nil, nil
+		return nil, ErrVariantSkipped
 	}
 
-	outputImage := srcImage
-	outputWidth := srcWidth
-	if task.Width > 0 && task.Width < srcWidth {
-		targetHeight := max(1, srcHeight*task.Width/srcWidth)
-		dst := image.NewRGBA(image.Rect(0, 0, task.Width, targetHeight))
-		draw.CatmullRom.Scale(dst, dst.Bounds(), srcImage, bounds, draw.Over, nil)
-		outputImage = dst
-		outputWidth = task.Width
-	}
+	outputImage, outputWidth := resizeImage(srcImage, srcWidth, srcHeight, task.Width)
 
 	payload, ext, mediaType, err := encodeImage(outputImage, targetFormat, clampJPEGQuality(s.cfg.JPEGQuality))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("encode image artifact: %w", err)
 	}
-	if outputWidth == srcWidth && mediaType == asset.MediaType && int64(len(payload)) >= asset.Size {
-		return nil, nil
+	if shouldSkipImageArtifact(asset, srcWidth, outputWidth, mediaType, len(payload)) {
+		return nil, ErrVariantSkipped
 	}
 
 	targetPath := s.store.PathFor(asset.Path, asset.SourceHash, "image", imageVariantSuffix(outputWidth, targetFormat, ext))
 	if err := s.store.Write(targetPath, payload); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("write image artifact: %w", err)
 	}
 
 	return &catalog.Variant{
@@ -171,42 +110,18 @@ func isResizableImage(asset *catalog.Asset) bool {
 	}
 }
 
-func hasImageVariant(variants collectionx.List[*catalog.Variant], sourceHash string, width int, format string) bool {
-	found := false
-	variants.Range(func(_ int, variant *catalog.Variant) bool {
-		if variant.Width != width {
-			return true
-		}
-		if format != "" && variant.Format != format {
-			return true
-		}
-		if sourceHash != "" && variant.SourceHash != "" && variant.SourceHash != sourceHash {
-			return true
-		}
-		if variant.ArtifactPath == "" {
-			return true
-		}
-		if _, err := os.Stat(variant.ArtifactPath); err != nil {
-			return true
-		}
-		found = true
-		return false
-	})
-	return found
-}
-
 func encodeImage(img image.Image, format string, jpegQuality int) ([]byte, string, string, error) {
 	var buf bytes.Buffer
 	switch normalizeImageFormat(format) {
 	case "jpeg":
 		if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: jpegQuality}); err != nil {
-			return nil, "", "", err
+			return nil, "", "", fmt.Errorf("encode jpeg image: %w", err)
 		}
 		return buf.Bytes(), ".jpg", "image/jpeg", nil
 	case "png":
 		encoder := png.Encoder{CompressionLevel: png.BestCompression}
 		if err := encoder.Encode(&buf, img); err != nil {
-			return nil, "", "", err
+			return nil, "", "", fmt.Errorf("encode png image: %w", err)
 		}
 		return buf.Bytes(), ".png", "image/png", nil
 	default:
@@ -262,7 +177,7 @@ func normalizeImageFormat(format string) string {
 	}
 }
 
-func imageVariantSuffix(width int, format string, ext string) string {
+func imageVariantSuffix(width int, format, ext string) string {
 	parts := make([]string, 0, 2)
 	if width > 0 {
 		parts = append(parts, fmt.Sprintf("w%d", width))

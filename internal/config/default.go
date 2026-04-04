@@ -7,7 +7,7 @@ import (
 
 func defaultConfig() Config {
 	return Config{
-		Http: Http{
+		HTTP: HTTP{
 			Port:      80,
 			LowMemory: true,
 		},

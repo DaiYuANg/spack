@@ -1,21 +1,15 @@
-package pipeline
+package pipeline_test
 
 import (
-	"image"
-	"image/color"
-	"image/jpeg"
-	"image/png"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/pipeline"
 )
 
 func TestCompressionStagePlanSkipsExistingVariant(t *testing.T) {
@@ -32,7 +26,7 @@ func TestCompressionStagePlanSkipsExistingVariant(t *testing.T) {
 	}
 
 	variantPath := filepath.Join(t.TempDir(), "app.js.br")
-	if err := os.WriteFile(variantPath, []byte("compressed"), 0o644); err != nil {
+	if err := os.WriteFile(variantPath, []byte("compressed"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := cat.UpsertVariant(&catalog.Variant{
@@ -47,16 +41,12 @@ func TestCompressionStagePlanSkipsExistingVariant(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stage := newCompressionStage(compressionStageIn{
-		Config: &config.Compression{
-			Enable: true,
-			Mode:   config.CompressionModeLazy,
-		},
-		Store:   newTestStore(t.TempDir()),
-		Catalog: cat,
-	}).(*compressionStage)
+	stage := pipeline.NewCompressionStageForTest(&config.Compression{
+		Enable: true,
+		Mode:   config.CompressionModeLazy,
+	}, newTestStore(t.TempDir()), cat)
 
-	tasks := stage.Plan(asset, Request{
+	tasks := stage.Plan(asset, pipeline.Request{
 		AssetPath:          asset.Path,
 		PreferredEncodings: collectionx.NewList("br", "gzip"),
 	})
@@ -72,7 +62,7 @@ func TestCompressionStageExecuteCreatesVariant(t *testing.T) {
 	dir := t.TempDir()
 	sourcePath := filepath.Join(dir, "payload.json")
 	raw := []byte(`{"message":"` + strings.Repeat("compressible-payload-", 256) + `"}`)
-	if err := os.WriteFile(sourcePath, raw, 0o644); err != nil {
+	if err := os.WriteFile(sourcePath, raw, 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -88,19 +78,16 @@ func TestCompressionStageExecuteCreatesVariant(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stage := newCompressionStage(compressionStageIn{
-		Config: &config.Compression{
-			Enable:    true,
-			Mode:      config.CompressionModeLazy,
-			CacheDir:  filepath.Join(dir, "cache"),
-			MinSize:   1,
-			GzipLevel: 5,
-		},
-		Store:   newTestStore(filepath.Join(dir, "cache")),
-		Catalog: cat,
-	}).(*compressionStage)
+	store := newTestStore(filepath.Join(dir, "cache"))
+	stage := pipeline.NewCompressionStageForTest(&config.Compression{
+		Enable:    true,
+		Mode:      config.CompressionModeLazy,
+		CacheDir:  filepath.Join(dir, "cache"),
+		MinSize:   1,
+		GzipLevel: 5,
+	}, store, cat)
 
-	variant, err := stage.Execute(Task{
+	variant, err := stage.Execute(pipeline.Task{
 		AssetPath: asset.Path,
 		Encoding:  "gzip",
 	}, asset)
@@ -113,7 +100,8 @@ func TestCompressionStageExecuteCreatesVariant(t *testing.T) {
 	if variant.Encoding != "gzip" {
 		t.Fatalf("expected gzip encoding, got %q", variant.Encoding)
 	}
-	if _, err := os.Stat(variant.ArtifactPath); err != nil {
+	expectedPath := store.PathFor(asset.Path, asset.SourceHash, "encoding", ".gz")
+	if _, err := os.Stat(expectedPath); err != nil {
 		t.Fatalf("expected artifact to exist: %v", err)
 	}
 }
@@ -131,16 +119,15 @@ func TestImageStagePlanSchedulesWidthVariant(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stage := newImageStage(imageStageIn{
-		Config: &config.Image{
-			Enable: true,
-			Widths: "640,1280",
-		},
-		Store:   newTestStore(t.TempDir()),
-		Catalog: cat,
-	}).(*imageStage)
+	stage := pipeline.NewImageStageForTest(&config.Image{
+		Enable: true,
+		Widths: "640,1280",
+	}, newTestStore(t.TempDir()), cat)
 
-	tasks := stage.Plan(asset, Request{AssetPath: asset.Path, PreferredWidths: collectionx.NewList(640)})
+	tasks := stage.Plan(asset, pipeline.Request{
+		AssetPath:       asset.Path,
+		PreferredWidths: collectionx.NewList(640),
+	})
 	if len(tasks) != 1 || tasks[0].Width != 640 {
 		t.Fatalf("unexpected image tasks: %#v", tasks)
 	}
@@ -159,16 +146,12 @@ func TestImageStagePlanSchedulesFormatVariant(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stage := newImageStage(imageStageIn{
-		Config: &config.Image{
-			Enable: true,
-			Widths: "640,1280",
-		},
-		Store:   newTestStore(t.TempDir()),
-		Catalog: cat,
-	}).(*imageStage)
+	stage := pipeline.NewImageStageForTest(&config.Image{
+		Enable: true,
+		Widths: "640,1280",
+	}, newTestStore(t.TempDir()), cat)
 
-	tasks := stage.Plan(asset, Request{
+	tasks := stage.Plan(asset, pipeline.Request{
 		AssetPath:        asset.Path,
 		PreferredFormats: collectionx.NewList("jpeg"),
 	})
@@ -198,16 +181,12 @@ func TestImageStageExecuteCreatesResizedVariant(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stage := newImageStage(imageStageIn{
-		Config: &config.Image{
-			Enable:      true,
-			JPEGQuality: 70,
-		},
-		Store:   newTestStore(filepath.Join(dir, "cache")),
-		Catalog: cat,
-	}).(*imageStage)
+	stage := pipeline.NewImageStageForTest(&config.Image{
+		Enable:      true,
+		JPEGQuality: 70,
+	}, newTestStore(filepath.Join(dir, "cache")), cat)
 
-	variant, err := stage.Execute(Task{
+	variant, err := stage.Execute(pipeline.Task{
 		AssetPath: asset.Path,
 		Width:     640,
 	}, asset)
@@ -243,16 +222,12 @@ func TestImageStageExecuteCreatesFormatVariant(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stage := newImageStage(imageStageIn{
-		Config: &config.Image{
-			Enable:      true,
-			JPEGQuality: 70,
-		},
-		Store:   newTestStore(filepath.Join(dir, "cache")),
-		Catalog: cat,
-	}).(*imageStage)
+	stage := pipeline.NewImageStageForTest(&config.Image{
+		Enable:      true,
+		JPEGQuality: 70,
+	}, newTestStore(filepath.Join(dir, "cache")), cat)
 
-	variant, err := stage.Execute(Task{
+	variant, err := stage.Execute(pipeline.Task{
 		AssetPath: asset.Path,
 		Format:    "jpeg",
 		Width:     0,
@@ -269,100 +244,4 @@ func TestImageStageExecuteCreatesFormatVariant(t *testing.T) {
 	if _, err := os.Stat(variant.ArtifactPath); err != nil {
 		t.Fatalf("expected artifact to exist: %v", err)
 	}
-}
-
-func newTestStore(root string) artifact.Store {
-	return &testStore{root: root}
-}
-
-type testStore struct {
-	root string
-}
-
-func (s *testStore) Root() string {
-	return s.root
-}
-
-func (s *testStore) PathFor(assetPath, sourceHash, namespace, suffix string) string {
-	cleanPath := filepath.Clean(filepath.FromSlash(assetPath))
-	return filepath.Join(s.root, namespace, sourceHash, cleanPath+suffix)
-}
-
-func (s *testStore) Write(path string, data []byte) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-
-	tmpPath := path + ".tmp-" + strconv.FormatInt(time.Now().UnixNano(), 10)
-	if err := os.WriteFile(tmpPath, data, 0o644); err != nil {
-		return err
-	}
-	if err := os.Rename(tmpPath, path); err != nil {
-		_ = os.Remove(tmpPath)
-		return err
-	}
-	return nil
-}
-
-func writeJPEGFixture(t *testing.T, path string, width int, height int) {
-	t.Helper()
-
-	img := image.NewRGBA(image.Rect(0, 0, width, height))
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
-			img.Set(x, y, color.RGBA{
-				R: uint8(x % 255),
-				G: uint8(y % 255),
-				B: uint8((x + y) % 255),
-				A: 255,
-			})
-		}
-	}
-
-	file, err := os.Create(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer file.Close()
-
-	if err := jpeg.Encode(file, img, &jpeg.Options{Quality: 92}); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func writePNGFixture(t *testing.T, path string, width int, height int) {
-	t.Helper()
-
-	img := image.NewRGBA(image.Rect(0, 0, width, height))
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
-			img.Set(x, y, color.RGBA{
-				R: uint8(x % 255),
-				G: uint8(y % 255),
-				B: uint8((x + y) % 255),
-				A: 255,
-			})
-		}
-	}
-
-	file, err := os.Create(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer file.Close()
-
-	encoder := png.Encoder{CompressionLevel: png.BestCompression}
-	if err := encoder.Encode(file, img); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func fileSize(t *testing.T, path string) int64 {
-	t.Helper()
-
-	info, err := os.Stat(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return info.Size()
 }

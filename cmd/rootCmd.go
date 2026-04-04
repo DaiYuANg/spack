@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/event"
@@ -33,5 +35,8 @@ var rootCmd = &cobra.Command{
 }
 
 func Execute() error {
-	return rootCmd.Execute()
+	if err := rootCmd.Execute(); err != nil {
+		return fmt.Errorf("execute root command: %w", err)
+	}
+	return nil
 }

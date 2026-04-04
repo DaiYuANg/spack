@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -35,19 +36,28 @@ func newServer(
 	pipelineSvc *pipeline.Service,
 	obs observabilityx.Observability,
 ) *fiber.App {
-	engine := html.NewFileSystem(http.FS(view.View), ".html")
-	info, ok := debug.ReadBuildInfo()
-	header := lo.Ternary(ok, "X-Spack-"+info.Main.Version, "X-Spack")
 	app := fiber.New(fiber.Config{
-		Views:             engine,
+		Views:             html.NewFileSystem(http.FS(view.View), ".html"),
 		PassLocalsToViews: true,
 		Immutable:         true,
 		StreamRequestBody: true,
 		ErrorHandler:      errorHandler,
-		ServerHeader:      header,
-		ReduceMemoryUsage: cfg.Http.LowMemory,
+		ServerHeader:      buildServerHeader(),
+		ReduceMemoryUsage: cfg.HTTP.LowMemory,
 	})
 
+	registerMiddleware(app, cfg, logger, obs)
+	registerHealthRoutes(app, cat)
+	registerAssetRoute(app, cfg, logger, assetResolver, pipelineSvc)
+	return app
+}
+
+func buildServerHeader() string {
+	info, ok := debug.ReadBuildInfo()
+	return lo.Ternary(ok, "X-Spack-"+info.Main.Version, "X-Spack")
+}
+
+func registerMiddleware(app *fiber.App, cfg *config.Config, logger *slog.Logger, obs observabilityx.Observability) {
 	requestIDConfig := requestid.ConfigDefault
 	requestIDConfig.Header = "Request-ID"
 	app.Use(requestid.New(requestIDConfig))
@@ -64,65 +74,97 @@ func newServer(
 	recoverConfig := recoverer.ConfigDefault
 	recoverConfig.EnableStackTrace = true
 	app.Use(recoverer.New(recoverConfig))
+}
 
+func registerHealthRoutes(app *fiber.App, cat catalog.Catalog) {
 	app.Get("/healthz", func(c fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusOK)
 	})
 	app.Get("/catalog", func(c fiber.Ctx) error {
 		return c.JSON(cat.Snapshot())
 	})
+}
 
+func registerAssetRoute(
+	app *fiber.App,
+	cfg *config.Config,
+	logger *slog.Logger,
+	assetResolver *resolver.Resolver,
+	pipelineSvc *pipeline.Service,
+) {
 	app.Use(routePattern(cfg.Assets.Path), func(c fiber.Ctx) error {
 		requestedFormat := normalizeImageFormat(c.Query("format"))
-		result, err := assetResolver.Resolve(resolver.Request{
-			Path:           trimMountPath(c.Path(), cfg.Assets.Path),
-			Accept:         c.Get(fiber.HeaderAccept),
-			AcceptEncoding: c.Get(fiber.HeaderAcceptEncoding),
-			Width:          parsePositiveInt(c.Query("w")),
-			Format:         requestedFormat,
-			RangeRequested: strings.TrimSpace(c.Get(fiber.HeaderRange)) != "",
-		})
+		result, err := assetResolver.Resolve(buildResolverRequest(c, cfg.Assets.Path, requestedFormat))
 		if err != nil {
 			return fiber.ErrNotFound
 		}
 
-		if result.PreferredEncodings.Len() > 0 || result.PreferredWidths.Len() > 0 || result.PreferredFormats.Len() > 0 {
-			pipelineSvc.Enqueue(pipeline.Request{
-				AssetPath:          result.Asset.Path,
-				PreferredEncodings: result.PreferredEncodings,
-				PreferredWidths:    result.PreferredWidths,
-				PreferredFormats:   result.PreferredFormats,
-			})
-		}
-
-		body, err := os.ReadFile(result.FilePath)
+		enqueuePipelineResult(result, pipelineSvc)
+		body, err := readResolvedAsset(result, logger)
 		if err != nil {
-			logger.Error("Read asset failed",
-				slog.String("path", result.FilePath),
-				slog.String("err", err.Error()),
-			)
 			return fiber.ErrInternalServerError
 		}
 
-		c.Set(fiber.HeaderContentType, result.MediaType)
-		c.Append(fiber.HeaderVary, fiber.HeaderAcceptEncoding)
-		if shouldVaryAccept(result.Asset.MediaType, requestedFormat) {
-			c.Append(fiber.HeaderVary, fiber.HeaderAccept)
-		}
-		if result.ETag != "" {
-			c.Set(fiber.HeaderETag, result.ETag)
-		}
-		if result.ContentEncoding != "" {
-			c.Set(fiber.HeaderContentEncoding, result.ContentEncoding)
-		}
-		if result.Variant != nil {
-			pipelineSvc.MarkVariantHit(result.FilePath)
-		}
-
+		applyResolvedHeaders(c, result, requestedFormat)
+		markVariantHit(result, pipelineSvc)
 		return c.Send(body)
 	})
+}
 
-	return app
+func buildResolverRequest(c fiber.Ctx, mountPath, requestedFormat string) resolver.Request {
+	return resolver.Request{
+		Path:           trimMountPath(c.Path(), mountPath),
+		Accept:         c.Get(fiber.HeaderAccept),
+		AcceptEncoding: c.Get(fiber.HeaderAcceptEncoding),
+		Width:          parsePositiveInt(c.Query("w")),
+		Format:         requestedFormat,
+		RangeRequested: strings.TrimSpace(c.Get(fiber.HeaderRange)) != "",
+	}
+}
+
+func enqueuePipelineResult(result *resolver.Result, pipelineSvc *pipeline.Service) {
+	if result.PreferredEncodings.Len() == 0 && result.PreferredWidths.Len() == 0 && result.PreferredFormats.Len() == 0 {
+		return
+	}
+
+	pipelineSvc.Enqueue(pipeline.Request{
+		AssetPath:          result.Asset.Path,
+		PreferredEncodings: result.PreferredEncodings,
+		PreferredWidths:    result.PreferredWidths,
+		PreferredFormats:   result.PreferredFormats,
+	})
+}
+
+func readResolvedAsset(result *resolver.Result, logger *slog.Logger) ([]byte, error) {
+	body, err := os.ReadFile(result.FilePath)
+	if err != nil {
+		logger.Error("Read asset failed",
+			slog.String("path", result.FilePath),
+			slog.String("err", err.Error()),
+		)
+		return nil, fmt.Errorf("read resolved asset: %w", err)
+	}
+	return body, nil
+}
+
+func applyResolvedHeaders(c fiber.Ctx, result *resolver.Result, requestedFormat string) {
+	c.Set(fiber.HeaderContentType, result.MediaType)
+	c.Append(fiber.HeaderVary, fiber.HeaderAcceptEncoding)
+	if shouldVaryAccept(result.Asset.MediaType, requestedFormat) {
+		c.Append(fiber.HeaderVary, fiber.HeaderAccept)
+	}
+	if result.ETag != "" {
+		c.Set(fiber.HeaderETag, result.ETag)
+	}
+	if result.ContentEncoding != "" {
+		c.Set(fiber.HeaderContentEncoding, result.ContentEncoding)
+	}
+}
+
+func markVariantHit(result *resolver.Result, pipelineSvc *pipeline.Service) {
+	if result.Variant != nil {
+		pipelineSvc.MarkVariantHit(result.FilePath)
+	}
 }
 
 func metricsMiddleware(obs observabilityx.Observability) fiber.Handler {
@@ -146,7 +188,10 @@ func metricsMiddleware(obs observabilityx.Observability) fiber.Handler {
 		}
 		obs.AddCounter(context.Background(), "http_requests_total", 1, attrs...)
 		obs.RecordHistogram(context.Background(), "http_request_duration_seconds", duration, attrs...)
-		return err
+		if err != nil {
+			return fmt.Errorf("run metrics middleware chain: %w", err)
+		}
+		return nil
 	}
 }
 
@@ -161,7 +206,10 @@ func requestLogMiddleware(logger *slog.Logger) fiber.Handler {
 			slog.Duration("duration", time.Since(startedAt)),
 			slog.String("request_id", c.GetRespHeader("Request-ID")),
 		)
-		return err
+		if err != nil {
+			return fmt.Errorf("run request log middleware chain: %w", err)
+		}
+		return nil
 	}
 }
 
@@ -202,7 +250,7 @@ func normalizeImageFormat(format string) string {
 	}
 }
 
-func shouldVaryAccept(sourceMediaType string, explicitFormat string) bool {
+func shouldVaryAccept(sourceMediaType, explicitFormat string) bool {
 	if strings.TrimSpace(explicitFormat) != "" {
 		return false
 	}

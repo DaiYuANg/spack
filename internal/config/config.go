@@ -1,7 +1,7 @@
 package config
 
 type Config struct {
-	Http        Http        `koanf:"http"`
+	HTTP        HTTP        `koanf:"http"`
 	Assets      Assets      `koanf:"assets"`
 	Debug       Debug       `koanf:"debug"`
 	Image       Image       `koanf:"image"`

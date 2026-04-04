@@ -1,15 +1,17 @@
-package catalog
+package catalog_test
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/daiyuang/spack/internal/catalog"
 )
 
 func TestDeleteVariantByArtifactPath(t *testing.T) {
-	cat := NewInMemoryCatalog()
+	cat := catalog.NewInMemoryCatalog()
 
-	asset := &Asset{
+	asset := &catalog.Asset{
 		Path:       "app.js",
 		FullPath:   "/assets/app.js",
 		MediaType:  "application/javascript",
@@ -22,14 +24,14 @@ func TestDeleteVariantByArtifactPath(t *testing.T) {
 
 	root := t.TempDir()
 	artifactPath := filepath.Join(root, "encoding", "hash-1", "app.js.br")
-	if err := os.MkdirAll(filepath.Dir(artifactPath), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(artifactPath), 0o750); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(artifactPath, []byte("payload"), 0o644); err != nil {
+	if err := os.WriteFile(artifactPath, []byte("payload"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := cat.UpsertVariant(&Variant{
+	if err := cat.UpsertVariant(&catalog.Variant{
 		ID:           "app.js|encoding=br",
 		AssetPath:    "app.js",
 		ArtifactPath: artifactPath,

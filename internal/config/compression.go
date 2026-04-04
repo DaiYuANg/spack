@@ -51,10 +51,7 @@ func (c Compression) QueueCapacity() int {
 	if c.QueueSize > 0 {
 		return c.QueueSize
 	}
-	workers := c.Workers
-	if workers < 1 {
-		workers = 1
-	}
+	workers := max(c.Workers, 1)
 	return workers * 64
 }
 

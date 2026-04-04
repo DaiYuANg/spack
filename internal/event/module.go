@@ -1,3 +1,4 @@
+// Package event wires application event infrastructure.
 package event
 
 import (

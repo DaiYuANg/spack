@@ -1,3 +1,4 @@
+// Package cmd wires the CLI and application container.
 package cmd
 
 import (
@@ -9,13 +10,13 @@ import (
 )
 
 func createContainer(userModules ...dix.Module) *dix.App {
-	commonModules := []dix.Module{
+	allModules := make([]dix.Module, 0, 4+len(userModules))
+	allModules = append(allModules,
 		config.Module,
 		logger.Module,
 		catalog.Module,
-	}
-
-	allModules := append(commonModules, userModules...)
+	)
+	allModules = append(allModules, userModules...)
 	allModules = append(allModules, runtime.Module)
 
 	return dix.New(

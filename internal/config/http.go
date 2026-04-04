@@ -2,11 +2,11 @@ package config
 
 import "strconv"
 
-type Http struct {
+type HTTP struct {
 	Port      int  `koanf:"port"`
 	LowMemory bool `koanf:"low_memory"`
 }
 
-func (h Http) GetPort() string {
+func (h HTTP) GetPort() string {
 	return strconv.Itoa(h.Port)
 }

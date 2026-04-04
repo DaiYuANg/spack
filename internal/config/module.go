@@ -1,6 +1,8 @@
 package config
 
 import (
+	"fmt"
+
 	"github.com/DaiYuANg/arcgo/configx"
 	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/daiyuang/spack/internal/constant"
@@ -16,7 +18,7 @@ var Module = dix.NewModule("config",
 				dix.TypedService[*Image](),
 				dix.TypedService[*Metrics](),
 				dix.TypedService[*Logger](),
-				dix.TypedService[*Http](),
+				dix.TypedService[*HTTP](),
 				dix.TypedService[*Assets](),
 				dix.TypedService[*Compression](),
 			),
@@ -36,7 +38,7 @@ func setupConfig(c *dix.Container, _ dix.Lifecycle) error {
 	dix.ProvideValueT(c, &cfg.Image)
 	dix.ProvideValueT(c, &cfg.Metrics)
 	dix.ProvideValueT(c, &cfg.Logger)
-	dix.ProvideValueT(c, &cfg.Http)
+	dix.ProvideValueT(c, &cfg.HTTP)
 	dix.ProvideValueT(c, &cfg.Assets)
 	dix.ProvideValueT(c, &cfg.Compression)
 
@@ -52,7 +54,7 @@ func loadConfig() (*Config, error) {
 		configx.WithDotenv(),
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("load config: %w", err)
 	}
 	return &loaded, nil
 }
