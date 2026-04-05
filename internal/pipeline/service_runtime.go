@@ -29,10 +29,13 @@ func newServiceState(
 	logger *slog.Logger,
 	cat catalog.Catalog,
 	metrics *Metrics,
-	stages []Stage,
+	stages collectionx.List[Stage],
 	bus eventx.BusRuntime,
 	queueSize int,
 ) *Service {
+	if stages == nil {
+		stages = collectionx.NewList[Stage]()
+	}
 	return &Service{
 		cfg:            cfg,
 		logger:         logger,
@@ -41,8 +44,8 @@ func newServiceState(
 		stages:         stages,
 		bus:            bus,
 		tasks:          make(chan Request, queueSize),
-		pending:        collectionx.NewSetWithCapacity[string](queueSize),
-		variantHits:    collectionx.NewMapWithCapacity[string, time.Time](queueSize),
+		pending:        collectionx.NewConcurrentSetWithCapacity[string](queueSize),
+		variantHits:    collectionx.NewConcurrentMapWithCapacity[string, time.Time](queueSize),
 		artifactPolicy: cachepolicy.NewArtifactPolicy(cfg),
 	}
 }

@@ -76,8 +76,6 @@ func (testStage) Execute(_ Task, _ *catalog.Asset) (*catalog.Variant, error) {
 
 // PendingCountForTest exposes pending queue cardinality for external tests.
 func PendingCountForTest(s *Service) int {
-	s.pendingMu.Lock()
-	defer s.pendingMu.Unlock()
 	return s.pending.Len()
 }
 

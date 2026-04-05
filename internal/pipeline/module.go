@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 
+	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/dix"
 )
 
@@ -23,14 +24,14 @@ var Module = dix.NewModule("pipeline",
 	),
 )
 
-func newStageRegistrations(image *imageStage, compression *compressionStage) []stageRegistration {
-	return []stageRegistration{
+func newStageRegistrations(image *imageStage, compression *compressionStage) collectionx.List[stageRegistration] {
+	return collectionx.NewList(
 		newStageRegistration(100, image),
 		newStageRegistration(200, compression),
-	}
+	)
 }
 
-func newStages(registrations []stageRegistration) []Stage {
+func newStages(registrations collectionx.List[stageRegistration]) collectionx.List[Stage] {
 	return buildStages(registrations)
 }
 

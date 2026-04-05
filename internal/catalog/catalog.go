@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/samber/lo"
 )
 
 var ErrAssetNotFound = errors.New("asset not found")
@@ -72,16 +73,23 @@ type Catalog interface {
 	Snapshot() *Snapshot
 }
 
+type variantRef struct {
+	assetPath string
+	id        string
+}
+
 type InMemoryCatalog struct {
-	mu       sync.RWMutex
-	assets   collectionx.Map[string, *Asset]
-	variants collectionx.Map[string, collectionx.Map[string, *Variant]]
+	mu            sync.RWMutex
+	assets        collectionx.Map[string, *Asset]
+	variants      collectionx.Table[string, string, *Variant]
+	artifactIndex collectionx.Map[string, variantRef]
 }
 
 func NewInMemoryCatalog() *InMemoryCatalog {
 	return &InMemoryCatalog{
-		assets:   collectionx.NewMap[string, *Asset](),
-		variants: collectionx.NewMap[string, collectionx.Map[string, *Variant]](),
+		assets:        collectionx.NewMap[string, *Asset](),
+		variants:      collectionx.NewTable[string, string, *Variant](),
+		artifactIndex: collectionx.NewMap[string, variantRef](),
 	}
 }
 
@@ -106,15 +114,12 @@ func (c *InMemoryCatalog) UpsertVariant(variant *Variant) error {
 		id = defaultVariantID(variant)
 	}
 
-	byAsset, ok := c.variants.Get(variant.AssetPath)
-	if !ok {
-		byAsset = collectionx.NewMap[string, *Variant]()
-		c.variants.Set(variant.AssetPath, byAsset)
-	}
-
 	cloned := cloneVariant(variant)
 	cloned.ID = id
-	byAsset.Set(id, cloned)
+	c.removeStaleVariantIndex(variant.AssetPath, id)
+	c.removeConflictingArtifactIndex(cloned.ArtifactPath, variant.AssetPath, id)
+	c.variants.Put(variant.AssetPath, id, cloned)
+	c.indexArtifactPath(cloned.ArtifactPath, variant.AssetPath, id)
 	return nil
 }
 
@@ -130,39 +135,25 @@ func (c *InMemoryCatalog) DeleteVariantByArtifactPath(artifactPath string) bool 
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	assetPath, byAsset, ok := c.variants.FirstEntryWhere(func(_ string, byAsset collectionx.Map[string, *Variant]) bool {
-		return byAsset != nil && byAsset.AnyEntryMatch(func(_ string, variant *Variant) bool {
-			return variant.ArtifactPath == artifactPath
-		})
-	})
-	if !ok || byAsset == nil {
-		return false
-	}
-
-	id, _, ok := byAsset.FirstEntryWhere(func(_ string, variant *Variant) bool {
-		return variant.ArtifactPath == artifactPath
-	})
+	ref, ok := c.artifactIndex.Get(artifactPath)
 	if !ok {
 		return false
 	}
 
-	byAsset.Delete(id)
-	if byAsset.Len() == 0 {
-		c.variants.Delete(assetPath)
-	}
-	return true
+	c.artifactIndex.Delete(artifactPath)
+	return c.variants.Delete(ref.assetPath, ref.id)
 }
 
 func (c *InMemoryCatalog) ListVariants(assetPath string) collectionx.List[*Variant] {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	byAsset, ok := c.variants.Get(assetPath)
-	if !ok {
+	byAsset := c.variants.Row(assetPath)
+	if len(byAsset) == 0 {
 		return collectionx.NewList[*Variant]()
 	}
 
-	out := collectionx.MapList(collectionx.NewList(byAsset.Values()...), func(_ int, variant *Variant) *Variant {
+	out := collectionx.MapList(collectionx.NewList(lo.Values(byAsset)...), func(_ int, variant *Variant) *Variant {
 		return cloneVariant(variant)
 	})
 	out.Sort(func(left, right *Variant) int {
@@ -195,12 +186,7 @@ func (c *InMemoryCatalog) VariantCount() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	return collectionx.ReduceList(collectionx.NewList(c.variants.Values()...), 0, func(total int, _ int, variants collectionx.Map[string, *Variant]) int {
-		if variants == nil {
-			return total
-		}
-		return total + variants.Len()
-	})
+	return c.variants.Len()
 }
 
 func (c *InMemoryCatalog) Snapshot() *Snapshot {
@@ -240,6 +226,34 @@ func cloneMap(src map[string]string) map[string]string {
 		return nil
 	}
 	return maps.Clone(src)
+}
+
+func (c *InMemoryCatalog) removeStaleVariantIndex(assetPath, id string) {
+	existing, ok := c.variants.Get(assetPath, id)
+	if !ok || existing == nil {
+		return
+	}
+	c.artifactIndex.Delete(existing.ArtifactPath)
+}
+
+func (c *InMemoryCatalog) removeConflictingArtifactIndex(artifactPath, assetPath, id string) {
+	if artifactPath == "" {
+		return
+	}
+
+	ref, ok := c.artifactIndex.Get(artifactPath)
+	if !ok || (ref.assetPath == assetPath && ref.id == id) {
+		return
+	}
+
+	c.variants.Delete(ref.assetPath, ref.id)
+}
+
+func (c *InMemoryCatalog) indexArtifactPath(artifactPath, assetPath, id string) {
+	if artifactPath == "" {
+		return
+	}
+	c.artifactIndex.Set(artifactPath, variantRef{assetPath: assetPath, id: id})
 }
 
 func defaultVariantID(variant *Variant) string {

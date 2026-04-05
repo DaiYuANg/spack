@@ -236,9 +236,7 @@ func cleanupNamespace(path, root string) string {
 }
 
 func (s *Service) effectiveLastUsed(path string, modTime time.Time) time.Time {
-	s.hitMu.Lock()
 	lastHit, ok := s.variantHits.Get(path)
-	s.hitMu.Unlock()
 	if ok && lastHit.After(modTime) {
 		return lastHit
 	}
@@ -246,9 +244,7 @@ func (s *Service) effectiveLastUsed(path string, modTime time.Time) time.Time {
 }
 
 func (s *Service) clearVariantHit(path string) {
-	s.hitMu.Lock()
 	s.variantHits.Delete(path)
-	s.hitMu.Unlock()
 }
 
 func collectCleanupFiles(root string) ([]cleanupFile, error) {

@@ -21,21 +21,19 @@ type Service struct {
 	logger  *slog.Logger
 	catalog catalog.Catalog
 	metrics *Metrics
-	stages  []Stage
+	stages  collectionx.List[Stage]
 	bus     eventx.BusRuntime
 
-	tasks     chan Request
-	wg        sync.WaitGroup
-	sf        singleflight.Group
-	pending   collectionx.Set[string]
-	pendingMu sync.Mutex
+	tasks   chan Request
+	wg      sync.WaitGroup
+	sf      singleflight.Group
+	pending collectionx.ConcurrentSet[string]
 
 	cleanupMu   sync.Mutex
 	cleanupStop chan struct{}
 	cleanupDone chan struct{}
 
-	hitMu       sync.Mutex
-	variantHits collectionx.Map[string, time.Time]
+	variantHits collectionx.ConcurrentMap[string, time.Time]
 
 	artifactPolicy cachepolicy.ArtifactPolicy
 
@@ -47,7 +45,7 @@ func newServiceFromDeps(
 	logger *slog.Logger,
 	cat catalog.Catalog,
 	metrics *Metrics,
-	stages []Stage,
+	stages collectionx.List[Stage],
 	bus eventx.BusRuntime,
 ) *Service {
 	workers := max(cfg.Workers, 1)
@@ -67,9 +65,7 @@ func (s *Service) Enqueue(request Request) {
 	}
 
 	key := requestKey(request)
-	s.pendingMu.Lock()
-	if s.pending.Contains(key) {
-		s.pendingMu.Unlock()
+	if !s.pending.AddIfAbsent(key) {
 		if s.metrics != nil {
 			s.metrics.EnqueueDeduplicatedTotal.Inc()
 		}
@@ -78,11 +74,9 @@ func (s *Service) Enqueue(request Request) {
 
 	select {
 	case s.tasks <- request:
-		s.pending.Add(key)
-		s.pendingMu.Unlock()
 		s.updateQueueLengthMetric()
 	default:
-		s.pendingMu.Unlock()
+		s.pending.Remove(key)
 		if s.metrics != nil {
 			s.metrics.EnqueueDroppedTotal.Inc()
 		}
@@ -103,9 +97,7 @@ func (s *Service) markVariantHitAt(path string, hitAt time.Time) {
 	if path == "" {
 		return
 	}
-	s.hitMu.Lock()
 	s.variantHits.Set(path, hitAt)
-	s.hitMu.Unlock()
 }
 
 func (s *Service) Warm(ctx context.Context) error {
@@ -135,17 +127,16 @@ func (s *Service) process(ctx context.Context, request Request) {
 		return
 	}
 
-	for _, stage := range s.stages {
+	s.stages.Range(func(_ int, stage Stage) bool {
 		for _, task := range stage.Plan(asset, request) {
 			if variant := s.executeStageTask(stage, asset, task); variant != nil {
 				s.upsertStageVariant(ctx, stage, asset, variant)
 			}
 		}
-	}
+		return true
+	})
 }
 
 func (s *Service) finishRequest(key string) {
-	s.pendingMu.Lock()
 	s.pending.Remove(key)
-	s.pendingMu.Unlock()
 }

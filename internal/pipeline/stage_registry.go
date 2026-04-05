@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"slices"
 
+	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/samber/lo"
 )
 
@@ -19,12 +20,12 @@ func newStageRegistration(order int, stage Stage) stageRegistration {
 	}
 }
 
-func buildStages(registrations []stageRegistration) []Stage {
-	if len(registrations) == 0 {
-		return nil
+func buildStages(registrations collectionx.List[stageRegistration]) collectionx.List[Stage] {
+	if registrations.IsEmpty() {
+		return collectionx.NewList[Stage]()
 	}
 
-	sorted := append([]stageRegistration(nil), registrations...)
+	sorted := registrations.Values()
 	slices.SortFunc(sorted, func(left, right stageRegistration) int {
 		if left.Order != right.Order {
 			return cmp.Compare(left.Order, right.Order)
@@ -41,9 +42,9 @@ func buildStages(registrations []stageRegistration) []Stage {
 		}
 	})
 
-	return lo.FilterMap(sorted, func(registration stageRegistration, _ int) (Stage, bool) {
+	return collectionx.NewList(lo.FilterMap(sorted, func(registration stageRegistration, _ int) (Stage, bool) {
 		return registration.Stage, registration.Stage != nil
-	})
+	})...)
 }
 
 func compareStageNames(left, right Stage) int {
