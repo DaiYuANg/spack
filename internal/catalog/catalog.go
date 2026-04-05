@@ -53,12 +53,12 @@ func (v *Variant) GetMetadata() map[string]string {
 }
 
 type Entry struct {
-	Asset    *Asset     `json:"asset"`
-	Variants []*Variant `json:"variants,omitempty"`
+	Asset    *Asset                     `json:"asset"`
+	Variants collectionx.List[*Variant] `json:"variants,omitempty"`
 }
 
 type Snapshot struct {
-	Assets []*Entry `json:"assets"`
+	Assets collectionx.List[*Entry] `json:"assets"`
 }
 
 type Catalog interface {
@@ -195,9 +195,9 @@ func (c *InMemoryCatalog) Snapshot() *Snapshot {
 		Assets: collectionx.MapList(assets, func(_ int, asset *Asset) *Entry {
 			return &Entry{
 				Asset:    asset,
-				Variants: c.ListVariants(asset.Path).Values(),
+				Variants: c.ListVariants(asset.Path),
 			}
-		}).Values(),
+		}),
 	}
 }
 

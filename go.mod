@@ -10,12 +10,12 @@ tool (
 )
 
 require (
-	github.com/DaiYuANg/arcgo/collectionx v0.1.0
-	github.com/DaiYuANg/arcgo/configx v0.2.0
-	github.com/DaiYuANg/arcgo/dix v0.2.1
-	github.com/DaiYuANg/arcgo/eventx v0.2.0
-	github.com/DaiYuANg/arcgo/logx v0.1.0
-	github.com/DaiYuANg/arcgo/observabilityx v0.1.0
+	github.com/DaiYuANg/arcgo/collectionx v0.1.1
+	github.com/DaiYuANg/arcgo/configx v0.2.1
+	github.com/DaiYuANg/arcgo/dix v0.2.2
+	github.com/DaiYuANg/arcgo/eventx v0.2.1
+	github.com/DaiYuANg/arcgo/logx v0.1.1
+	github.com/DaiYuANg/arcgo/observabilityx v0.1.1
 	github.com/andybalholm/brotli v1.2.1
 	github.com/anthonynsimon/bild v0.15.0
 	github.com/arl/statsviz v0.8.0
