@@ -15,7 +15,7 @@ import (
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
-	"github.com/daiyuang/spack/internal/mediax"
+	"github.com/daiyuang/spack/internal/media"
 	"github.com/daiyuang/spack/internal/pipeline"
 	"github.com/daiyuang/spack/internal/resolver"
 	"github.com/daiyuang/spack/view"
@@ -98,7 +98,7 @@ func registerAssetRoute(
 	bus eventx.BusRuntime,
 ) {
 	app.Use(routePattern(cfg.Assets.Path), func(c fiber.Ctx) error {
-		requestedFormat := mediax.NormalizeImageFormat(c.Query("format"))
+		requestedFormat := media.NormalizeImageFormat(c.Query("format"))
 		request := buildResolverRequest(c, cfg.Assets.Path, requestedFormat)
 		result, err := assetResolver.Resolve(request)
 		if err != nil {
@@ -229,5 +229,5 @@ func shouldVaryAccept(sourceMediaType, explicitFormat string) bool {
 	if strings.TrimSpace(explicitFormat) != "" {
 		return false
 	}
-	return mediax.IsImageMediaType(sourceMediaType)
+	return media.IsImageMediaType(sourceMediaType)
 }

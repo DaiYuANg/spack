@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/daiyuang/spack/internal/mediax"
+	"github.com/daiyuang/spack/internal/media"
 	"github.com/samber/lo"
 )
 
@@ -171,7 +171,7 @@ func applyImagePreference(prefs *imagePreferences, entry acceptEntry) {
 		prefs.hasWildcardAny = true
 		prefs.wildcardAnyQ = entry.q
 	default:
-		if capability, ok := mediax.LookupImageCapabilityByAcceptToken(entry.token); ok {
+		if capability, ok := media.LookupImageCapabilityByAcceptToken(entry.token); ok {
 			setMaxQuality(prefs.explicit, capability.Name, entry.q)
 		}
 	}
@@ -191,7 +191,7 @@ func buildImageCandidates(prefs imagePreferences, sourceFormat string) collectio
 		priority int
 	}
 
-	supported := mediax.SupportedImageFormats()
+	supported := media.SupportedImageFormats()
 	candidates := collectionx.FilterMapList(supported, func(index int, format string) (candidate, bool) {
 		q := imageQualityForFormat(prefs, format)
 		if q <= 0 {

@@ -6,7 +6,7 @@ import (
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/daiyuang/spack/internal/catalog"
-	"github.com/daiyuang/spack/internal/mediax"
+	"github.com/daiyuang/spack/internal/media"
 	"github.com/samber/lo"
 )
 
@@ -54,8 +54,8 @@ func preferredImageFormats(acceptHeader, explicitFormat, sourceMediaType string)
 	if explicitFormat != "" {
 		return collectionx.NewList(explicitFormat)
 	}
-	if !mediax.IsImageMediaType(sourceMediaType) {
+	if !media.IsImageMediaType(sourceMediaType) {
 		return collectionx.NewList[string]()
 	}
-	return parseAcceptImageFormats(acceptHeader, mediax.ImageFormat(sourceMediaType))
+	return parseAcceptImageFormats(acceptHeader, media.ImageFormat(sourceMediaType))
 }

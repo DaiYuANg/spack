@@ -128,7 +128,7 @@ func (c *Cache) Warm(ctx context.Context, cat catalog.Catalog) (WarmStats, error
 }
 
 func (c *Cache) warmAssets(ctx context.Context, cat catalog.Catalog, stats *WarmStats) error {
-	return warmList(ctx, cat.AllAssets(), stats, func(ctx context.Context, asset *catalog.Asset, stats *WarmStats) error {
+	return warmList[*catalog.Asset](ctx, cat.AllAssets(), stats, func(ctx context.Context, asset *catalog.Asset, stats *WarmStats) error {
 		return c.warmAsset(ctx, cat, asset, stats)
 	})
 }
@@ -153,7 +153,7 @@ func (c *Cache) warmVariants(
 	variants collectionx.List[*catalog.Variant],
 	stats *WarmStats,
 ) error {
-	return warmList(ctx, variants, stats, func(ctx context.Context, variant *catalog.Variant, stats *WarmStats) error {
+	return warmList[*catalog.Variant](ctx, variants, stats, func(ctx context.Context, variant *catalog.Variant, stats *WarmStats) error {
 		return c.warmVariant(ctx, variant, stats)
 	})
 }

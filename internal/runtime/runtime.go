@@ -2,13 +2,9 @@ package runtime
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 
@@ -84,7 +80,7 @@ func scanCatalogAssets(src source.Source, cat catalog.Catalog) (int64, error) {
 }
 
 func buildCatalogAsset(file source.File) (*catalog.Asset, error) {
-	sourceHash, err := hashFile(file.FullPath)
+	sourceHash, err := pkg.HashFile(file.FullPath)
 	if err != nil {
 		return nil, fmt.Errorf("hash asset %s: %w", file.Path, err)
 	}
@@ -234,23 +230,4 @@ func debugLifecycle(
 	lc.OnStop(func(ctx context.Context) error {
 		return server.Shutdown(ctx)
 	})
-}
-
-func hashFile(path string) (string, error) {
-	// #nosec G304 -- paths come from the scanned local asset tree.
-	file, err := os.Open(path)
-	if err != nil {
-		return "", fmt.Errorf("open file for hashing: %w", err)
-	}
-	defer func() {
-		if closeErr := file.Close(); closeErr != nil {
-			return
-		}
-	}()
-
-	hasher := sha256.New()
-	if _, err := io.Copy(hasher, file); err != nil {
-		return "", fmt.Errorf("copy file into hasher: %w", err)
-	}
-	return hex.EncodeToString(hasher.Sum(nil)), nil
 }

@@ -1,5 +1,5 @@
-// Package mediax centralizes media-type and image-format normalization helpers.
-package mediax
+// Package media centralizes media-type and image-format normalization helpers.
+package media
 
 import (
 	"slices"

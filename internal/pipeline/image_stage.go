@@ -12,7 +12,7 @@ import (
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
-	"github.com/daiyuang/spack/internal/mediax"
+	"github.com/daiyuang/spack/internal/media"
 )
 
 type imageStage struct {
@@ -104,13 +104,13 @@ func (s *imageStage) Execute(task Task, asset *catalog.Asset) (*catalog.Variant,
 }
 
 func isResizableImage(asset *catalog.Asset) bool {
-	_, ok := mediax.LookupImageCapabilityByMediaType(asset.MediaType)
+	_, ok := media.LookupImageCapabilityByMediaType(asset.MediaType)
 	return ok
 }
 
 func encodeImage(img image.Image, format string, jpegQuality int) ([]byte, string, string, error) {
 	var buf bytes.Buffer
-	capability, ok := mediax.LookupImageCapability(mediax.NormalizeImageFormat(format))
+	capability, ok := media.LookupImageCapability(media.NormalizeImageFormat(format))
 	if !ok {
 		return nil, "", "", fmt.Errorf("unsupported image format: %s", format)
 	}
@@ -133,7 +133,7 @@ func clampJPEGQuality(quality int) int {
 }
 
 func normalizeImageFormats(formats collectionx.List[string]) collectionx.List[string] {
-	return mediax.NormalizeImageFormats(formats)
+	return media.NormalizeImageFormats(formats)
 }
 
 func imageVariantSuffix(width int, format, ext string) string {

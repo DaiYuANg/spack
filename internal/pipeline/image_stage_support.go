@@ -9,7 +9,7 @@ import (
 	"github.com/anthonynsimon/bild/imgio"
 	"github.com/anthonynsimon/bild/transform"
 	"github.com/daiyuang/spack/internal/catalog"
-	"github.com/daiyuang/spack/internal/mediax"
+	"github.com/daiyuang/spack/internal/media"
 	"github.com/samber/lo"
 )
 
@@ -18,7 +18,7 @@ func (s *imageStage) planFormats(asset *catalog.Asset, request Request) collecti
 	if !formats.IsEmpty() {
 		return formats
 	}
-	return collectionx.NewList(mediax.ImageFormat(asset.MediaType))
+	return collectionx.NewList(media.ImageFormat(asset.MediaType))
 }
 
 func (s *imageStage) planWidths(request Request) collectionx.List[int] {
@@ -51,7 +51,7 @@ func shouldCreateImageTask(asset *catalog.Asset, variants collectionx.List[*cata
 	if width < 0 {
 		return false
 	}
-	if width == 0 && format == mediax.ImageFormat(asset.MediaType) {
+	if width == 0 && format == media.ImageFormat(asset.MediaType) {
 		return false
 	}
 	return !hasImageVariant(variants, asset.SourceHash, width, format)
@@ -60,12 +60,12 @@ func shouldCreateImageTask(asset *catalog.Asset, variants collectionx.List[*cata
 func resolveTargetFormat(task Task, asset *catalog.Asset) (string, error) {
 	targetFormat := task.Format
 	if targetFormat == "" {
-		targetFormat = mediax.ImageFormat(asset.MediaType)
+		targetFormat = media.ImageFormat(asset.MediaType)
 	}
 	if task.Width < 0 {
 		return "", ErrVariantSkipped
 	}
-	if task.Width == 0 && targetFormat == mediax.ImageFormat(asset.MediaType) {
+	if task.Width == 0 && targetFormat == media.ImageFormat(asset.MediaType) {
 		return "", ErrVariantSkipped
 	}
 	return targetFormat, nil

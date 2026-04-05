@@ -5,6 +5,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/DaiYuANg/arcgo/logx"
 	"github.com/daiyuang/spack/internal/config"
@@ -19,21 +20,21 @@ var Module = dix.NewModule("logger",
 )
 
 func Build(cfg *config.Config) *slog.Logger {
-	opts := []logx.Option{
+	opts := collectionx.NewListWithCapacity[logx.Option](5,
 		logx.WithLevelString(cfg.Logger.Level),
 		logx.WithConsole(cfg.Logger.Console.Enabled),
 		logx.WithCaller(true),
 		logx.WithGlobalLogger(),
-	}
+	)
 
 	if cfg.Logger.File.Enabled {
-		opts = append(opts,
+		opts.Add(
 			logx.WithFile(cfg.Logger.File.Path),
 			logx.WithFileRotation(cfg.Logger.File.MaxSize, cfg.Logger.File.MaxAge, cfg.Logger.File.MaxFiles),
 		)
 	}
 
-	logger, err := logx.New(opts...)
+	logger, err := logx.New(opts.Values()...)
 	if err != nil {
 		fallback := slog.Default()
 		fallback.Error("logger bootstrap failed, fallback to slog default", slog.String("err", err.Error()))
@@ -52,8 +53,4 @@ func Bootstrap(loadOptions config.LoadOptions) *slog.Logger {
 		return fallback
 	}
 	return Build(cfg)
-}
-
-func BootstrapFromEnv() *slog.Logger {
-	return Bootstrap(config.LoadOptions{})
 }
