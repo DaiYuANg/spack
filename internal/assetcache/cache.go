@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/eventx"
@@ -15,6 +16,8 @@ import (
 	"github.com/daiyuang/spack/internal/cachepolicy"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/workerpool"
+	"github.com/panjf2000/ants/v2"
 	"github.com/samber/hot"
 	"github.com/samber/hot/pkg/base"
 )
@@ -38,6 +41,7 @@ type Cache struct {
 	warmup bool
 	cache  *hot.HotCache[string, []byte]
 	bus    eventx.BusRuntime
+	pool   *ants.Pool
 
 	variantRemovedUnsubscribe   func()
 	variantGeneratedUnsubscribe func()
@@ -48,7 +52,7 @@ type WarmStats struct {
 	Bytes   int64
 }
 
-func newCache(cfg *config.HTTP, logger *slog.Logger, obs observabilityx.Observability, bus eventx.BusRuntime) *Cache {
+func newCache(cfg *config.HTTP, logger *slog.Logger, obs observabilityx.Observability, bus eventx.BusRuntime, pool *ants.Pool) *Cache {
 	cacheCfg := cfg.MemoryCache
 	cache := &Cache{
 		logger: logger,
@@ -56,6 +60,7 @@ func newCache(cfg *config.HTTP, logger *slog.Logger, obs observabilityx.Observab
 		policy: cachepolicy.NewMemoryPolicy(cacheCfg),
 		warmup: cacheCfg.WarmupEnabled(),
 		bus:    bus,
+		pool:   pool,
 	}
 	if !cacheCfg.Enabled() {
 		return cache
@@ -128,9 +133,25 @@ func (c *Cache) Warm(ctx context.Context, cat catalog.Catalog) (WarmStats, error
 }
 
 func (c *Cache) warmAssets(ctx context.Context, cat catalog.Catalog, stats *WarmStats) error {
-	return warmList[*catalog.Asset](ctx, cat.AllAssets(), stats, func(ctx context.Context, asset *catalog.Asset, stats *WarmStats) error {
-		return c.warmAsset(ctx, cat, asset, stats)
+	var statsMu sync.Mutex
+	err := workerpool.RunList(ctx, c.pool, cat.AllAssets(), func(ctx context.Context, asset *catalog.Asset) error {
+		assetStats := WarmStats{}
+		if err := c.warmAsset(ctx, cat, asset, &assetStats); err != nil {
+			return err
+		}
+		if assetStats.Entries == 0 && assetStats.Bytes == 0 {
+			return nil
+		}
+		statsMu.Lock()
+		stats.Entries += assetStats.Entries
+		stats.Bytes += assetStats.Bytes
+		statsMu.Unlock()
+		return nil
 	})
+	if err != nil {
+		return fmt.Errorf("run asset warm list: %w", err)
+	}
+	return nil
 }
 
 func (c *Cache) warmAsset(
@@ -153,12 +174,12 @@ func (c *Cache) warmVariants(
 	variants collectionx.List[*catalog.Variant],
 	stats *WarmStats,
 ) error {
-	return warmList[*catalog.Variant](ctx, variants, stats, func(ctx context.Context, variant *catalog.Variant, stats *WarmStats) error {
+	return warmListSerial[*catalog.Variant](ctx, variants, stats, func(ctx context.Context, variant *catalog.Variant, stats *WarmStats) error {
 		return c.warmVariant(ctx, variant, stats)
 	})
 }
 
-func warmList[T any](
+func warmListSerial[T any](
 	ctx context.Context,
 	values collectionx.List[T],
 	stats *WarmStats,

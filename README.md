@@ -190,6 +190,12 @@ Assets:
 - `SPACK_ASSETS_FALLBACK_ON=not_found|forbidden`
 - `SPACK_ASSETS_FALLBACK_TARGET=index.html`
 
+Async:
+
+- `SPACK_ASYNC_WORKERS=<int>` default `runtime.NumCPU()`
+- used by the shared `ants` worker pool module
+- event bus async dispatch follows the same worker-count setting
+
 Compression:
 
 - `SPACK_COMPRESSION_ENABLE=true`

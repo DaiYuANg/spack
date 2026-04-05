@@ -10,6 +10,24 @@ import (
 	"github.com/spf13/pflag"
 )
 
+func unsetEnvForTest(t *testing.T, key string) {
+	t.Helper()
+
+	value, ok := os.LookupEnv(key)
+	if err := os.Unsetenv(key); err != nil {
+		t.Fatalf("unset %s: %v", key, err)
+	}
+	t.Cleanup(func() {
+		if !ok {
+			if err := os.Unsetenv(key); err != nil {
+				t.Fatalf("cleanup unset %s: %v", key, err)
+			}
+			return
+		}
+		t.Setenv(key, value)
+	})
+}
+
 func TestLoadIntoDefaultConfigPreservesNestedDefaultsWithPartialDotenv(t *testing.T) {
 	t.Helper()
 
@@ -52,6 +70,12 @@ func TestLoadIntoDefaultConfigPreservesNestedDefaultsWithPartialDotenv(t *testin
 
 func TestLoadWithOptions_PrioritizesFlagsOverEnvOverFiles(t *testing.T) {
 	t.Helper()
+
+	unsetEnvForTest(t, "SPACK_HTTP_PORT")
+	unsetEnvForTest(t, "SPACK_HTTP_LOW_MEMORY")
+	unsetEnvForTest(t, "SPACK_ASSETS_PATH")
+	unsetEnvForTest(t, "SPACK_ASSETS_BACKEND")
+	unsetEnvForTest(t, "SPACK_LOGGER_LEVEL")
 
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "spack.yaml")

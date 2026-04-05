@@ -3,6 +3,7 @@ package config
 type Config struct {
 	HTTP        HTTP        `koanf:"http"`
 	Assets      Assets      `koanf:"assets"`
+	Async       Async       `koanf:"async"`
 	Debug       Debug       `koanf:"debug"`
 	Image       Image       `koanf:"image"`
 	Metrics     Metrics     `koanf:"metrics"`

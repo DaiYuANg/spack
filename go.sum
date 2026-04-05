@@ -70,8 +70,6 @@ github.com/DaiYuANg/arcgo/logx v0.1.0 h1:AeX4V0fBgj9vyLQwcTBZ7qchlumWoWasXZYwhz4
 github.com/DaiYuANg/arcgo/logx v0.1.0/go.mod h1:mA2TVrzTuqT+gr8GFBycOnUNZ8SX00ZcEhH5Bi7ULJw=
 github.com/DaiYuANg/arcgo/observabilityx v0.1.0 h1:7S2eL9DuAlc1jy/Dk0WjMovcNFOSnfqtrwXKCMJ/F8w=
 github.com/DaiYuANg/arcgo/observabilityx v0.1.0/go.mod h1:tCmK0RueriVqkELBfTdF/Co6MNyEn35iz4udwSewym4=
-github.com/DaiYuANg/arcgo/pkg/option v0.0.0-20260403112347-2ed2801ae2e6 h1:Q/tagwAbXBpnKxS7O8Th3HTNAUy4M5beqkGpJuPHk0o=
-github.com/DaiYuANg/arcgo/pkg/option v0.0.0-20260403112347-2ed2801ae2e6/go.mod h1:QN5k2mQ/27XH9Swgz98u1PYEvFhM2Ul/XT0FojvVE64=
 github.com/DaiYuANg/arcgo/pkg/option v0.0.0-20260404203100-30bc2f895d65 h1:eVfimFtLbHfl+326pbrCmHEyoEDDWwpMvd7O/JBA33g=
 github.com/DaiYuANg/arcgo/pkg/option v0.0.0-20260404203100-30bc2f895d65/go.mod h1:QN5k2mQ/27XH9Swgz98u1PYEvFhM2Ul/XT0FojvVE64=
 github.com/Djarvur/go-err113 v0.1.1 h1:eHfopDqXRwAi+YmCUas75ZE0+hoBHJ2GQNLYRSxao4g=
@@ -116,8 +114,6 @@ github.com/alingse/nilnesserr v0.2.0 h1:raLem5KG7EFVb4UIDAXgrv3N2JIaffeKNtcEXkEW
 github.com/alingse/nilnesserr v0.2.0/go.mod h1:1xJPrXonEtX7wyTq8Dytns5P2hNzoWymVUIaKm4HNFg=
 github.com/andybalholm/brotli v1.2.1 h1:R+f5xP285VArJDRgowrfb9DqL18yVK0gKAW/F+eTWro=
 github.com/andybalholm/brotli v1.2.1/go.mod h1:rzTDkvFWvIrjDXZHkuS16NPggd91W3kUSvPlQ1pLaKY=
-github.com/anthonynsimon/bild v0.14.0 h1:IFRkmKdNdqmexXHfEU7rPlAmdUZ8BDZEGtGHDnGWync=
-github.com/anthonynsimon/bild v0.14.0/go.mod h1:hcvEAyBjTW69qkKJTfpcDQ83sSZHxwOunsseDfeQhUs=
 github.com/anthonynsimon/bild v0.15.0 h1:FzvaNLuNlAPKw1Xz7V2WYOcGIEBMj8Y6ZyAk7CI+HzA=
 github.com/anthonynsimon/bild v0.15.0/go.mod h1:qIgJ9FldkCn0iy5Ad24fzUkz5R+iJ0WfhiV+6FeCB5A=
 github.com/arl/statsviz v0.8.0 h1:O6GjjVxEDxcByAucOSl29HaGYLXsuwA3ujJw8H9E7/U=

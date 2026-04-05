@@ -34,6 +34,7 @@ func newConfigFlagSet() *pflag.FlagSet {
 
 	bindHTTPFlags(flags, defaults.HTTP)
 	bindAssetFlags(flags, defaults.Assets)
+	bindAsyncFlags(flags, defaults.Async)
 	bindDebugFlags(flags, defaults.Debug)
 	bindImageFlags(flags, defaults.Image)
 	bindMetricsFlags(flags, defaults.Metrics)
@@ -60,6 +61,10 @@ func bindAssetFlags(flags *pflag.FlagSet, defaults config.Assets) {
 	flags.String("assets.entry", defaults.Entry, "Default entry file for directory requests.")
 	flags.String("assets.fallback.on", string(defaults.Fallback.On), "Fallback trigger mode.")
 	flags.String("assets.fallback.target", defaults.Fallback.Target, "Fallback asset path.")
+}
+
+func bindAsyncFlags(flags *pflag.FlagSet, defaults config.Async) {
+	flags.Int("async.workers", defaults.NormalizedWorkers(), "Shared async worker pool size.")
 }
 
 func bindDebugFlags(flags *pflag.FlagSet, defaults config.Debug) {

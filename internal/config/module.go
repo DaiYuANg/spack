@@ -24,6 +24,7 @@ func NewModule(loadOptions LoadOptions) dix.Module {
 			dix.Provider1(func(cfg *Config) *Logger { return &cfg.Logger }),
 			dix.Provider1(func(cfg *Config) *HTTP { return &cfg.HTTP }),
 			dix.Provider1(func(cfg *Config) *Assets { return &cfg.Assets }),
+			dix.Provider1(func(cfg *Config) *Async { return &cfg.Async }),
 			dix.Provider1(func(cfg *Config) *Compression { return &cfg.Compression }),
 		),
 	)

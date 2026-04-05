@@ -170,6 +170,7 @@ func configLogAttrs(cfg *config.Config) collectionx.List[slog.Attr] {
 		slog.String("assets_entry", cfg.Assets.Entry),
 		slog.String("fallback_on", string(cfg.Assets.Fallback.On)),
 		slog.String("fallback_target", cfg.Assets.Fallback.Target),
+		slog.Int("async_workers", cfg.Async.NormalizedWorkers()),
 		slog.Bool("compression_enable", cfg.Compression.Enable),
 		slog.String("compression_mode", cfg.Compression.NormalizedMode()),
 		slog.String("compression_cache_dir", cfg.Compression.CacheDir),

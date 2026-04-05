@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 )
 
 func defaultConfig() Config {
@@ -23,6 +24,9 @@ func defaultConfig() Config {
 			Path:     "/",
 			Entry:    "index.html",
 			Fallback: Fallback{On: FallbackOnNotFound, Target: "index.html"},
+		},
+		Async: Async{
+			Workers: max(runtime.NumCPU(), 1),
 		},
 		Logger: Logger{
 			Level: "debug",

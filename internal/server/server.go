@@ -30,17 +30,8 @@ import (
 	"github.com/samber/lo"
 )
 
-func newServer(
-	cfg *config.Config,
-	logger *slog.Logger,
-	cat catalog.Catalog,
-	bodyCache *assetcache.Cache,
-	assetResolver *resolver.Resolver,
-	pipelineSvc *pipeline.Service,
-	obs observabilityx.Observability,
-	bus eventx.BusRuntime,
-) *fiber.App {
-	app := fiber.New(fiber.Config{
+func newServerApp(cfg *config.Config) *fiber.App {
+	return fiber.New(fiber.Config{
 		Views:             html.NewFileSystem(http.FS(view.View), ".html"),
 		PassLocalsToViews: true,
 		Immutable:         true,
@@ -49,10 +40,6 @@ func newServer(
 		ServerHeader:      buildServerHeader(),
 		ReduceMemoryUsage: cfg.HTTP.LowMemory,
 	})
-	registerMiddleware(app, cfg, logger, obs)
-	registerHealthRoutes(app, cat)
-	registerAssetRoute(app, cfg, logger, assetResolver, pipelineSvc, bodyCache, bus)
-	return app
 }
 
 func buildServerHeader() string {

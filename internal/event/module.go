@@ -6,12 +6,16 @@ import (
 
 	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/DaiYuANg/arcgo/eventx"
+	"github.com/daiyuang/spack/internal/workerpool"
 )
 
 var Module = dix.NewModule("event",
 	dix.WithModuleProviders(
-		dix.Provider0(func() eventx.BusRuntime {
-			return eventx.New()
+		dix.Provider1(func(settings *workerpool.Settings) eventx.BusRuntime {
+			return eventx.New(
+				eventx.WithParallelDispatch(true),
+				eventx.WithAntsPool(settings.Size),
+			)
 		}),
 	),
 	dix.WithModuleHooks(

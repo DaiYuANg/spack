@@ -12,6 +12,7 @@ import (
 	"github.com/daiyuang/spack/internal/resolver"
 	"github.com/daiyuang/spack/internal/server"
 	"github.com/daiyuang/spack/internal/source"
+	"github.com/daiyuang/spack/internal/workerpool"
 	"github.com/spf13/cobra"
 )
 
@@ -23,6 +24,7 @@ var rootCmd = &cobra.Command{
 		container = createContainer(
 			configLoadOptions(),
 			metrics.Module,
+			workerpool.Module,
 			event.Module,
 			source.Module,
 			artifact.Module,

@@ -13,6 +13,8 @@ import (
 	"github.com/daiyuang/spack/internal/cachepolicy"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/workerpool"
+	"github.com/panjf2000/ants/v2"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -34,26 +36,11 @@ type Service struct {
 	cleanupDone chan struct{}
 
 	variantHits collectionx.ConcurrentMap[string, time.Time]
+	warmPool    *ants.Pool
 
 	artifactPolicy cachepolicy.ArtifactPolicy
 
 	variantServedUnsubscribe func()
-}
-
-func newServiceFromDeps(
-	cfg *config.Compression,
-	logger *slog.Logger,
-	cat catalog.Catalog,
-	metrics *Metrics,
-	stages collectionx.List[Stage],
-	bus eventx.BusRuntime,
-) *Service {
-	workers := max(cfg.Workers, 1)
-	queueSize := resolveQueueSize(cfg, workers)
-
-	svc := newServiceState(cfg, logger, cat, metrics, stages, bus, queueSize)
-	svc.initializeMetrics(queueSize)
-	return svc
 }
 
 func (s *Service) Enqueue(request Request) {
@@ -105,18 +92,12 @@ func (s *Service) Warm(ctx context.Context) error {
 		return nil
 	}
 
-	s.catalog.AllAssets().Range(func(_ int, asset *catalog.Asset) bool {
-		select {
-		case <-ctx.Done():
-			return false
-		default:
-		}
-
+	err := workerpool.RunList(ctx, s.warmPool, s.catalog.AllAssets(), func(ctx context.Context, asset *catalog.Asset) error {
 		s.process(ctx, Request{AssetPath: asset.Path})
-		return true
+		return nil
 	})
-	if ctx.Err() != nil {
-		return fmt.Errorf("warm pipeline: %w", ctx.Err())
+	if err != nil {
+		return fmt.Errorf("warm pipeline: %w", err)
 	}
 	return nil
 }
@@ -124,6 +105,9 @@ func (s *Service) Warm(ctx context.Context) error {
 func (s *Service) process(ctx context.Context, request Request) {
 	asset, ok := s.catalog.FindAsset(request.AssetPath)
 	if !ok {
+		return
+	}
+	if ctx.Err() != nil {
 		return
 	}
 

@@ -14,6 +14,7 @@ import (
 	"github.com/daiyuang/spack/internal/cachepolicy"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
+	"github.com/panjf2000/ants/v2"
 )
 
 func resolveQueueSize(cfg *config.Compression, workers int) int {
@@ -31,6 +32,7 @@ func newServiceState(
 	metrics *Metrics,
 	stages collectionx.List[Stage],
 	bus eventx.BusRuntime,
+	pool *ants.Pool,
 	queueSize int,
 ) *Service {
 	if stages == nil {
@@ -46,6 +48,7 @@ func newServiceState(
 		tasks:          make(chan Request, queueSize),
 		pending:        collectionx.NewConcurrentSetWithCapacity[string](queueSize),
 		variantHits:    collectionx.NewConcurrentMapWithCapacity[string, time.Time](queueSize),
+		warmPool:       pool,
 		artifactPolicy: cachepolicy.NewArtifactPolicy(cfg),
 	}
 }

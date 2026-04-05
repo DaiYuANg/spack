@@ -23,6 +23,7 @@ require (
 	github.com/gofiber/fiber/v3 v3.1.0
 	github.com/gofiber/template/html/v2 v2.1.3
 	github.com/joho/godotenv v1.5.1
+	github.com/panjf2000/ants/v2 v2.12.0
 	github.com/pquerna/cachecontrol v0.2.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/samber/do/v2 v2.0.0
@@ -265,7 +266,6 @@ require (
 	github.com/nishanths/predeclared v0.2.2 // indirect
 	github.com/nunnatsa/ginkgolinter v0.23.0 // indirect
 	github.com/oklog/ulid/v2 v2.1.1 // indirect
-	github.com/panjf2000/ants/v2 v2.12.0 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.3.0 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
