@@ -92,7 +92,7 @@ func (s *Service) Warm(ctx context.Context) error {
 		return nil
 	}
 
-	err := workerpool.RunList(ctx, s.warmPool, s.catalog.AllAssets(), func(ctx context.Context, asset *catalog.Asset) error {
+	err := workerpool.RunList[*catalog.Asset](ctx, s.warmPool, s.catalog.AllAssets(), func(ctx context.Context, asset *catalog.Asset) error {
 		s.process(ctx, Request{AssetPath: asset.Path})
 		return nil
 	})

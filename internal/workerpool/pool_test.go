@@ -38,7 +38,7 @@ func TestRunListFallsBackToSerialWithoutPool(t *testing.T) {
 	values := collectionx.NewList(1, 2, 3)
 	visited := make([]int, 0, values.Len())
 
-	err := workerpool.RunList(context.Background(), nil, values, func(_ context.Context, value int) error {
+	err := workerpool.RunList[int](context.Background(), nil, values, func(_ context.Context, value int) error {
 		visited = append(visited, value)
 		return nil
 	})
@@ -64,7 +64,7 @@ func TestRunListUsesPool(t *testing.T) {
 	values := collectionx.NewList(1, 2, 3, 4)
 	visited := collectionx.NewConcurrentSet[int]()
 
-	err = workerpool.RunList(context.Background(), pool, values, func(_ context.Context, value int) error {
+	err = workerpool.RunList[int](context.Background(), pool, values, func(_ context.Context, value int) error {
 		visited.Add(value)
 		return nil
 	})

@@ -3,13 +3,14 @@ package pipeline
 import (
 	"context"
 
+	"log/slog"
+
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/panjf2000/ants/v2"
-	"log/slog"
 )
 
 var Module = dix.NewModule("pipeline",

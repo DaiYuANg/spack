@@ -21,9 +21,9 @@ func RunList[T any](
 		return contextErr(ctx)
 	}
 	if pool == nil {
-		return runListSerial(ctx, values, run)
+		return runListSerial[T](ctx, values, run)
 	}
-	return runListParallel(ctx, pool, values, run)
+	return runListParallel[T](ctx, pool, values, run)
 }
 
 func runListParallel[T any](
@@ -36,7 +36,7 @@ func runListParallel[T any](
 	defer cancel()
 
 	state := newRunState(cancel)
-	scheduleRunList(workerCtx, pool, values, run, state)
+	scheduleRunList[T](workerCtx, pool, values, run, state)
 	state.Wait()
 	return pickRunErr(ctx, state.Err())
 }

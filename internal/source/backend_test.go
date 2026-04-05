@@ -24,7 +24,7 @@ func TestNewSourceForTestSupportsLocalBackend(t *testing.T) {
 
 func TestNewSourceForTestRejectsUnsupportedBackend(t *testing.T) {
 	_, err := source.NewSourceForTest(&config.Assets{
-		Backend: config.SourceBackend("memory"),
+		Backend: "memory",
 		Root:    t.TempDir(),
 	}, slog.New(slog.DiscardHandler))
 	if err == nil {
