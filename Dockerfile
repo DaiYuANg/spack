@@ -7,7 +7,7 @@ USER root
 
 WORKDIR /app
 
-ARG UPX_VERSION=5.0.1
+ARG UPX_VERSION=5.1.1
 
 RUN apt update && apt install -y curl xz-utils ca-certificates dumb-init libwebp-dev   \
     && ARCH=$(dpkg --print-architecture) && \
