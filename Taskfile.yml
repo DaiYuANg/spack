@@ -77,12 +77,17 @@ tasks:
           --platform {{.CONTAINER_PLATFORM}} \
           -t {{.DOCKERHUB_REPO}}:alpine \
           -t {{.DOCKERHUB_REPO}}:latest \
+          -t {{.DOCKERHUB_REPO}}:{{.RELEASE_VERSION}} \
+          -t {{.DOCKERHUB_REPO}}:alpine-{{.RELEASE_VERSION}} \
           -t {{.DOCKERHUB_REPO}}:alpine-{{.GIT_COMMIT}} \
           --push \
           .
     vars:
       GIT_COMMIT:
         sh: git log -n 1 --format=%h
+      AUTO_RELEASE_VERSION:
+        sh: go run ./scripts/release latest-no-v
+      RELEASE_VERSION: '{{default .AUTO_RELEASE_VERSION .VERSION}}'
 
   build:docker:debian:
     desc: 构建 Debian Slim 运行时镜像
@@ -92,12 +97,16 @@ tasks:
           --target debian \
           --platform {{.CONTAINER_PLATFORM}} \
           -t {{.DOCKERHUB_REPO}}:debian \
+          -t {{.DOCKERHUB_REPO}}:debian-{{.RELEASE_VERSION}} \
           -t {{.DOCKERHUB_REPO}}:debian-{{.GIT_COMMIT}} \
           --push \
           .
     vars:
       GIT_COMMIT:
         sh: git log -n 1 --format=%h
+      AUTO_RELEASE_VERSION:
+        sh: go run ./scripts/release latest-no-v
+      RELEASE_VERSION: '{{default .AUTO_RELEASE_VERSION .VERSION}}'
 
   build:docker:
     desc: build container
@@ -110,3 +119,73 @@ tasks:
   lint:
     cmds:
       - go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest run
+
+  release:tag:
+    desc: "创建注释标签（用法: task release:tag VERSION=0.1.0）"
+    requires:
+      vars: [ VERSION ]
+    vars:
+      TAG: '{{if hasPrefix .VERSION "v"}}{{.VERSION}}{{else}}v{{.VERSION}}{{end}}'
+    cmds:
+      - git tag -a {{.TAG}} -m "release {{.TAG}}"
+
+  release:gorelease:
+    desc: "运行 gorelease 并自动建议下一个语义化版本"
+    cmds:
+      - go run golang.org/x/exp/cmd/gorelease@latest
+
+  release:gorelease:check:
+    desc: "使用 gorelease 校验目标版本（用法: task release:gorelease:check VERSION=0.1.1）"
+    requires:
+      vars: [ VERSION ]
+    vars:
+      TAG: '{{if hasPrefix .VERSION "v"}}{{.VERSION}}{{else}}v{{.VERSION}}{{end}}'
+    cmds:
+      - go run golang.org/x/exp/cmd/gorelease@latest -version={{.TAG}}
+
+  release:
+    desc: "创建并推送标签（用法: task release VERSION=0.1.0）"
+    requires:
+      vars: [ VERSION ]
+    vars:
+      TAG: '{{if hasPrefix .VERSION "v"}}{{.VERSION}}{{else}}v{{.VERSION}}{{end}}'
+      VERSION_NO_V: '{{trimPrefix "v" .TAG}}'
+      RELEASE_BRANCH: release/{{.VERSION_NO_V}}
+    cmds:
+      - task: release:gorelease:check
+        vars:
+          VERSION: '{{.VERSION}}'
+      - task: release:tag
+        vars:
+          VERSION: '{{.VERSION}}'
+      - git push --atomic origin {{.TAG}} HEAD:refs/heads/{{.RELEASE_BRANCH}}
+
+  release:bump:major:
+    desc: "自动递增 major 并发布（用法: task release:bump:major）"
+    vars:
+      VERSION:
+        sh: go run ./scripts/release bump-major
+    cmds:
+      - task: release
+        vars:
+          VERSION: '{{.VERSION}}'
+
+  release:bump:minor:
+    desc: "自动递增 minor 并发布（用法: task release:bump:minor）"
+    vars:
+      VERSION:
+        sh: go run ./scripts/release bump-minor
+    cmds:
+      - task: release
+        vars:
+          VERSION: '{{.VERSION}}'
+
+  release:bump:patch:
+    desc: "自动递增 patch 并发布（用法: task release:bump:patch）"
+    vars:
+      VERSION:
+        sh: go run ./scripts/release bump-patch
+    cmds:
+      - task: release
+        vars:
+          VERSION: '{{.VERSION}}'
