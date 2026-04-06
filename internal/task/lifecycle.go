@@ -12,9 +12,9 @@ import (
 func setup(c *dix.Container, _ dix.Lifecycle) error {
 	scheduler := dix.MustResolveAs[gocron.Scheduler](c)
 	logger := dix.MustResolveAs[*slog.Logger](c)
-	_, err := scheduler.NewJob(
+	j, err := scheduler.NewJob(
 		gocron.DurationJob(
-			10*time.Second,
+			10*time.Minute,
 		),
 		gocron.NewTask(
 			func() {
@@ -25,6 +25,7 @@ func setup(c *dix.Container, _ dix.Lifecycle) error {
 	if err != nil {
 		return fmt.Errorf("create job error %w", err)
 	}
+	logger.Info("Job created", slog.String("id", j.ID().String()))
 
 	return nil
 }

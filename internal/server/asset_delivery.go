@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"time"
@@ -106,10 +105,10 @@ func logRequest(logger *slog.Logger, c fiber.Ctx, startedAt time.Time) {
 		slog.String("path", c.Path()),
 		slog.Int("status", c.Response().StatusCode()),
 		slog.Duration("duration", time.Since(startedAt)),
-		slog.String("request_id", c.GetRespHeader("Request-ID")),
+		slog.String("request_id", c.GetRespHeader(RequestIDHeader)),
 	)
 	if delivery := getAssetDelivery(c); delivery != "" {
 		attrs.Add(slog.String("delivery", delivery))
 	}
-	logger.LogAttrs(context.Background(), slog.LevelInfo, "HTTP request", attrs.Values()...)
+	logger.LogAttrs(c.RequestCtx(), slog.LevelInfo, "HTTP request", attrs.Values()...)
 }

@@ -309,7 +309,7 @@ require (
 	github.com/sajari/fuzzy v1.0.0 // indirect
 	github.com/samber/go-singleflightx v0.3.2 // indirect
 	github.com/samber/go-type-to-string v1.8.0 // indirect
-	github.com/samber/oops/loggers/zerolog v0.0.0-20260406133710-5748a6c9ba2b // indirect
+	github.com/samber/oops/loggers/zerolog v0.0.0-20260406154246-13cd300e3bcf // indirect
 	github.com/samber/slog-common v0.22.0 // indirect
 	github.com/samber/slog-zerolog/v2 v2.9.2 // indirect
 	github.com/sanposhiho/wastedassign/v2 v2.1.0 // indirect

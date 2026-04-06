@@ -16,6 +16,7 @@ import (
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/samber/lo"
+	"github.com/samber/oops"
 )
 
 type compressionStage struct {
@@ -125,10 +126,10 @@ func (s *compressionStage) compressBrotli(raw []byte) ([]byte, string, error) {
 	var buf bytes.Buffer
 	writer := brotli.NewWriterLevel(&buf, clampBrotliQuality(s.cfg.BrotliQuality))
 	if _, err := writer.Write(raw); err != nil {
-		return nil, "", fmt.Errorf("write brotli payload: %w", err)
+		return nil, "", oops.In("compress").Wrap(fmt.Errorf("write brotli payload: %w", err))
 	}
 	if err := writer.Close(); err != nil {
-		return nil, "", fmt.Errorf("close brotli writer: %w", err)
+		return nil, "", oops.Owner("compress brotli writer").In("closer").Wrap(fmt.Errorf("close brotli writer: %w", err))
 	}
 	return buf.Bytes(), ".br", nil
 }
