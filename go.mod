@@ -20,11 +20,13 @@ require (
 	github.com/anthonynsimon/bild v0.15.0
 	github.com/arl/statsviz v0.8.0
 	github.com/gabriel-vasile/mimetype v1.4.13
+	github.com/go-co-op/gocron/v2 v2.20.0
 	github.com/go-git/go-git/v5 v5.17.2
 	github.com/go-playground/validator/v10 v10.30.2
 	github.com/gofiber/fiber/v3 v3.1.0
 	github.com/gofiber/template/html/v2 v2.1.3
 	github.com/gofrs/uuid/v5 v5.4.0
+	github.com/google/uuid v1.6.0
 	github.com/goyek/goyek/v2 v2.3.0
 	github.com/joho/godotenv v1.5.1
 	github.com/panjf2000/ants/v2 v2.12.0
@@ -163,7 +165,6 @@ require (
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/fzipp/gocyclo v0.6.0 // indirect
 	github.com/ghostiam/protogetter v0.3.20 // indirect
-	github.com/go-co-op/gocron/v2 v2.19.1 // indirect
 	github.com/go-critic/go-critic v0.14.3 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-git/go-billy/v5 v5.8.0 // indirect
@@ -207,7 +208,6 @@ require (
 	github.com/golangci/unconvert v0.0.0-20250410112200-a129a6e6413e // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.14 // indirect
 	github.com/googleapis/gax-go/v2 v2.21.0 // indirect
 	github.com/gordonklaus/ineffassign v0.2.0 // indirect

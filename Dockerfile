@@ -9,7 +9,7 @@ WORKDIR /app
 
 ARG UPX_VERSION=5.1.1
 
-RUN apt update && apt install -y curl xz-utils ca-certificates dumb-init libwebp-dev   \
+RUN apt update && apt install -y curl xz-utils ca-certificates dumb-init  \
     && ARCH=$(dpkg --print-architecture) && \
     case "$ARCH" in \
         amd64)   UPX_ARCH=amd64 ;; \
@@ -35,7 +35,7 @@ COPY --from=builder /app/dist/spack /opt/spack
 
 USER root
 
-RUN apk add --no-cache dumb-init libwebp
+RUN apk add --no-cache dumb-init
 
 RUN chmod +x /opt/spack
 
@@ -56,7 +56,7 @@ COPY --from=builder /usr/bin/dumb-init /usr/bin/dumb-init
 
 COPY --from=builder /app/dist/spack /opt/spack
 
-RUN apt-get update && apt-get install -y ca-certificates libwebp7 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 
 RUN chmod +x /opt/spack
 
