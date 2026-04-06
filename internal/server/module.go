@@ -15,6 +15,7 @@ import (
 	"github.com/daiyuang/spack/internal/pipeline"
 	"github.com/daiyuang/spack/internal/resolver"
 	"github.com/gofiber/fiber/v3"
+	"github.com/samber/lo"
 )
 
 var Module = dix.NewModule("server",
@@ -102,7 +103,7 @@ func newServerRegistrations(
 }
 
 func newServerFromDeps(cfg *config.Config, registrations collectionx.List[appRegistration]) *fiber.App {
-	app := newServerApp(cfg)
+	app := lo.Must1(newServerApp(cfg))
 	registrations.Range(func(_ int, registration appRegistration) bool {
 		if registration.Apply != nil {
 			registration.Apply(app)

@@ -20,6 +20,7 @@ import (
 	"github.com/daiyuang/spack/pkg"
 	"github.com/gofiber/fiber/v3"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/samber/oops"
 )
 
 func bootstrapCatalog(
@@ -40,7 +41,7 @@ func bootstrapCatalog(
 
 		warmErr := pipelineSvc.Warm(ctx)
 		if warmErr != nil {
-			return fmt.Errorf("warm pipeline: %w", warmErr)
+			return oops.In("pipeline").Wrap(fmt.Errorf("warm pipeline: %w", warmErr))
 		}
 		cacheStats, cacheErr := bodyCache.Warm(ctx, cat)
 		if cacheErr != nil {
@@ -91,9 +92,9 @@ func buildCatalogAsset(file source.File) (*catalog.Asset, error) {
 		MediaType:  string(pkg.DetectMIME(file.FullPath)),
 		SourceHash: sourceHash,
 		ETag:       fmt.Sprintf("%q", sourceHash),
-		Metadata: map[string]string{
+		Metadata: collectionx.NewMapFrom(map[string]string{
 			"mtime_unix": strconv.FormatInt(file.ModTime.Unix(), 10),
-		},
+		}),
 	}, nil
 }
 

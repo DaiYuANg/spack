@@ -4,6 +4,7 @@ package cmd
 import (
 	"log/slog"
 
+	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
@@ -12,18 +13,16 @@ import (
 )
 
 func createContainer(loadOptions config.LoadOptions, userModules ...dix.Module) *dix.App {
-	allModules := make([]dix.Module, 0, 4+len(userModules))
-	allModules = append(allModules,
-		config.NewModule(loadOptions),
+	allModules := collectionx.NewListWithCapacity[dix.Module](4 + len(userModules))
+	allModules.Add(config.NewModule(loadOptions),
 		logger.Module,
 		catalog.Module,
+		runtime.Module,
 	)
-	allModules = append(allModules, userModules...)
-	allModules = append(allModules, runtime.Module)
-
+	allModules.Add(userModules...)
 	return dix.New(
 		"spack",
-		dix.WithModules(allModules...),
+		dix.WithModules(allModules.Values()...),
 		dix.WithLoggerFrom0(func() *slog.Logger {
 			return logger.Bootstrap(loadOptions)
 		}),

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -10,11 +11,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/DaiYuANg/arcgo/observabilityx"
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/constant"
 	"github.com/daiyuang/spack/internal/media"
 	"github.com/daiyuang/spack/internal/pipeline"
 	"github.com/daiyuang/spack/internal/resolver"
@@ -27,24 +30,35 @@ import (
 	recoverer "github.com/gofiber/fiber/v3/middleware/recover"
 	"github.com/gofiber/fiber/v3/middleware/requestid"
 	"github.com/gofiber/template/html/v2"
-	"github.com/samber/lo"
+	"github.com/samber/oops"
 )
 
-func newServerApp(cfg *config.Config) *fiber.App {
+func buildServerHeader() (string, error) {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "", oops.In("server").Owner("server custom header").Wrap(errors.New("could not read build info"))
+	}
+	version := info.Main.Version
+	goVersion := info.GoVersion
+	path := info.Path
+	return collectionx.NewList(constant.ServerHeaderPrefix, version, goVersion, path).Join("-"), nil
+}
+
+func newServerApp(cfg *config.Config) (*fiber.App, error) {
+	header, err := buildServerHeader()
+	if err != nil {
+		return nil, err
+	}
 	return fiber.New(fiber.Config{
 		Views:             html.NewFileSystem(http.FS(view.View), ".html"),
 		PassLocalsToViews: true,
 		Immutable:         true,
 		StreamRequestBody: true,
 		ErrorHandler:      errorHandler,
-		ServerHeader:      buildServerHeader(),
+		ServerHeader:      header,
+		StrictRouting:     true,
 		ReduceMemoryUsage: cfg.HTTP.LowMemory,
-	})
-}
-
-func buildServerHeader() string {
-	info, ok := debug.ReadBuildInfo()
-	return lo.Ternary(ok, "X-Spack-"+info.Main.Version, "X-Spack")
+	}), nil
 }
 
 func registerMiddleware(app *fiber.App, cfg *config.Config, logger *slog.Logger, obs observabilityx.Observability) {
@@ -152,7 +166,7 @@ func metricsMiddleware(obs observabilityx.Observability) fiber.Handler {
 			obs.RecordHistogram(context.Background(), "http_asset_delivery_duration_seconds", duration, deliveryAttrs...)
 		}
 		if err != nil {
-			return fmt.Errorf("run metrics middleware chain: %w", err)
+			return oops.In("server").Wrap(fmt.Errorf("run metrics middleware chain: %w", err))
 		}
 		return nil
 	}

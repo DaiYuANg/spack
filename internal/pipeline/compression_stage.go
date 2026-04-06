@@ -103,10 +103,10 @@ func (s *compressionStage) Execute(task Task, asset *catalog.Asset) (*catalog.Va
 		SourceHash:   asset.SourceHash,
 		ETag:         fmt.Sprintf("\"%s-%s\"", asset.SourceHash, task.Encoding),
 		Encoding:     task.Encoding,
-		Metadata: map[string]string{
+		Metadata: collectionx.NewMapFrom(map[string]string{
 			"stage":      "compression",
 			"mtime_unix": strconv.FormatInt(time.Now().Unix(), 10),
-		},
+		}),
 	}, nil
 }
 

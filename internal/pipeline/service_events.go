@@ -11,6 +11,7 @@ import (
 	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/daiyuang/spack/internal/catalog"
 	appEvent "github.com/daiyuang/spack/internal/event"
+	"github.com/samber/oops"
 )
 
 func (s *Service) subscribeVariantServed() error {
@@ -23,7 +24,7 @@ func (s *Service) subscribeVariantServed() error {
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("subscribe variant served: %w", err)
+		return oops.In("server").Owner("events").Wrap(fmt.Errorf("subscribe variant served: %w", err))
 	}
 	s.variantServedUnsubscribe = unsubscribe
 	return nil

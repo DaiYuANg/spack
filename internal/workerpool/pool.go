@@ -6,6 +6,7 @@ import (
 
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/panjf2000/ants/v2"
+	"github.com/samber/oops"
 )
 
 type Settings struct {
@@ -25,7 +26,7 @@ func newPool(settings *Settings) (*ants.Pool, error) {
 
 	pool, err := ants.NewPool(settings.Size)
 	if err != nil {
-		return nil, fmt.Errorf("create ants pool: %w", err)
+		return nil, oops.Wrap(fmt.Errorf("create ants pool: %w", err))
 	}
 	return pool, nil
 }

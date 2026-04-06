@@ -4,86 +4,13 @@ package catalog
 import (
 	"cmp"
 	"errors"
-	"maps"
 	"strconv"
-	"sync"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/samber/lo"
 )
 
 var ErrAssetNotFound = errors.New("asset not found")
-
-type Asset struct {
-	Path       string            `json:"path"`
-	FullPath   string            `json:"full_path"`
-	Size       int64             `json:"size"`
-	MediaType  string            `json:"media_type"`
-	SourceHash string            `json:"source_hash"`
-	ETag       string            `json:"etag"`
-	Metadata   map[string]string `json:"metadata,omitempty"`
-}
-
-func (a *Asset) GetMetadata() map[string]string {
-	if a == nil {
-		return nil
-	}
-	return a.Metadata
-}
-
-type Variant struct {
-	ID           string            `json:"id"`
-	AssetPath    string            `json:"asset_path"`
-	ArtifactPath string            `json:"artifact_path"`
-	Size         int64             `json:"size"`
-	MediaType    string            `json:"media_type"`
-	SourceHash   string            `json:"source_hash"`
-	ETag         string            `json:"etag"`
-	Encoding     string            `json:"encoding,omitempty"`
-	Format       string            `json:"format,omitempty"`
-	Width        int               `json:"width,omitempty"`
-	Metadata     map[string]string `json:"metadata,omitempty"`
-}
-
-func (v *Variant) GetMetadata() map[string]string {
-	if v == nil {
-		return nil
-	}
-	return v.Metadata
-}
-
-type Entry struct {
-	Asset    *Asset                     `json:"asset"`
-	Variants collectionx.List[*Variant] `json:"variants,omitempty"`
-}
-
-type Snapshot struct {
-	Assets collectionx.List[*Entry] `json:"assets"`
-}
-
-type Catalog interface {
-	UpsertAsset(asset *Asset) error
-	UpsertVariant(variant *Variant) error
-	DeleteVariantByArtifactPath(artifactPath string) bool
-	FindAsset(assetPath string) (*Asset, bool)
-	ListVariants(assetPath string) collectionx.List[*Variant]
-	AllAssets() collectionx.List[*Asset]
-	AssetCount() int
-	VariantCount() int
-	Snapshot() *Snapshot
-}
-
-type variantRef struct {
-	assetPath string
-	id        string
-}
-
-type InMemoryCatalog struct {
-	mu            sync.RWMutex
-	assets        collectionx.Map[string, *Asset]
-	variants      collectionx.Table[string, string, *Variant]
-	artifactIndex collectionx.Map[string, variantRef]
-}
 
 func NewInMemoryCatalog() *InMemoryCatalog {
 	return &InMemoryCatalog{
@@ -207,7 +134,7 @@ func cloneAsset(asset *Asset) *Asset {
 	}
 
 	cloned := *asset
-	cloned.Metadata = cloneMap(asset.Metadata)
+	cloned.Metadata = asset.Metadata.Clone()
 	return &cloned
 }
 
@@ -217,15 +144,8 @@ func cloneVariant(variant *Variant) *Variant {
 	}
 
 	cloned := *variant
-	cloned.Metadata = cloneMap(variant.Metadata)
+	cloned.Metadata = variant.Metadata
 	return &cloned
-}
-
-func cloneMap(src map[string]string) map[string]string {
-	if len(src) == 0 {
-		return nil
-	}
-	return maps.Clone(src)
 }
 
 func (c *InMemoryCatalog) removeStaleVariantIndex(assetPath, id string) {

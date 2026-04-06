@@ -13,6 +13,7 @@ import (
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/media"
+	"github.com/samber/oops"
 )
 
 type imageStage struct {
@@ -83,7 +84,7 @@ func (s *imageStage) Execute(task Task, asset *catalog.Asset) (*catalog.Variant,
 
 	targetPath := s.store.PathFor(asset.Path, asset.SourceHash, "image", imageVariantSuffix(outputWidth, targetFormat, ext))
 	if err := s.store.Write(targetPath, payload); err != nil {
-		return nil, fmt.Errorf("write image artifact: %w", err)
+		return nil, oops.Wrap(fmt.Errorf("write image artifact: %w", err))
 	}
 
 	return &catalog.Variant{
@@ -96,10 +97,10 @@ func (s *imageStage) Execute(task Task, asset *catalog.Asset) (*catalog.Variant,
 		ETag:         imageVariantETag(asset.SourceHash, outputWidth, targetFormat),
 		Format:       targetFormat,
 		Width:        outputWidth,
-		Metadata: map[string]string{
+		Metadata: collectionx.NewMapFrom(map[string]string{
 			"stage":      "image",
 			"mtime_unix": strconv.FormatInt(time.Now().Unix(), 10),
-		},
+		}),
 	}, nil
 }
 

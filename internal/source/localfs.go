@@ -21,7 +21,7 @@ type localFS struct {
 func newLocalFS(cfg *config.Assets, logger *slog.Logger) (Source, error) {
 	root := strings.TrimSpace(cfg.Root)
 	if root == "" {
-		return nil, errors.New("assets root is required")
+		return nil, oops.Owner("source").Wrap(errors.New("assets root is required"))
 	}
 
 	info, err := os.Stat(root)
@@ -29,7 +29,7 @@ func newLocalFS(cfg *config.Assets, logger *slog.Logger) (Source, error) {
 		return nil, oops.Wrap(err)
 	}
 	if !info.IsDir() {
-		return nil, fmt.Errorf("assets root must be a directory: %s", root)
+		return nil, oops.Owner("source").Wrap(fmt.Errorf("assets root must be a directory: %s", root))
 	}
 
 	logger.Info("Source configured",

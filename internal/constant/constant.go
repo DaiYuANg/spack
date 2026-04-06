@@ -2,3 +2,4 @@
 package constant
 
 const EnvPrefix = "SPACK_"
+const ServerHeaderPrefix = "X-Spack"

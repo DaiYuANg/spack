@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/daiyuang/spack/internal/cachepolicy"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/resolver"
@@ -70,7 +71,7 @@ func resolvedLastModified(result *resolver.Result) (time.Time, bool) {
 }
 
 type metadataCarrier interface {
-	GetMetadata() map[string]string
+	GetMetadata() collectionx.Map[string, string]
 }
 
 func resolvedLastModifiedOption(result *resolver.Result) mo.Option[time.Time] {
@@ -89,8 +90,11 @@ func metadataModTime(carrier metadataCarrier) mo.Option[time.Time] {
 	if carrier == nil {
 		return mo.None[time.Time]()
 	}
-
-	raw := strings.TrimSpace(carrier.GetMetadata()["mtime_unix"])
+	value, ok := carrier.GetMetadata().Get("mtime_unix")
+	if !ok {
+		return mo.None[time.Time]()
+	}
+	raw := strings.TrimSpace(value)
 	if raw == "" {
 		return mo.None[time.Time]()
 	}

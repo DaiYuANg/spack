@@ -15,40 +15,6 @@ import (
 
 var ErrNotFound = errors.New("asset not found")
 
-type Request struct {
-	Path           string
-	Accept         string
-	AcceptEncoding string
-	Width          int
-	Format         string
-	RangeRequested bool
-}
-
-type Result struct {
-	Asset              *catalog.Asset
-	Variant            *catalog.Variant
-	FilePath           string
-	MediaType          string
-	ContentEncoding    string
-	ETag               string
-	PreferredEncodings collectionx.List[string]
-	PreferredWidths    collectionx.List[int]
-	PreferredFormats   collectionx.List[string]
-	FallbackUsed       bool
-}
-
-type Resolver struct {
-	cfg     *config.Assets
-	catalog catalog.Catalog
-	logger  *slog.Logger
-}
-
-type resolverIn struct {
-	Config  *config.Assets
-	Catalog catalog.Catalog
-	Logger  *slog.Logger
-}
-
 func newResolver(in resolverIn) *Resolver {
 	return &Resolver{
 		cfg:     in.Config,

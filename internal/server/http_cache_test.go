@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
@@ -39,9 +40,9 @@ func TestAssetRouteReturnsNotModifiedForFreshValidator(t *testing.T) {
 		MediaType:  "application/javascript",
 		SourceHash: "hash-app",
 		ETag:       "\"hash-app\"",
-		Metadata: map[string]string{
+		Metadata: collectionx.NewMapFrom(map[string]string{
 			"mtime_unix": "1720000000",
-		},
+		}),
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -158,10 +159,10 @@ func newVariantTestApp(t *testing.T) *fiber.App {
 		SourceHash:   "hash-app",
 		ETag:         "\"hash-app-br\"",
 		Encoding:     "br",
-		Metadata: map[string]string{
+		Metadata: collectionx.NewMapFrom(map[string]string{
 			"stage":      "compression",
 			"mtime_unix": "1720000100",
-		},
+		}),
 	})
 
 	return server.NewAppForTest(

@@ -6,6 +6,7 @@ import (
 	"github.com/DaiYuANg/arcgo/configx"
 	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/samber/do/v2"
+	"github.com/samber/oops"
 )
 
 var Module = NewModule(LoadOptions{})
@@ -42,7 +43,7 @@ func loadConfig(loadOptions LoadOptions) (*Config, error) {
 	loaded := defaultConfig()
 	err := configx.Load(&loaded, loadOptions.configxOptions()...)
 	if err != nil {
-		return nil, fmt.Errorf("load config: %w", err)
+		return nil, oops.In("config").Wrap(fmt.Errorf("load config: %w", err))
 	}
 	return &loaded, nil
 }

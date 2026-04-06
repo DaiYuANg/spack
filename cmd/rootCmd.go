@@ -13,6 +13,7 @@ import (
 	"github.com/daiyuang/spack/internal/server"
 	"github.com/daiyuang/spack/internal/source"
 	"github.com/daiyuang/spack/internal/workerpool"
+	"github.com/samber/oops"
 	"github.com/spf13/cobra"
 )
 
@@ -41,7 +42,7 @@ var rootCmd = &cobra.Command{
 
 func Execute() error {
 	if err := rootCmd.Execute(); err != nil {
-		return fmt.Errorf("execute root command: %w", err)
+		return oops.In("command").Wrap(fmt.Errorf("execute root command: %w", err))
 	}
 	return nil
 }

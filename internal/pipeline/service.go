@@ -15,6 +15,7 @@ import (
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/workerpool"
 	"github.com/panjf2000/ants/v2"
+	"github.com/samber/oops"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -97,7 +98,7 @@ func (s *Service) Warm(ctx context.Context) error {
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("warm pipeline: %w", err)
+		return oops.In("pipeline").Wrap(fmt.Errorf("warm pipeline: %w", err))
 	}
 	return nil
 }
