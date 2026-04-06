@@ -49,7 +49,7 @@ type Assets struct {
 	//   "/static" → serve assets under /static/*
 	//
 	// This path is matched before any filesystem lookup occurs.
-	Path string `koanf:"path"`
+	Path string `koanf:"path" validate:"required,startswith=/"`
 
 	// Backend selects the source backend implementation.
 	//
@@ -57,7 +57,7 @@ type Assets struct {
 	//   - "local": scan assets from a local filesystem root
 	//
 	// Unknown values are rejected during source initialization.
-	Backend SourceBackend `koanf:"backend"`
+	Backend SourceBackend `koanf:"backend" validate:"required,oneof=local"`
 
 	// Root is the filesystem directory used as the source of static assets.
 	//
@@ -66,7 +66,7 @@ type Assets struct {
 	//
 	// This path should point to an existing directory and is
 	// typically resolved to an absolute path during initialization.
-	Root string `koanf:"root"`
+	Root string `koanf:"root" validate:"required"`
 
 	// Entry is the default entry file name used for directory requests.
 	//
@@ -77,7 +77,7 @@ type Assets struct {
 	//   - "index.html"
 	//
 	// Entry must be a relative file name and must not start with '/'.
-	Entry string `koanf:"entry"`
+	Entry string `koanf:"entry" validate:"required,spack_relative_path"`
 
 	// Fallback defines the fallback serving behavior when a request
 	// cannot be resolved normally.
@@ -87,7 +87,7 @@ type Assets struct {
 	//
 	// If no fallback behavior is desired, this field should be left
 	// empty in the configuration.
-	Fallback Fallback `koanf:"fallback"`
+	Fallback Fallback `koanf:"fallback" validate:"required"`
 }
 
 func NormalizeSourceBackend(raw SourceBackend) SourceBackend {
@@ -130,7 +130,7 @@ type Fallback struct {
 	// Supported values:
 	//   - "not_found"  : triggered when asset lookup fails
 	//   - "forbidden"  : triggered when asset access is denied
-	On FallbackOn `koanf:"on"`
+	On FallbackOn `koanf:"on" validate:"omitempty,oneof=not_found forbidden"`
 
 	// Target is the virtual asset path to be served as fallback.
 	//
@@ -139,5 +139,5 @@ type Fallback struct {
 	// such as "/index.html".
 	//
 	// The target is not re-scanned or dynamically resolved at runtime.
-	Target string `koanf:"target"`
+	Target string `koanf:"target" validate:"required_with=On,omitempty,spack_relative_path"`
 }

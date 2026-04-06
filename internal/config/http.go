@@ -7,17 +7,17 @@ import (
 )
 
 type HTTP struct {
-	Port        int         `koanf:"port"`
+	Port        int         `koanf:"port"         validate:"gte=1,lte=65535"`
 	LowMemory   bool        `koanf:"low_memory"`
-	MemoryCache MemoryCache `koanf:"memory_cache"`
+	MemoryCache MemoryCache `koanf:"memory_cache" validate:"required"`
 }
 
 type MemoryCache struct {
 	Enable      bool   `koanf:"enable"`
 	Warmup      bool   `koanf:"warmup"`
-	MaxEntries  int    `koanf:"max_entries"`
-	MaxFileSize int64  `koanf:"max_file_size"`
-	TTL         string `koanf:"ttl"`
+	MaxEntries  int    `koanf:"max_entries"   validate:"gte=0"`
+	MaxFileSize int64  `koanf:"max_file_size" validate:"gte=0"`
+	TTL         string `koanf:"ttl"           validate:"omitempty,spack_duration"`
 }
 
 func (h HTTP) GetPort() string {

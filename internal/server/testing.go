@@ -49,9 +49,13 @@ func NewAppForTest(
 	pipelineSvc *pipeline.Service,
 	bus eventx.BusRuntime,
 ) *fiber.App {
-	return newServerFromDeps(cfg, newServerRegistrations(
+	app, err := newServerFromDeps(cfg, newServerRegistrations(
 		newMiddlewareRegistration(cfg, logger, nil),
 		newHealthRoutesRegistration(cat),
 		newAssetRouteRegistration(cfg, logger, assetResolver, pipelineSvc, bodyCache, bus),
 	))
+	if err != nil {
+		panic(err)
+	}
+	return app
 }

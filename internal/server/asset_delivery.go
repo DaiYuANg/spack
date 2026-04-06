@@ -11,6 +11,7 @@ import (
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/resolver"
 	"github.com/gofiber/fiber/v3"
+	"github.com/samber/mo"
 )
 
 func sendResolvedAsset(
@@ -23,25 +24,53 @@ func sendResolvedAsset(
 	bodyCache *assetcache.Cache,
 ) (string, error) {
 	applyResolvedHeaders(c, cfg, result, requestedFormat)
-	if shouldSendNotModified(c, request) {
-		c.Status(fiber.StatusNotModified)
+	if handled := handleConditionalAssetRequest(c, request); handled {
 		return "", nil
 	}
 
-	if bodyCache.ShouldServe(resolvedAssetSize(result), request.RangeRequested) {
-		body, found, err := bodyCache.GetOrLoad(result.FilePath)
-		if err != nil {
-			return "", fiber.ErrInternalServerError
+	if size, ok := resolvedAssetSizeOption(result).Get(); ok {
+		if bodyCache.ShouldServe(size, request.RangeRequested) {
+			return sendCachedResolvedAsset(c, bodyCache, result)
 		}
-		if err := c.Send(body); err != nil {
-			return "", fmt.Errorf("send cached asset body: %w", err)
-		}
-		if found {
-			return deliveryMemoryCacheHit, nil
-		}
-		return deliveryMemoryCacheFill, nil
 	}
 
+	return sendResolvedAssetFile(c, cfg, request, result, requestedFormat, logger)
+}
+
+func handleConditionalAssetRequest(c fiber.Ctx, request resolver.Request) bool {
+	if shouldSendNotModified(c, request) {
+		c.Status(fiber.StatusNotModified)
+		return true
+	}
+	if c.Method() == fiber.MethodHead {
+		c.Status(fiber.StatusOK)
+		return true
+	}
+	return false
+}
+
+func sendCachedResolvedAsset(c fiber.Ctx, bodyCache *assetcache.Cache, result *resolver.Result) (string, error) {
+	body, found, err := bodyCache.GetOrLoad(result.FilePath)
+	if err != nil {
+		return "", fiber.ErrInternalServerError
+	}
+	if err := c.Send(body); err != nil {
+		return "", fmt.Errorf("send cached asset body: %w", err)
+	}
+	if found {
+		return deliveryMemoryCacheHit, nil
+	}
+	return deliveryMemoryCacheFill, nil
+}
+
+func sendResolvedAssetFile(
+	c fiber.Ctx,
+	cfg *config.Config,
+	request resolver.Request,
+	result *resolver.Result,
+	requestedFormat string,
+	logger *slog.Logger,
+) (string, error) {
 	if err := c.SendFile(result.FilePath, fiber.SendFile{ByteRange: true}); err != nil {
 		logger.Error("Send asset failed",
 			slog.String("path", result.FilePath),
@@ -58,17 +87,17 @@ func sendResolvedAsset(
 	return deliverySendFile, nil
 }
 
-func resolvedAssetSize(result *resolver.Result) int64 {
+func resolvedAssetSizeOption(result *resolver.Result) mo.Option[int64] {
 	if result == nil {
-		return -1
+		return mo.None[int64]()
 	}
 	if result.Variant != nil && result.Variant.Size >= 0 {
-		return result.Variant.Size
+		return mo.Some(result.Variant.Size)
 	}
-	if result.Asset != nil {
-		return result.Asset.Size
+	if result.Asset != nil && result.Asset.Size >= 0 {
+		return mo.Some(result.Asset.Size)
 	}
-	return -1
+	return mo.None[int64]()
 }
 
 func logRequest(logger *slog.Logger, c fiber.Ctx, startedAt time.Time) {

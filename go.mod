@@ -10,7 +10,7 @@ tool (
 )
 
 require (
-	github.com/DaiYuANg/arcgo/collectionx v0.1.1
+	github.com/DaiYuANg/arcgo/collectionx v0.1.2
 	github.com/DaiYuANg/arcgo/configx v0.2.1
 	github.com/DaiYuANg/arcgo/dix v0.2.2
 	github.com/DaiYuANg/arcgo/eventx v0.2.1
@@ -21,6 +21,7 @@ require (
 	github.com/arl/statsviz v0.8.0
 	github.com/gabriel-vasile/mimetype v1.4.13
 	github.com/go-git/go-git/v5 v5.17.2
+	github.com/go-playground/validator/v10 v10.30.2
 	github.com/gofiber/fiber/v3 v3.1.0
 	github.com/gofiber/template/html/v2 v2.1.3
 	github.com/goyek/goyek/v2 v2.3.0
@@ -65,7 +66,7 @@ require (
 	github.com/Antonboom/nilnil v1.1.1 // indirect
 	github.com/Antonboom/testifylint v1.6.4 // indirect
 	github.com/BurntSushi/toml v1.6.0 // indirect
-	github.com/DaiYuANg/arcgo/pkg/option v0.0.0-20260405162607-d44486cf0895 // indirect
+	github.com/DaiYuANg/arcgo/pkg/option v0.0.0-20260406090949-b1ea5746c0fa // indirect
 	github.com/Djarvur/go-err113 v0.1.1 // indirect
 	github.com/DmitriyVTitov/size v1.5.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.31.0 // indirect
@@ -169,7 +170,6 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
-	github.com/go-playground/validator/v10 v10.30.2 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/go-task/task/v3 v3.49.1 // indirect
 	github.com/go-task/template v0.2.0 // indirect

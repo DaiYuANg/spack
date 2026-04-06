@@ -22,6 +22,9 @@ func applyResolvedHeaders(c fiber.Ctx, cfg *config.Config, result *resolver.Resu
 	cacheControl := policy.CacheControl(result)
 
 	c.Set(fiber.HeaderContentType, result.MediaType)
+	if size, ok := resolvedAssetSizeOption(result).Get(); ok {
+		c.Set(fiber.HeaderContentLength, strconv.FormatInt(size, 10))
+	}
 	c.Append(fiber.HeaderVary, fiber.HeaderAcceptEncoding)
 	if shouldVaryAccept(result.Asset.MediaType, requestedFormat) {
 		c.Append(fiber.HeaderVary, fiber.HeaderAccept)

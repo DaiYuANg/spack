@@ -60,6 +60,8 @@ github.com/BurntSushi/toml v1.6.0 h1:dRaEfpa2VI55EwlIW72hMRHdWouJeRF7TPYhI+AUQjk
 github.com/BurntSushi/toml v1.6.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
 github.com/DaiYuANg/arcgo/collectionx v0.1.1 h1:EOzMUjABGOk1j7VfgbN1sQYb+cUkC9B9ErVSlIFzid8=
 github.com/DaiYuANg/arcgo/collectionx v0.1.1/go.mod h1:hPLWO0oXuOJF9wGS37+2SvREbBvdCx7A+TEOMXyort0=
+github.com/DaiYuANg/arcgo/collectionx v0.1.2 h1:J8Wm4e3jSOhAJo9OI13+7eZ+O+KWvuUEmiCoA5twFWY=
+github.com/DaiYuANg/arcgo/collectionx v0.1.2/go.mod h1:hPLWO0oXuOJF9wGS37+2SvREbBvdCx7A+TEOMXyort0=
 github.com/DaiYuANg/arcgo/configx v0.2.1 h1:OLqlTTtIFsIv5yOwK2qRlFPbUuZMTgzwKuWZgU9RMDU=
 github.com/DaiYuANg/arcgo/configx v0.2.1/go.mod h1:1jDwdwhvSxMqIu4GacFkUULLwtzeYqbnww7W/OWhx4s=
 github.com/DaiYuANg/arcgo/dix v0.2.2 h1:pkNmxdjFHHFIN/vczHPjv9gsibFzydjBzvDobMA+yIw=
@@ -72,6 +74,8 @@ github.com/DaiYuANg/arcgo/observabilityx v0.1.1 h1:R2+mFfEZDpqY0U+Lt7V6nWyXW5oBB
 github.com/DaiYuANg/arcgo/observabilityx v0.1.1/go.mod h1:tCmK0RueriVqkELBfTdF/Co6MNyEn35iz4udwSewym4=
 github.com/DaiYuANg/arcgo/pkg/option v0.0.0-20260405162607-d44486cf0895 h1:LfFm+nr0C8TOEbQgN6G5NibdQGphIucopgTEx8uOOxA=
 github.com/DaiYuANg/arcgo/pkg/option v0.0.0-20260405162607-d44486cf0895/go.mod h1:vjHGxwTFMoDeS94B2AUSmaFh9s5s2Q7uIVPM9cSJ2S8=
+github.com/DaiYuANg/arcgo/pkg/option v0.0.0-20260406090949-b1ea5746c0fa h1:MUpYp2ZJ4TdJ3xTz807i8iTs08VZQySlHnFJiBSMTXA=
+github.com/DaiYuANg/arcgo/pkg/option v0.0.0-20260406090949-b1ea5746c0fa/go.mod h1:vjHGxwTFMoDeS94B2AUSmaFh9s5s2Q7uIVPM9cSJ2S8=
 github.com/Djarvur/go-err113 v0.1.1 h1:eHfopDqXRwAi+YmCUas75ZE0+hoBHJ2GQNLYRSxao4g=
 github.com/Djarvur/go-err113 v0.1.1/go.mod h1:IaWJdYFLg76t2ihfflPZnM1LIQszWOsFDh2hhhAVF6k=
 github.com/DmitriyVTitov/size v1.5.0 h1:/PzqxYrOyOUX1BXj6J9OuVRVGe+66VL4D9FlUaW515g=

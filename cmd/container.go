@@ -10,11 +10,13 @@ import (
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/logger"
 	"github.com/daiyuang/spack/internal/runtime"
+	"github.com/daiyuang/spack/internal/validation"
 )
 
 func createContainer(loadOptions config.LoadOptions, userModules ...dix.Module) *dix.App {
-	allModules := collectionx.NewListWithCapacity[dix.Module](4 + len(userModules))
-	allModules.Add(config.NewModule(loadOptions),
+	allModules := collectionx.NewListWithCapacity[dix.Module](5 + len(userModules))
+	allModules.Add(validation.Module,
+		config.NewModule(loadOptions),
 		logger.Module,
 		catalog.Module,
 		runtime.Module,

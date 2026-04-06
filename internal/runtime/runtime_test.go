@@ -1,0 +1,89 @@
+package runtime_test
+
+import (
+	"log/slog"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/daiyuang/spack/internal/assetcache"
+	"github.com/daiyuang/spack/internal/catalog"
+	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/runtime"
+	"github.com/daiyuang/spack/internal/source"
+)
+
+func TestBuildCatalogAssetSetsHashETagAndMtime(t *testing.T) {
+	root := t.TempDir()
+	assetPath := filepath.Join(root, "app.js")
+	payload := []byte("console.log('runtime');")
+	if err := os.WriteFile(assetPath, payload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	modTime := time.Unix(1_720_000_321, 0).UTC()
+	if err := os.Chtimes(assetPath, modTime, modTime); err != nil {
+		t.Fatal(err)
+	}
+
+	fileInfo, err := os.Stat(assetPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	asset, err := runtime.BuildCatalogAssetForTest(source.File{
+		Path:     "app.js",
+		FullPath: assetPath,
+		Size:     fileInfo.Size(),
+		ModTime:  fileInfo.ModTime(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if asset.Path != "app.js" {
+		t.Fatalf("expected asset path app.js, got %q", asset.Path)
+	}
+	if asset.SourceHash == "" {
+		t.Fatal("expected source hash to be populated")
+	}
+	if asset.ETag != `"`+asset.SourceHash+`"` {
+		t.Fatalf("expected etag derived from source hash, got %q", asset.ETag)
+	}
+	if got := asset.Metadata.GetOrDefault("mtime_unix", ""); got != "1720000321" {
+		t.Fatalf("expected mtime metadata to be preserved, got %q", got)
+	}
+}
+
+func TestCatalogReadyAttrsIncludeCacheAndCompressionState(t *testing.T) {
+	cfg := config.DefaultConfigForTest()
+	cat := catalog.NewInMemoryCatalog()
+	bodyCache := assetcache.NewCacheForTest(cfg.HTTP.MemoryCache, slog.New(slog.DiscardHandler))
+
+	if err := cat.UpsertAsset(&catalog.Asset{Path: "app.js"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := cat.UpsertVariant(&catalog.Variant{ID: "app.js|encoding=br", AssetPath: "app.js"}); err != nil {
+		t.Fatal(err)
+	}
+
+	attrs := runtime.CatalogReadyAttrsForTest(&cfg, cat, bodyCache, assetcache.WarmStats{Entries: 2, Bytes: 128}, 2048, 50*time.Millisecond)
+	attrMap := make(map[string]any, len(attrs.Values()))
+	for _, attr := range attrs.Values() {
+		attrMap[attr.Key] = attr.Value.Any()
+	}
+
+	if attrMap["assets"] != int64(1) {
+		t.Fatalf("expected assets attr to be 1, got %#v", attrMap["assets"])
+	}
+	if attrMap["variants"] != int64(1) {
+		t.Fatalf("expected variants attr to be 1, got %#v", attrMap["variants"])
+	}
+	if attrMap["memory_cache_enable"] != false {
+		t.Fatalf("expected memory_cache_enable false, got %#v", attrMap["memory_cache_enable"])
+	}
+	if attrMap["compression_mode"] != cfg.Compression.NormalizedMode() {
+		t.Fatalf("expected compression_mode %q, got %#v", cfg.Compression.NormalizedMode(), attrMap["compression_mode"])
+	}
+}

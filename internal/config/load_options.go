@@ -3,6 +3,7 @@ package config
 import (
 	"github.com/DaiYuANg/arcgo/configx"
 	"github.com/daiyuang/spack/internal/constant"
+	"github.com/go-playground/validator/v10"
 	"github.com/spf13/pflag"
 )
 
@@ -13,11 +14,13 @@ type LoadOptions struct {
 	FlagSet *pflag.FlagSet
 }
 
-func (o LoadOptions) configxOptions() []configx.Option {
+func (o LoadOptions) configxOptions(validate *validator.Validate) []configx.Option {
 	options := []configx.Option{
 		configx.WithEnvPrefix(constant.EnvPrefix),
 		configx.WithIgnoreDotenvError(true),
 		configx.WithDotenv(),
+		configx.WithValidator(validate),
+		configx.WithValidateLevel(configx.ValidateLevelStruct),
 	}
 	if len(o.Files) > 0 {
 		options = append(options, configx.WithFiles(o.Files...))

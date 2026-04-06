@@ -8,9 +8,18 @@ on:
     branches:
       - '**'
 
+permissions:
+  contents: read
+
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -21,8 +30,7 @@ jobs:
           go-version: 1.25
 
       - name: Install task runner
-        run: |
-          curl -sL https://taskfile.dev/install.sh | sh -s -- -d
+        run: go install github.com/go-task/task/v3/cmd/task@latest
 
       - name: Cache Go modules
         uses: actions/cache@v4
@@ -35,13 +43,17 @@ jobs:
             ${{ runner.os }}-go-
 
       - name: Run lint
-        run: ./bin/task lint
+        run: task lint
 
       - name: Run check
-        run: ./bin/task check
+        run: task check
 
       - name: Run task build
-        run: ./bin/task build
+        run: task build
+
+      - name: Validate GoReleaser config
+        if: runner.os == 'Linux'
+        run: task release:goreleaser:check
 
       - name: Run tests
         run: go test -v ./...

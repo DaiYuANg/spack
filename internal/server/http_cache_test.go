@@ -12,9 +12,11 @@ import (
 	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/pipeline"
 	"github.com/daiyuang/spack/internal/resolver"
 	"github.com/daiyuang/spack/internal/server"
 	"github.com/gofiber/fiber/v3"
@@ -47,7 +49,8 @@ func TestAssetRouteReturnsNotModifiedForFreshValidator(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	app := server.NewAppForTest(
+	app := newHTTPTestApp(
+		t,
 		&cfg,
 		slog.New(slog.DiscardHandler),
 		cat,
@@ -165,7 +168,8 @@ func newVariantTestApp(t *testing.T) *fiber.App {
 		}),
 	})
 
-	return server.NewAppForTest(
+	return newHTTPTestApp(
+		t,
 		&cfg,
 		slog.New(slog.DiscardHandler),
 		cat,
@@ -174,6 +178,27 @@ func newVariantTestApp(t *testing.T) *fiber.App {
 		nil,
 		nil,
 	)
+}
+
+func newHTTPTestApp(
+	t *testing.T,
+	cfg *config.Config,
+	logger *slog.Logger,
+	cat catalog.Catalog,
+	bodyCache *assetcache.Cache,
+	assetResolver *resolver.Resolver,
+	pipelineSvc *pipeline.Service,
+	bus eventx.BusRuntime,
+) *fiber.App {
+	t.Helper()
+
+	app := server.NewAppForTest(cfg, logger, cat, bodyCache, assetResolver, pipelineSvc, bus)
+	t.Cleanup(func() {
+		if err := app.Shutdown(); err != nil {
+			t.Fatalf("shutdown test app: %v", err)
+		}
+	})
+	return app
 }
 
 func upsertAssetForTest(t *testing.T, cat catalog.Catalog, asset *catalog.Asset) {

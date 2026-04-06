@@ -1,11 +1,11 @@
 package config
 
 import (
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/daiyuang/spack/internal/validation"
 )
 
 const (
@@ -16,18 +16,18 @@ const (
 
 type Compression struct {
 	Enable         bool   `koanf:"enable"`
-	Mode           string `koanf:"mode"`
-	CacheDir       string `koanf:"cache_dir"`
-	MinSize        int64  `koanf:"min_size"`
-	Workers        int    `koanf:"workers"`
-	QueueSize      int    `koanf:"queue_size"`
-	CleanupEvery   string `koanf:"cleanup_every"`
-	MaxAge         string `koanf:"max_age"`
-	ImageMaxAge    string `koanf:"image_max_age"`
-	EncodingMaxAge string `koanf:"encoding_max_age"`
-	MaxCacheBytes  int64  `koanf:"max_cache_bytes"`
-	BrotliQuality  int    `koanf:"brotli_quality"`
-	GzipLevel      int    `koanf:"gzip_level"`
+	Mode           string `koanf:"mode"             validate:"required,oneof=off lazy warmup"`
+	CacheDir       string `koanf:"cache_dir"        validate:"required"`
+	MinSize        int64  `koanf:"min_size"         validate:"gte=0"`
+	Workers        int    `koanf:"workers"          validate:"gte=0"`
+	QueueSize      int    `koanf:"queue_size"       validate:"gte=0"`
+	CleanupEvery   string `koanf:"cleanup_every"    validate:"omitempty,spack_duration"`
+	MaxAge         string `koanf:"max_age"          validate:"omitempty,spack_flexible_duration"`
+	ImageMaxAge    string `koanf:"image_max_age"    validate:"omitempty,spack_flexible_duration"`
+	EncodingMaxAge string `koanf:"encoding_max_age" validate:"omitempty,spack_flexible_duration"`
+	MaxCacheBytes  int64  `koanf:"max_cache_bytes"  validate:"gte=0"`
+	BrotliQuality  int    `koanf:"brotli_quality"   validate:"gte=0,lte=11"`
+	GzipLevel      int    `koanf:"gzip_level"       validate:"gte=-2,lte=9"`
 }
 
 func (c Compression) NormalizedMode() string {
@@ -68,36 +68,16 @@ func (c Compression) ParsedCleanupInterval() time.Duration {
 }
 
 func (c Compression) ParsedMaxAge() time.Duration {
-	return parseFlexibleDuration(c.MaxAge)
+	return validation.ParseFlexibleDuration(c.MaxAge)
 }
 
 func (c Compression) NamespaceMaxAges() collectionx.Map[string, time.Duration] {
 	out := collectionx.NewMapWithCapacity[string, time.Duration](2)
-	if d := parseFlexibleDuration(c.EncodingMaxAge); d > 0 {
+	if d := validation.ParseFlexibleDuration(c.EncodingMaxAge); d > 0 {
 		out.Set("encoding", d)
 	}
-	if d := parseFlexibleDuration(c.ImageMaxAge); d > 0 {
+	if d := validation.ParseFlexibleDuration(c.ImageMaxAge); d > 0 {
 		out.Set("image", d)
 	}
 	return out
-}
-
-func parseFlexibleDuration(raw string) time.Duration {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return 0
-	}
-	d, err := time.ParseDuration(raw)
-	if err == nil {
-		if d > 0 {
-			return d
-		}
-		return 0
-	}
-
-	seconds, secErr := strconv.ParseInt(raw, 10, 64)
-	if secErr != nil || seconds <= 0 {
-		return 0
-	}
-	return time.Duration(seconds) * time.Second
 }

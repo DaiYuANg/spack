@@ -3,6 +3,7 @@ package config_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/DaiYuANg/arcgo/configx"
@@ -26,6 +27,58 @@ func unsetEnvForTest(t *testing.T, key string) {
 		}
 		t.Setenv(key, value)
 	})
+}
+
+func TestLoadWithOptions_RejectsInvalidCompressionCachePolicyDurations(t *testing.T) {
+	t.Helper()
+
+	unsetEnvForTest(t, "SPACK_ASSETS_ROOT")
+
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "spack.yaml")
+	configBody := "" +
+		"assets:\n" +
+		"  root: ./dist\n" +
+		"compression:\n" +
+		"  cleanup_every: nope\n" +
+		"  max_age: later\n"
+	if err := os.WriteFile(configPath, []byte(configBody), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := config.LoadWithOptions(config.LoadOptions{Files: []string{configPath}})
+	if err == nil {
+		t.Fatal("expected invalid compression durations to fail validation")
+	}
+	if !strings.Contains(err.Error(), "spack_duration") && !strings.Contains(err.Error(), "spack_flexible_duration") {
+		t.Fatalf("expected validator error for compression duration, got %v", err)
+	}
+}
+
+func TestLoadWithOptions_RejectsFallbackWithoutTarget(t *testing.T) {
+	t.Helper()
+
+	unsetEnvForTest(t, "SPACK_ASSETS_ROOT")
+
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "spack.yaml")
+	configBody := "" +
+		"assets:\n" +
+		"  root: ./dist\n" +
+		"  fallback:\n" +
+		"    on: not_found\n" +
+		"    target: \"\"\n"
+	if err := os.WriteFile(configPath, []byte(configBody), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := config.LoadWithOptions(config.LoadOptions{Files: []string{configPath}})
+	if err == nil {
+		t.Fatal("expected fallback without target to fail validation")
+	}
+	if !strings.Contains(err.Error(), "required_with") {
+		t.Fatalf("expected fallback target validation error, got %v", err)
+	}
 }
 
 func TestLoadIntoDefaultConfigPreservesNestedDefaultsWithPartialDotenv(t *testing.T) {
