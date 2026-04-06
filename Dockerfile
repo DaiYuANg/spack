@@ -35,7 +35,7 @@ COPY --from=builder /app/dist/spack /opt/spack
 
 USER root
 
-RUN apk add --no-cache dumb-init
+RUN apk add --no-cache dumb-init curl
 
 RUN chmod +x /opt/spack
 
@@ -56,7 +56,7 @@ COPY --from=builder /usr/bin/dumb-init /usr/bin/dumb-init
 
 COPY --from=builder /app/dist/spack /opt/spack
 
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y ca-certificates curl && rm -rf /var/lib/apt/lists/*
 
 RUN chmod +x /opt/spack
 
