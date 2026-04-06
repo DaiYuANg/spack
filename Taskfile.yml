@@ -129,19 +129,15 @@ tasks:
     cmds:
       - git tag -a {{.TAG}} -m "release {{.TAG}}"
 
-  release:gorelease:
-    desc: "运行 gorelease 并自动建议下一个语义化版本"
+  release:goreleaser:check:
+    desc: "校验 .goreleaser.yml 配置"
     cmds:
-      - go run golang.org/x/exp/cmd/gorelease@latest
+      - go run github.com/goreleaser/goreleaser/v2@latest check
 
-  release:gorelease:check:
-    desc: "使用 gorelease 校验目标版本（用法: task release:gorelease:check VERSION=0.1.1）"
-    requires:
-      vars: [ VERSION ]
-    vars:
-      TAG: '{{if hasPrefix .VERSION "v"}}{{.VERSION}}{{else}}v{{.VERSION}}{{end}}'
+  release:goreleaser:snapshot:
+    desc: "使用 GoReleaser 执行本地快照构建（不发布）"
     cmds:
-      - go run golang.org/x/exp/cmd/gorelease@latest -version={{.TAG}}
+      - go run github.com/goreleaser/goreleaser/v2@latest release --snapshot --clean --skip=publish
 
   release:
     desc: "创建并推送标签（用法: task release VERSION=0.1.0）"
@@ -152,9 +148,7 @@ tasks:
       VERSION_NO_V: '{{trimPrefix "v" .TAG}}'
       RELEASE_BRANCH: release/{{.VERSION_NO_V}}
     cmds:
-      - task: release:gorelease:check
-        vars:
-          VERSION: '{{.VERSION}}'
+      - task: release:goreleaser:check
       - task: release:tag
         vars:
           VERSION: '{{.VERSION}}'
