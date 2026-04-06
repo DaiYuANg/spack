@@ -11,67 +11,14 @@ import (
 	"sync"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/DaiYuANg/arcgo/eventx"
-	"github.com/DaiYuANg/arcgo/observabilityx"
-	"github.com/daiyuang/spack/internal/cachepolicy"
 	"github.com/daiyuang/spack/internal/catalog"
-	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/workerpool"
-	"github.com/panjf2000/ants/v2"
-	"github.com/samber/hot"
 	"github.com/samber/hot/pkg/base"
 )
-
-const (
-	metricAssetCacheHits         = "asset_cache_hits_total"
-	metricAssetCacheMisses       = "asset_cache_misses_total"
-	metricAssetCacheFills        = "asset_cache_fills_total"
-	metricAssetCacheFillBytes    = "asset_cache_fill_bytes_total"
-	metricAssetCacheWarmEntries  = "asset_cache_warm_entries_total"
-	metricAssetCacheWarmBytes    = "asset_cache_warm_bytes_total"
-	metricAssetCacheEvictions    = "asset_cache_evictions_total"
-	metricAssetCacheEvictedBytes = "asset_cache_evicted_bytes_total"
-	metricAssetCacheLoadErrors   = "asset_cache_load_errors_total"
-)
-
-type Cache struct {
-	logger *slog.Logger
-	obs    observabilityx.Observability
-	policy cachepolicy.MemoryPolicy
-	warmup bool
-	cache  *hot.HotCache[string, []byte]
-	bus    eventx.BusRuntime
-	pool   *ants.Pool
-
-	variantRemovedUnsubscribe   func()
-	variantGeneratedUnsubscribe func()
-}
 
 type WarmStats struct {
 	Entries int
 	Bytes   int64
-}
-
-func newCache(cfg *config.HTTP, logger *slog.Logger, obs observabilityx.Observability, bus eventx.BusRuntime, pool *ants.Pool) *Cache {
-	cacheCfg := cfg.MemoryCache
-	cache := &Cache{
-		logger: logger,
-		obs:    observabilityx.Normalize(obs, logger),
-		policy: cachepolicy.NewMemoryPolicy(cacheCfg),
-		warmup: cacheCfg.WarmupEnabled(),
-		bus:    bus,
-		pool:   pool,
-	}
-	if !cacheCfg.Enabled() {
-		return cache
-	}
-
-	cache.cache = hot.NewHotCache[string, []byte](hot.WTinyLFU, cacheCfg.MaxEntries).
-		WithTTL(cacheCfg.ParsedTTL()).
-		WithJanitor().
-		WithEvictionCallback(cache.onEviction).
-		Build()
-	return cache
 }
 
 func (c *Cache) Enabled() bool {

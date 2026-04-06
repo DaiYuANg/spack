@@ -12,8 +12,8 @@ func defaultConfig() Config {
 			Port:      80,
 			LowMemory: true,
 			MemoryCache: MemoryCache{
-				Enable:      false,
-				Warmup:      false,
+				Enable:      true,
+				Warmup:      true,
 				MaxEntries:  1024,
 				MaxFileSize: 64 * 1024,
 				TTL:         "5m",
@@ -40,6 +40,7 @@ func defaultConfig() Config {
 			Enable:      true,
 			PprofPrefix: "/pprof",
 			LivePort:    8080,
+			Address:     "0.0.0.0",
 		},
 		Image: Image{
 			Enable:      true,

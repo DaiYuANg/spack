@@ -2,22 +2,18 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
-	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/DaiYuANg/arcgo/observabilityx"
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
-	"github.com/daiyuang/spack/internal/constant"
 	"github.com/daiyuang/spack/internal/media"
 	"github.com/daiyuang/spack/internal/pipeline"
 	"github.com/daiyuang/spack/internal/resolver"
@@ -25,6 +21,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/etag"
 	expvarmw "github.com/gofiber/fiber/v3/middleware/expvar"
+	"github.com/gofiber/fiber/v3/middleware/healthcheck"
 	"github.com/gofiber/fiber/v3/middleware/helmet"
 	"github.com/gofiber/fiber/v3/middleware/pprof"
 	recoverer "github.com/gofiber/fiber/v3/middleware/recover"
@@ -33,23 +30,13 @@ import (
 	"github.com/samber/oops"
 )
 
-func buildServerHeader() (string, error) {
-	info, ok := debug.ReadBuildInfo()
-	if !ok {
-		return "", oops.In("server").Owner("server custom header").Wrap(errors.New("could not read build info"))
-	}
-	version := info.Main.Version
-	goVersion := info.GoVersion
-	path := info.Path
-	return collectionx.NewList(constant.ServerHeaderPrefix, version, goVersion, path).Join("-"), nil
-}
-
 func newServerApp(cfg *config.Config) (*fiber.App, error) {
 	header, err := buildServerHeader()
 	if err != nil {
 		return nil, err
 	}
 	return fiber.New(fiber.Config{
+		AppName:           "Spack",
 		Views:             html.NewFileSystem(http.FS(view.View), ".html"),
 		PassLocalsToViews: true,
 		Immutable:         true,
@@ -61,14 +48,21 @@ func newServerApp(cfg *config.Config) (*fiber.App, error) {
 	}), nil
 }
 
-func registerMiddleware(app *fiber.App, cfg *config.Config, logger *slog.Logger, obs observabilityx.Observability) {
+func registerMiddleware(
+	app *fiber.App,
+	cfg *config.Config,
+	logger *slog.Logger,
+	obs observabilityx.Observability,
+) {
 	requestIDConfig := requestid.ConfigDefault
-	requestIDConfig.Header = "Request-ID"
+	requestIDConfig.Header = RequestIDHeader
+	requestIDConfig.Generator = requestIDGenerator
 	app.Use(requestid.New(requestIDConfig))
 	app.Use(etag.New())
 	app.Use(helmet.New())
 	app.Use(requestLogMiddleware(logger))
 	app.Use(metricsMiddleware(obs))
+	app.Get(healthcheck.LivenessEndpoint, healthcheck.New())
 
 	if cfg.Debug.Enable {
 		app.Use(expvarmw.New())
@@ -81,9 +75,6 @@ func registerMiddleware(app *fiber.App, cfg *config.Config, logger *slog.Logger,
 }
 
 func registerHealthRoutes(app *fiber.App, cat catalog.Catalog) {
-	app.Get("/healthz", func(c fiber.Ctx) error {
-		return c.SendStatus(fiber.StatusOK)
-	})
 	app.Get("/catalog", func(c fiber.Ctx) error {
 		return c.JSON(cat.Snapshot())
 	})

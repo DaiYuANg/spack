@@ -24,6 +24,7 @@ require (
 	github.com/go-playground/validator/v10 v10.30.2
 	github.com/gofiber/fiber/v3 v3.1.0
 	github.com/gofiber/template/html/v2 v2.1.3
+	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/goyek/goyek/v2 v2.3.0
 	github.com/joho/godotenv v1.5.1
 	github.com/panjf2000/ants/v2 v2.12.0
@@ -66,7 +67,7 @@ require (
 	github.com/Antonboom/nilnil v1.1.1 // indirect
 	github.com/Antonboom/testifylint v1.6.4 // indirect
 	github.com/BurntSushi/toml v1.6.0 // indirect
-	github.com/DaiYuANg/arcgo/pkg/option v0.0.0-20260406090949-b1ea5746c0fa // indirect
+	github.com/DaiYuANg/arcgo/pkg/option v0.0.0-20260406093614-39f4f3dbfb3e // indirect
 	github.com/Djarvur/go-err113 v0.1.1 // indirect
 	github.com/DmitriyVTitov/size v1.5.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.31.0 // indirect
@@ -162,6 +163,7 @@ require (
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/fzipp/gocyclo v0.6.0 // indirect
 	github.com/ghostiam/protogetter v0.3.20 // indirect
+	github.com/go-co-op/gocron/v2 v2.19.1 // indirect
 	github.com/go-critic/go-critic v0.14.3 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-git/go-billy/v5 v5.8.0 // indirect
@@ -227,6 +229,7 @@ require (
 	github.com/jgautheron/goconst v1.8.2 // indirect
 	github.com/jingyugao/rowserrcheck v1.1.1 // indirect
 	github.com/jjti/go-spancheck v0.6.5 // indirect
+	github.com/jonboulle/clockwork v0.5.0 // indirect
 	github.com/julz/importas v0.2.0 // indirect
 	github.com/karamaru-alpha/copyloopvar v1.2.2 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
@@ -298,6 +301,7 @@ require (
 	github.com/quasilyte/stdinfo v0.0.0-20220114132959-f7386bf02567 // indirect
 	github.com/raeperd/recvcheck v0.2.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
+	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/rs/zerolog v1.35.0 // indirect
 	github.com/ryancurrah/gomodguard v1.4.1 // indirect
@@ -305,7 +309,7 @@ require (
 	github.com/sajari/fuzzy v1.0.0 // indirect
 	github.com/samber/go-singleflightx v0.3.2 // indirect
 	github.com/samber/go-type-to-string v1.8.0 // indirect
-	github.com/samber/oops/loggers/zerolog v0.0.0-20260402170550-f43e94be84d4 // indirect
+	github.com/samber/oops/loggers/zerolog v0.0.0-20260406133710-5748a6c9ba2b // indirect
 	github.com/samber/slog-common v0.22.0 // indirect
 	github.com/samber/slog-zerolog/v2 v2.9.2 // indirect
 	github.com/sanposhiho/wastedassign/v2 v2.1.0 // indirect

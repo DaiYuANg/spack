@@ -10,6 +10,7 @@ import (
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/logger"
 	"github.com/daiyuang/spack/internal/runtime"
+	"github.com/daiyuang/spack/internal/task"
 	"github.com/daiyuang/spack/internal/validation"
 )
 
@@ -20,6 +21,7 @@ func createContainer(loadOptions config.LoadOptions, userModules ...dix.Module) 
 		logger.Module,
 		catalog.Module,
 		runtime.Module,
+		task.Module,
 	)
 	allModules.Add(userModules...)
 	return dix.New(
