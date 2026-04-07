@@ -21,8 +21,8 @@ var container *dix.App
 
 var rootCmd = &cobra.Command{
 	Use: "spack",
-	PreRun: func(cmd *cobra.Command, args []string) {
-		container = createContainer(
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		dixInstance, err := createContainer(
 			configLoadOptions(),
 			metrics.Module,
 			workerpool.Module,
@@ -34,9 +34,17 @@ var rootCmd = &cobra.Command{
 			resolver.Module,
 			server.Module,
 		)
+		if err != nil {
+			return err
+		}
+		container = dixInstance
+		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return container.Run()
+	},
+	PostRun: func(cmd *cobra.Command, args []string) {
+		fmt.Printf("%s", container.Meta())
 	},
 }
 

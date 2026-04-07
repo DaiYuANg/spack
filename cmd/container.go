@@ -3,6 +3,7 @@ package cmd
 
 import (
 	"log/slog"
+	"runtime/debug"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/dix"
@@ -14,7 +15,7 @@ import (
 	"github.com/daiyuang/spack/internal/validation"
 )
 
-func createContainer(loadOptions config.LoadOptions, userModules ...dix.Module) *dix.App {
+func createContainer(loadOptions config.LoadOptions, userModules ...dix.Module) (*dix.App, error) {
 	allModules := collectionx.NewListWithCapacity[dix.Module](5 + len(userModules))
 	allModules.Add(validation.Module,
 		config.NewModule(loadOptions),
@@ -24,11 +25,21 @@ func createContainer(loadOptions config.LoadOptions, userModules ...dix.Module) 
 		task.Module,
 	)
 	allModules.Add(userModules...)
-	return dix.New(
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		panic("could not read build info")
+	}
+	instance := dix.New(
 		"spack",
+		dix.WithVersion(info.Main.Version),
 		dix.WithModules(allModules.Values()...),
 		dix.WithLoggerFrom0(func() *slog.Logger {
 			return logger.Bootstrap(loadOptions)
 		}),
 	)
+	err := instance.Validate()
+	if err != nil {
+		return nil, err
+	}
+	return instance, nil
 }
