@@ -2,6 +2,7 @@
 package pipeline
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -71,7 +72,7 @@ func (s *compressionStage) Execute(task Task, asset *catalog.Asset) (*catalog.Va
 		With("asset_path", asset.Path).
 		With("encoding", task.Encoding)
 	if asset.SourceHash == "" {
-		return nil, stageErr.Wrap(fmt.Errorf("asset missing source hash"))
+		return nil, stageErr.Wrap(errors.New("asset missing source hash"))
 	}
 
 	raw, err := os.ReadFile(asset.FullPath)
@@ -114,12 +115,12 @@ func (s *compressionStage) Execute(task Task, asset *catalog.Asset) (*catalog.Va
 func (s *compressionStage) compress(raw []byte, encoding string) ([]byte, string, error) {
 	strategy, ok := s.strategies.Lookup(encoding)
 	if !ok {
-		return nil, "", fmt.Errorf("unsupported compression encoding")
+		return nil, "", errors.New("unsupported compression encoding")
 	}
 
 	compressed, err := strategy.Compress(raw)
 	if err != nil {
-		return nil, "", err
+		return nil, "", oops.In("pipeline").Owner("compression strategy").With("encoding", encoding).Wrap(err)
 	}
 	return compressed, strategy.Suffix(), nil
 }

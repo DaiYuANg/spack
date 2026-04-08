@@ -65,6 +65,19 @@ func (c *Cache) Delete(path string) bool {
 	return c.cache.Delete(path)
 }
 
+func (c *Cache) WarmSelected(ctx context.Context, cat catalog.Catalog) (WarmStats, error) {
+	if !c.Enabled() {
+		return WarmStats{}, nil
+	}
+
+	stats := WarmStats{}
+	if err := c.warmAssets(ctx, cat, &stats); err != nil {
+		return WarmStats{}, fmt.Errorf("warm selected memory cache: %w", err)
+	}
+	c.recordWarmStats(ctx, stats)
+	return stats, nil
+}
+
 func (c *Cache) Warm(ctx context.Context, cat catalog.Catalog) (WarmStats, error) {
 	if !c.WarmupEnabled() {
 		return WarmStats{}, nil

@@ -6,6 +6,7 @@ import (
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"
+	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/source"
 )
 
@@ -27,4 +28,14 @@ func SyncArtifactCatalogForTest(
 	bodyCache *assetcache.Cache,
 ) (ArtifactJanitorReport, error) {
 	return syncArtifactCatalog(ctx, store, cat, bodyCache)
+}
+
+// WarmCacheHotsetForTest exposes hotset warming for black-box tests.
+func WarmCacheHotsetForTest(
+	ctx context.Context,
+	cfg *config.Config,
+	cat catalog.Catalog,
+	bodyCache *assetcache.Cache,
+) (CacheWarmerReport, error) {
+	return warmCacheHotset(ctx, cfg, cat, bodyCache)
 }

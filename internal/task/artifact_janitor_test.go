@@ -12,6 +12,7 @@ import (
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/task"
+	"github.com/samber/oops"
 )
 
 func TestSyncArtifactCatalogRemovesOrphanArtifacts(t *testing.T) {
@@ -99,7 +100,10 @@ func (s *testArtifactStore) PathFor(assetPath, sourceHash, namespace, suffix str
 
 func (s *testArtifactStore) Write(path string, data []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
-		return err
+		return oops.In("task").Owner("artifact janitor test").Wrap(err)
 	}
-	return os.WriteFile(path, data, 0o600)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		return oops.In("task").Owner("artifact janitor test").Wrap(err)
+	}
+	return nil
 }

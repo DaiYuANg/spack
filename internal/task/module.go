@@ -12,6 +12,7 @@ import (
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"
+	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/source"
 	"github.com/go-co-op/gocron/v2"
 	"github.com/samber/lo"
@@ -23,9 +24,11 @@ var Module = dix.NewModule("task",
 		dix.ProviderErr1(newScheduler),
 		dix.Provider4(newSourceRescanRuntime),
 		dix.Provider4(newArtifactJanitorRuntime),
+		dix.Provider4(newCacheWarmerRuntime),
 		dix.Provider1(newSourceRescanTaskRegistration),
 		dix.Provider1(newArtifactJanitorTaskRegistration),
-		dix.Provider2(newTaskRegistrations),
+		dix.Provider1(newCacheWarmerTaskRegistration),
+		dix.Provider3(newTaskRegistrations),
 	),
 	dix.WithModuleHooks(
 		dix.OnStart2(startTaskRuntime),
@@ -57,6 +60,10 @@ type artifactJanitorTaskRegistration struct {
 	taskRegistration
 }
 
+type cacheWarmerTaskRegistration struct {
+	taskRegistration
+}
+
 func newTaskRegistration(
 	order int,
 	name string,
@@ -72,10 +79,12 @@ func newTaskRegistration(
 func newTaskRegistrations(
 	sourceRescan sourceRescanTaskRegistration,
 	artifactJanitor artifactJanitorTaskRegistration,
+	cacheWarmer cacheWarmerTaskRegistration,
 ) collectionx.List[taskRegistration] {
 	return collectionx.NewList(
 		sourceRescan.taskRegistration,
 		artifactJanitor.taskRegistration,
+		cacheWarmer.taskRegistration,
 	).Sort(func(left, right taskRegistration) int {
 		if left.Order != right.Order {
 			return cmp.Compare(left.Order, right.Order)
@@ -135,6 +144,33 @@ func newArtifactJanitorRuntime(
 func newArtifactJanitorTaskRegistration(runtime *artifactJanitorRuntime) artifactJanitorTaskRegistration {
 	return artifactJanitorTaskRegistration{newTaskRegistration(200, "artifact_janitor", func(ctx context.Context, scheduler gocron.Scheduler) (bool, error) {
 		return registerArtifactJanitorTask(ctx, scheduler, runtime)
+	})}
+}
+
+type cacheWarmerRuntime struct {
+	cfg       *config.Config
+	catalog   catalog.Catalog
+	bodyCache *assetcache.Cache
+	logger    *slog.Logger
+}
+
+func newCacheWarmerRuntime(
+	cfg *config.Config,
+	cat catalog.Catalog,
+	bodyCache *assetcache.Cache,
+	logger *slog.Logger,
+) *cacheWarmerRuntime {
+	return &cacheWarmerRuntime{
+		cfg:       cfg,
+		catalog:   cat,
+		bodyCache: bodyCache,
+		logger:    logger,
+	}
+}
+
+func newCacheWarmerTaskRegistration(runtime *cacheWarmerRuntime) cacheWarmerTaskRegistration {
+	return cacheWarmerTaskRegistration{newTaskRegistration(300, "cache_warmer", func(ctx context.Context, scheduler gocron.Scheduler) (bool, error) {
+		return registerCacheWarmerTask(ctx, scheduler, runtime)
 	})}
 }
 

@@ -2,6 +2,7 @@ package task
 
 import (
 	"context"
+	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -100,50 +101,58 @@ func collectCatalogArtifactPaths(
 ) (collectionx.Set[string], ArtifactJanitorReport, error) {
 	expected := collectionx.NewSet[string]()
 	report := ArtifactJanitorReport{}
-	entries := cat.Snapshot().Assets
-
-	var collectErr error
-	entries.Range(func(_ int, entry *catalog.Entry) bool {
-		if err := ctx.Err(); err != nil {
-			collectErr = err
-			return false
+	for _, entry := range cat.Snapshot().Assets.Values() {
+		if err := janitorContextErr(ctx); err != nil {
+			return nil, ArtifactJanitorReport{}, err
 		}
-		if entry == nil || entry.Asset == nil {
-			return true
+		if err := collectCatalogEntry(entry, cat, bodyCache, expected, &report); err != nil {
+			return nil, ArtifactJanitorReport{}, err
 		}
-
-		entry.Variants.Range(func(_ int, variant *catalog.Variant) bool {
-			if err := ctx.Err(); err != nil {
-				collectErr = err
-				return false
-			}
-			if variant == nil || strings.TrimSpace(variant.ArtifactPath) == "" {
-				return true
-			}
-
-			artifactPath := variant.ArtifactPath
-			if _, statErr := os.Stat(artifactPath); statErr != nil {
-				if os.IsNotExist(statErr) {
-					if cat.DeleteVariantByArtifactPath(artifactPath) {
-						report.MissingVariants++
-						report.CacheInvalidations += invalidateAssetCache(bodyCache, artifactPath)
-					}
-					return true
-				}
-				collectErr = oops.In("task").Owner("artifact janitor").With("artifact_path", artifactPath).Wrap(statErr)
-				return false
-			}
-
-			expected.Add(artifactPath)
-			return true
-		})
-		return collectErr == nil
-	})
-
-	if collectErr != nil {
-		return nil, ArtifactJanitorReport{}, collectErr
 	}
 	return expected, report, nil
+}
+
+func collectCatalogEntry(
+	entry *catalog.Entry,
+	cat catalog.Catalog,
+	bodyCache *assetcache.Cache,
+	expected collectionx.Set[string],
+	report *ArtifactJanitorReport,
+) error {
+	if entry == nil || entry.Asset == nil {
+		return nil
+	}
+	for _, variant := range entry.Variants.Values() {
+		if err := collectCatalogVariant(variant, cat, bodyCache, expected, report); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func collectCatalogVariant(
+	variant *catalog.Variant,
+	cat catalog.Catalog,
+	bodyCache *assetcache.Cache,
+	expected collectionx.Set[string],
+	report *ArtifactJanitorReport,
+) error {
+	artifactPath := variantArtifactPath(variant)
+	if artifactPath == "" {
+		return nil
+	}
+	if artifactExists(artifactPath) {
+		expected.Add(artifactPath)
+		return nil
+	}
+	if _, statErr := os.Stat(artifactPath); statErr != nil && !os.IsNotExist(statErr) {
+		return oops.In("task").Owner("artifact janitor").With("artifact_path", artifactPath).Wrap(statErr)
+	}
+	if cat.DeleteVariantByArtifactPath(artifactPath) {
+		report.MissingVariants++
+		report.CacheInvalidations += invalidateAssetCache(bodyCache, artifactPath)
+	}
+	return nil
 }
 
 func removeOrphanArtifacts(
@@ -154,41 +163,60 @@ func removeOrphanArtifacts(
 	bodyCache *assetcache.Cache,
 	report *ArtifactJanitorReport,
 ) error {
-	walkErr := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if walkCtxErr := ctx.Err(); walkCtxErr != nil {
-			return walkCtxErr
-		}
-		if entry.IsDir() {
+	rootHandle, err := openArtifactRoot(root)
+	if err != nil {
+		if os.IsNotExist(err) {
 			return nil
 		}
-
-		if report != nil {
-			report.ScannedArtifacts++
-		}
-		if expected != nil && expected.Contains(path) {
-			return nil
-		}
-		if removeErr := os.Remove(path); removeErr != nil && !os.IsNotExist(removeErr) {
-			return oops.In("task").Owner("artifact janitor").With("artifact_path", path).Wrap(removeErr)
-		}
-
-		if report != nil {
-			report.RemovedOrphans++
-			report.CacheInvalidations += invalidateAssetCache(bodyCache, path)
-		}
-		cat.DeleteVariantByArtifactPath(path)
-		return nil
-	})
-	if walkErr != nil {
-		if os.IsNotExist(walkErr) {
-			return nil
-		}
-		return oops.In("task").Owner("artifact janitor").Wrap(walkErr)
+		return err
 	}
+	if rootHandle == nil {
+		return nil
+	}
+
+	walkErr := walkOrphanArtifacts(ctx, rootHandle, root, expected, cat, bodyCache, report)
+	closeErr := closeRoot(rootHandle)
+	if walkErr != nil {
+		return walkErr
+	}
+	return closeErr
+}
+
+func removeOrphanArtifact(
+	root *os.Root,
+	relativePath string,
+	artifactPath string,
+	cat catalog.Catalog,
+	bodyCache *assetcache.Cache,
+	report *ArtifactJanitorReport,
+) error {
+	if removeErr := root.Remove(filepath.ToSlash(relativePath)); removeErr != nil && !os.IsNotExist(removeErr) {
+		return oops.In("task").Owner("artifact janitor").With("artifact_path", artifactPath).Wrap(removeErr)
+	}
+	if report != nil {
+		report.RemovedOrphans++
+		report.CacheInvalidations += invalidateAssetCache(bodyCache, artifactPath)
+	}
+	cat.DeleteVariantByArtifactPath(artifactPath)
 	return nil
+}
+
+func walkOrphanArtifacts(
+	ctx context.Context,
+	rootHandle *os.Root,
+	root string,
+	expected collectionx.Set[string],
+	cat catalog.Catalog,
+	bodyCache *assetcache.Cache,
+	report *ArtifactJanitorReport,
+) error {
+	walkErr := fs.WalkDir(rootHandle.FS(), ".", func(relativePath string, entry fs.DirEntry, err error) error {
+		return visitArtifactPath(ctx, rootHandle, root, relativePath, entry, err, expected, cat, bodyCache, report)
+	})
+	if walkErr == nil || os.IsNotExist(walkErr) {
+		return nil
+	}
+	return oops.In("task").Owner("artifact janitor").Wrap(walkErr)
 }
 
 func pruneEmptyArtifactDirs(root string) int {
