@@ -1,26 +1,187 @@
 // Package cachepolicy centralizes runtime cache policy decisions.
 package cachepolicy
 
-import "github.com/daiyuang/spack/internal/config"
+import (
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/media"
+)
+
+const robotsAssetPath = "robots.txt"
+
+type MemoryEntryKind string
+
+const (
+	MemoryEntryKindAsset   MemoryEntryKind = "asset"
+	MemoryEntryKindVariant MemoryEntryKind = "variant"
+)
+
+type MemoryUseCase string
+
+const (
+	MemoryUseCaseServe  MemoryUseCase = "serve"
+	MemoryUseCaseWarm   MemoryUseCase = "warm"
+	MemoryUseCaseEvent  MemoryUseCase = "event"
+	MemoryUseCaseDirect MemoryUseCase = "direct"
+)
+
+type MemoryRequest struct {
+	Path           string
+	AssetPath      string
+	Size           int64
+	MediaType      string
+	Encoding       string
+	Format         string
+	Width          int
+	Kind           MemoryEntryKind
+	UseCase        MemoryUseCase
+	RangeRequested bool
+}
 
 // MemoryPolicy decides when an asset should be served from the in-memory body cache.
 type MemoryPolicy interface {
-	ShouldServe(size int64, rangeRequested bool) bool
+	ShouldServe(request MemoryRequest) bool
+	ShouldWarm(request MemoryRequest) bool
+	TTL(request MemoryRequest) time.Duration
 }
 
 // StaticMemoryPolicy applies size and range-request admission rules from static config.
 type StaticMemoryPolicy struct {
-	maxFileSize int64
+	maxFileSize   int64
+	baseTTL       time.Duration
+	priorityTTL   time.Duration
+	variantTTL    time.Duration
+	genericTTL    time.Duration
+	priorityPaths collectionx.OrderedSet[string]
 }
 
 // NewMemoryPolicy builds a memory-cache admission policy from HTTP config.
-func NewMemoryPolicy(cfg config.MemoryCache) MemoryPolicy {
-	return StaticMemoryPolicy{maxFileSize: cfg.MaxFileSize}
+func NewMemoryPolicy(cfg *config.Config) MemoryPolicy {
+	if cfg == nil {
+		return StaticMemoryPolicy{}
+	}
+
+	baseTTL := cfg.HTTP.MemoryCache.ParsedTTL()
+	return StaticMemoryPolicy{
+		maxFileSize:   cfg.HTTP.MemoryCache.MaxFileSize,
+		baseTTL:       baseTTL,
+		priorityTTL:   clampMemoryTTL(baseTTL*2, baseTTL, 30*time.Minute),
+		variantTTL:    clampMemoryTTL(baseTTL+baseTTL/2, baseTTL, 20*time.Minute),
+		genericTTL:    clampMemoryTTL(baseTTL/2, time.Minute, baseTTL),
+		priorityPaths: memoryPriorityPaths(cfg),
+	}
 }
 
-func (p StaticMemoryPolicy) ShouldServe(size int64, rangeRequested bool) bool {
-	if rangeRequested {
+func (p StaticMemoryPolicy) ShouldServe(request MemoryRequest) bool {
+	if request.RangeRequested {
 		return false
 	}
-	return size >= 0 && size <= p.maxFileSize
+	return request.Size >= 0 && request.Size <= p.maxFileSize
+}
+
+func (p StaticMemoryPolicy) ShouldWarm(request MemoryRequest) bool {
+	if !p.ShouldServe(request) {
+		return false
+	}
+	if p.isPriorityPath(request) {
+		return true
+	}
+	if request.UseCase == MemoryUseCaseEvent {
+		return p.isVariant(request)
+	}
+	return p.isVariant(request) || isTextLikeRequest(request)
+}
+
+func (p StaticMemoryPolicy) TTL(request MemoryRequest) time.Duration {
+	if !p.ShouldServe(request) {
+		return 0
+	}
+	switch {
+	case p.isPriorityPath(request):
+		return p.priorityTTL
+	case p.isVariant(request):
+		return p.variantTTL
+	case isTextLikeRequest(request):
+		return p.baseTTL
+	default:
+		return p.genericTTL
+	}
+}
+
+func (p StaticMemoryPolicy) isPriorityPath(request MemoryRequest) bool {
+	return p.priorityPaths.Contains(memorySubjectPath(request))
+}
+
+func (p StaticMemoryPolicy) isVariant(request MemoryRequest) bool {
+	if request.Kind == MemoryEntryKindVariant {
+		return true
+	}
+	return strings.TrimSpace(request.Encoding) != "" || strings.TrimSpace(request.Format) != "" || request.Width > 0
+}
+
+func memoryPriorityPaths(cfg *config.Config) collectionx.OrderedSet[string] {
+	if cfg == nil {
+		return collectionx.NewOrderedSet[string]()
+	}
+	return collectionx.NewOrderedSet(
+		strings.TrimSpace(cfg.Assets.Entry),
+		strings.TrimSpace(cfg.Assets.Fallback.Target),
+		robotsAssetPath,
+	)
+}
+
+func memorySubjectPath(request MemoryRequest) string {
+	if subject := strings.TrimSpace(request.AssetPath); subject != "" {
+		return subject
+	}
+	return strings.TrimSpace(request.Path)
+}
+
+func isTextLikeMediaType(mediaType string) bool {
+	mediaType = strings.ToLower(strings.TrimSpace(mediaType))
+	switch {
+	case strings.HasPrefix(mediaType, "text/"):
+		return true
+	case mediaType == "application/javascript",
+		mediaType == "application/x-javascript",
+		mediaType == "application/json",
+		mediaType == "application/manifest+json",
+		mediaType == "application/xml",
+		mediaType == "application/xhtml+xml",
+		mediaType == "image/svg+xml":
+		return true
+	default:
+		return !media.IsImageMediaType(mediaType) && strings.Contains(mediaType, "json")
+	}
+}
+
+func isTextLikeRequest(request MemoryRequest) bool {
+	if isTextLikeMediaType(request.MediaType) {
+		return true
+	}
+
+	ext := strings.ToLower(filepath.Ext(memorySubjectPath(request)))
+	switch ext {
+	case ".html", ".css", ".js", ".mjs", ".json", ".xml", ".txt", ".svg", ".webmanifest":
+		return true
+	default:
+		return false
+	}
+}
+
+func clampMemoryTTL(value, minTTL, maxTTL time.Duration) time.Duration {
+	switch {
+	case value <= 0:
+		return minTTL
+	case value < minTTL:
+		return minTTL
+	case maxTTL > 0 && value > maxTTL:
+		return maxTTL
+	default:
+		return value
+	}
 }

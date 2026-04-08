@@ -24,12 +24,12 @@ type Cache struct {
 	variantGeneratedUnsubscribe func()
 }
 
-func newCache(cfg *config.HTTP, logger *slog.Logger, obs observabilityx.Observability, bus eventx.BusRuntime, pool *ants.Pool) *Cache {
-	cacheCfg := cfg.MemoryCache
+func newCache(cfg *config.Config, logger *slog.Logger, obs observabilityx.Observability, bus eventx.BusRuntime, pool *ants.Pool) *Cache {
+	cacheCfg := cfg.HTTP.MemoryCache
 	cache := &Cache{
 		logger: logger,
 		obs:    observabilityx.Normalize(obs, logger),
-		policy: cachepolicy.NewMemoryPolicy(cacheCfg),
+		policy: cachepolicy.NewMemoryPolicy(cfg),
 		warmup: cacheCfg.WarmupEnabled(),
 		bus:    bus,
 		pool:   pool,

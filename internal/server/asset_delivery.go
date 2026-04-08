@@ -3,10 +3,12 @@ package server
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/daiyuang/spack/internal/assetcache"
+	"github.com/daiyuang/spack/internal/cachepolicy"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/resolver"
@@ -30,7 +32,7 @@ func sendResolvedAsset(
 	}
 
 	if shouldServeFromMemoryCache(bodyCache, result, request) {
-		return sendCachedResolvedAsset(c, bodyCache, result)
+		return sendCachedResolvedAsset(c, bodyCache, result, request)
 	}
 
 	return sendResolvedAssetFile(c, cfg, request, result, requestedFormat, logger)
@@ -48,8 +50,13 @@ func handleConditionalAssetRequest(c fiber.Ctx, request resolver.Request) bool {
 	return false
 }
 
-func sendCachedResolvedAsset(c fiber.Ctx, bodyCache *assetcache.Cache, result *resolver.Result) (string, error) {
-	body, found, err := bodyCache.GetOrLoad(result.FilePath)
+func sendCachedResolvedAsset(
+	c fiber.Ctx,
+	bodyCache *assetcache.Cache,
+	result *resolver.Result,
+	request resolver.Request,
+) (string, error) {
+	body, found, err := bodyCache.GetOrLoadWithRequest(result.FilePath, buildMemoryCacheRequest(result, request))
 	if err != nil {
 		return "", fiber.ErrInternalServerError
 	}
@@ -108,8 +115,51 @@ func logRequest(logger *slog.Logger, c fiber.Ctx, startedAt time.Time) {
 }
 
 func shouldServeFromMemoryCache(bodyCache *assetcache.Cache, result *resolver.Result, request resolver.Request) bool {
-	size, ok := resolvedAssetSizeOption(result).Get()
-	return ok && bodyCache.ShouldServe(size, request.RangeRequested)
+	return bodyCache.ShouldServeRequest(buildMemoryCacheRequest(result, request))
+}
+
+func buildMemoryCacheRequest(result *resolver.Result, request resolver.Request) cachepolicy.MemoryRequest {
+	if result == nil {
+		return cachepolicy.MemoryRequest{
+			RangeRequested: request.RangeRequested,
+			UseCase:        cachepolicy.MemoryUseCaseServe,
+		}
+	}
+
+	cacheRequest := cachepolicy.MemoryRequest{
+		Path:           result.FilePath,
+		MediaType:      result.MediaType,
+		RangeRequested: request.RangeRequested,
+		UseCase:        cachepolicy.MemoryUseCaseServe,
+		Kind:           cachepolicy.MemoryEntryKindAsset,
+	}
+
+	if result.Asset != nil {
+		cacheRequest.AssetPath = result.Asset.Path
+		cacheRequest.Size = result.Asset.Size
+		cacheRequest.MediaType = result.Asset.MediaType
+	}
+
+	if result.Variant != nil {
+		cacheRequest.AssetPath = result.Variant.AssetPath
+		cacheRequest.Size = result.Variant.Size
+		cacheRequest.MediaType = firstNonEmptyString(result.Variant.MediaType, cacheRequest.MediaType)
+		cacheRequest.Encoding = result.Variant.Encoding
+		cacheRequest.Format = result.Variant.Format
+		cacheRequest.Width = result.Variant.Width
+		cacheRequest.Kind = cachepolicy.MemoryEntryKindVariant
+	}
+
+	return cacheRequest
+}
+
+func firstNonEmptyString(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
 }
 
 func nonNegativeSize(size int64) mo.Option[int64] {

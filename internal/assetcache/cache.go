@@ -5,15 +5,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
-	"os"
 	"strings"
 	"sync"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/daiyuang/spack/internal/cachepolicy"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/workerpool"
-	"github.com/samber/hot/pkg/base"
 )
 
 type WarmStats struct {
@@ -30,13 +28,28 @@ func (c *Cache) WarmupEnabled() bool {
 }
 
 func (c *Cache) ShouldServe(size int64, rangeRequested bool) bool {
+	return c.ShouldServeRequest(cachepolicy.MemoryRequest{
+		Size:           size,
+		RangeRequested: rangeRequested,
+		UseCase:        cachepolicy.MemoryUseCaseDirect,
+	})
+}
+
+func (c *Cache) ShouldServeRequest(request cachepolicy.MemoryRequest) bool {
 	if !c.Enabled() || c.policy == nil {
 		return false
 	}
-	return c.policy.ShouldServe(size, rangeRequested)
+	return c.policy.ShouldServe(request)
 }
 
 func (c *Cache) GetOrLoad(path string) ([]byte, bool, error) {
+	return c.GetOrLoadWithRequest(path, cachepolicy.MemoryRequest{
+		Path:    path,
+		UseCase: cachepolicy.MemoryUseCaseDirect,
+	})
+}
+
+func (c *Cache) GetOrLoadWithRequest(path string, request cachepolicy.MemoryRequest) ([]byte, bool, error) {
 	if !c.Enabled() {
 		return nil, false, errors.New("memory cache is disabled")
 	}
@@ -47,7 +60,7 @@ func (c *Cache) GetOrLoad(path string) ([]byte, bool, error) {
 	}
 	c.addCounter(metricAssetCacheMisses, 1)
 
-	body, err := c.readAndCachePath(path)
+	body, err := c.readAndCachePath(path, request)
 	if err != nil {
 		c.addCounter(metricAssetCacheLoadErrors, 1)
 		return nil, false, err
@@ -123,7 +136,7 @@ func (c *Cache) warmAsset(
 	if err := contextErr(ctx); err != nil {
 		return err
 	}
-	if err := c.preloadPath(asset.FullPath, asset.Size, stats); err != nil {
+	if err := c.preloadAsset(asset, stats); err != nil {
 		return err
 	}
 	return c.warmVariants(ctx, cat.ListVariants(asset.Path), stats)
@@ -157,7 +170,7 @@ func (c *Cache) warmVariant(ctx context.Context, variant *catalog.Variant, stats
 	if err := contextErr(ctx); err != nil {
 		return err
 	}
-	return c.preloadPath(variant.ArtifactPath, variant.Size, stats)
+	return c.preloadVariant(variant, cachepolicy.MemoryUseCaseWarm, stats)
 }
 
 func pickWarmError(ctx context.Context, warmErr error) error {
@@ -176,15 +189,49 @@ func contextErr(ctx context.Context) error {
 	}
 }
 
-func (c *Cache) preloadPath(path string, size int64, stats *WarmStats) error {
-	if !c.ShouldServe(size, false) || strings.TrimSpace(path) == "" {
+func (c *Cache) preloadAsset(asset *catalog.Asset, stats *WarmStats) error {
+	if asset == nil {
+		return nil
+	}
+	return c.preloadPath(asset.FullPath, cachepolicy.MemoryRequest{
+		Path:      asset.FullPath,
+		AssetPath: asset.Path,
+		Size:      asset.Size,
+		MediaType: asset.MediaType,
+		Kind:      cachepolicy.MemoryEntryKindAsset,
+		UseCase:   cachepolicy.MemoryUseCaseWarm,
+	}, stats)
+}
+
+func (c *Cache) preloadVariant(variant *catalog.Variant, useCase cachepolicy.MemoryUseCase, stats *WarmStats) error {
+	if variant == nil {
+		return nil
+	}
+	return c.preloadPath(variant.ArtifactPath, cachepolicy.MemoryRequest{
+		Path:      variant.ArtifactPath,
+		AssetPath: variant.AssetPath,
+		Size:      variant.Size,
+		MediaType: variant.MediaType,
+		Encoding:  variant.Encoding,
+		Format:    variant.Format,
+		Width:     variant.Width,
+		Kind:      cachepolicy.MemoryEntryKindVariant,
+		UseCase:   useCase,
+	}, stats)
+}
+
+func (c *Cache) preloadPath(path string, request cachepolicy.MemoryRequest, stats *WarmStats) error {
+	if strings.TrimSpace(path) == "" {
+		return nil
+	}
+	if !c.ShouldServeRequest(request) || !c.shouldWarm(request) {
 		return nil
 	}
 	if _, found := c.cache.MustGet(path); found {
 		return nil
 	}
 
-	body, err := c.readAndCachePath(path)
+	body, err := c.readAndCachePath(path, request)
 	if err != nil {
 		return err
 	}
@@ -196,51 +243,21 @@ func (c *Cache) preloadPath(path string, size int64, stats *WarmStats) error {
 	return nil
 }
 
-func (c *Cache) readAndCachePath(path string) ([]byte, error) {
+func (c *Cache) shouldWarm(request cachepolicy.MemoryRequest) bool {
+	return c.Enabled() && c.policy != nil && c.policy.ShouldWarm(request)
+}
+
+func (c *Cache) readAndCachePath(path string, request cachepolicy.MemoryRequest) ([]byte, error) {
 	body, err := c.readFile(path)
 	if err != nil {
 		return nil, err
 	}
 
-	c.cache.Set(path, body)
-	return body, nil
-}
-
-func (c *Cache) readFile(path string) ([]byte, error) {
-	// #nosec G304 -- path comes from resolver/catalog-selected asset paths already validated against the asset tree.
-	body, err := os.ReadFile(path)
-	if err != nil {
-		if c.logger != nil {
-			c.logger.Error("Read asset failed",
-				slog.String("path", path),
-				slog.String("err", err.Error()),
-			)
-		}
-		return nil, fmt.Errorf("read resolved asset: %w", err)
+	ttl := c.policy.TTL(request)
+	if ttl > 0 {
+		c.cache.SetWithTTL(path, body, ttl)
+	} else {
+		c.cache.Set(path, body)
 	}
 	return body, nil
-}
-
-func (c *Cache) recordWarmStats(ctx context.Context, stats WarmStats) {
-	if stats.Entries == 0 {
-		return
-	}
-	c.addCounterWithContext(ctx, metricAssetCacheWarmEntries, int64(stats.Entries))
-	c.addCounterWithContext(ctx, metricAssetCacheWarmBytes, stats.Bytes)
-}
-
-func (c *Cache) onEviction(_ base.EvictionReason, _ string, body []byte) {
-	c.addCounter(metricAssetCacheEvictions, 1)
-	c.addCounter(metricAssetCacheEvictedBytes, int64(len(body)))
-}
-
-func (c *Cache) addCounter(name string, value int64) {
-	c.addCounterWithContext(context.Background(), name, value)
-}
-
-func (c *Cache) addCounterWithContext(ctx context.Context, name string, value int64) {
-	if value == 0 || c == nil || c.obs == nil {
-		return
-	}
-	c.obs.AddCounter(ctx, name, value)
 }

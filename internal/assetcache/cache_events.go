@@ -7,6 +7,7 @@ import (
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/eventx"
+	"github.com/daiyuang/spack/internal/cachepolicy"
 	appEvent "github.com/daiyuang/spack/internal/event"
 )
 
@@ -57,7 +58,13 @@ func (c *Cache) subscribeVariantRemoved() (func(), error) {
 
 func (c *Cache) subscribeVariantGenerated() (func(), error) {
 	unsubscribe, err := eventx.Subscribe(c.bus, func(_ context.Context, event appEvent.VariantGenerated) error {
-		if preloadErr := c.preloadPath(event.ArtifactPath, event.Size, nil); preloadErr != nil && c.logger != nil {
+		if preloadErr := c.preloadPath(event.ArtifactPath, cachepolicy.MemoryRequest{
+			Path:      event.ArtifactPath,
+			AssetPath: event.AssetPath,
+			Size:      event.Size,
+			Kind:      cachepolicy.MemoryEntryKindVariant,
+			UseCase:   cachepolicy.MemoryUseCaseEvent,
+		}, nil); preloadErr != nil && c.logger != nil {
 			c.logger.Debug("Preload generated variant failed",
 				slog.String("path", event.ArtifactPath),
 				slog.String("stage", event.Stage),

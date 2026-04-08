@@ -21,7 +21,9 @@ func NewCacheWithObservabilityForTest(
 	logger *slog.Logger,
 	obs observabilityx.Observability,
 ) *Cache {
-	return newCache(&config.HTTP{MemoryCache: cfg}, logger, obs, nil, nil)
+	testCfg := config.DefaultConfigForTest()
+	testCfg.HTTP.MemoryCache = cfg
+	return newCache(&testCfg, logger, obs, nil, nil)
 }
 
 // NewCacheWithBusForTest exposes cache construction with an event bus for external tests.
@@ -31,7 +33,9 @@ func NewCacheWithBusForTest(
 	obs observabilityx.Observability,
 	bus eventx.BusRuntime,
 ) *Cache {
-	return newCache(&config.HTTP{MemoryCache: cfg}, logger, obs, bus, nil)
+	testCfg := config.DefaultConfigForTest()
+	testCfg.HTTP.MemoryCache = cfg
+	return newCache(&testCfg, logger, obs, bus, nil)
 }
 
 // NewCacheWithPoolForTest exposes cache construction with a shared worker pool for external tests.
@@ -41,7 +45,9 @@ func NewCacheWithPoolForTest(
 	obs observabilityx.Observability,
 	pool *ants.Pool,
 ) *Cache {
-	return newCache(&config.HTTP{MemoryCache: cfg}, logger, obs, nil, pool)
+	testCfg := config.DefaultConfigForTest()
+	testCfg.HTTP.MemoryCache = cfg
+	return newCache(&testCfg, logger, obs, nil, pool)
 }
 
 // StartForTest exposes cache lifecycle start for external tests.
