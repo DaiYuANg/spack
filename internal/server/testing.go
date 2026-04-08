@@ -52,6 +52,7 @@ func NewAppForTest(
 	app, err := newServerFromDeps(cfg, newServerRegistrations(
 		newMiddlewareRegistration(cfg, logger, nil),
 		newHealthRoutesRegistration(cat),
+		newRobotsRouteRegistration(cfg, logger, cat, bodyCache),
 		newAssetRouteRegistration(cfg, logger, assetResolver, pipelineSvc, bodyCache, bus),
 	))
 	if err != nil {

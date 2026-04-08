@@ -8,6 +8,7 @@ type Config struct {
 	Image       Image       `koanf:"image"       validate:"required"`
 	Metrics     Metrics     `koanf:"metrics"     validate:"required"`
 	Logger      Logger      `koanf:"logger"      validate:"required"`
+	Robots      Robots      `koanf:"robots"      validate:"required"`
 	Compression Compression `koanf:"compression" validate:"required"`
 }
 

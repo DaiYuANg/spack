@@ -13,6 +13,7 @@ Current scope:
 
 - SPA/static asset serving
 - `index.html` fallback for client-side routing
+- built-in `robots.txt` fallback generation with static-file precedence
 - runtime asset catalog
 - `gzip`, `brotli`, and `zstd` variant generation
 - on-demand image width/format variants via query or `Accept` negotiation
@@ -46,10 +47,12 @@ The current runtime is composed of:
 5. `assetcache`
    Keeps small hot responses in memory and supports warmup/invalidation.
 6. `server`
-   Handles HTTP, fallback, delivery, and observability.
+   Handles HTTP, fallback, delivery, generated `robots.txt`, and observability.
 7. `event`
    Decouples variant lifecycle notifications between server, pipeline, and cache.
-8. `runtime`
+8. `task`
+   Runs internal scheduled maintenance such as periodic source rescans.
+9. `runtime`
    Boots scanning, warmup, HTTP serving, and debug endpoints through `dix` lifecycle hooks.
 
 ```mermaid
@@ -93,11 +96,12 @@ flowchart TB
 Request flow at a high level:
 
 1. The runtime scans `SPACK_ASSETS_ROOT` into the catalog.
-2. The pipeline optionally warms compressed/image variants.
-3. The memory cache can optionally preload small hot assets and generated variants.
-4. For each request, the resolver chooses the best asset or variant.
-5. Delivery uses memory cache for eligible small files, otherwise Fiber `SendFile`.
-6. Served/generated/removed variants are propagated through the event bus for decoupled cache and pipeline updates.
+2. An internal scheduler periodically rescans the source tree and removes stale generated artifacts.
+3. The pipeline optionally warms compressed/image variants.
+4. The memory cache can optionally preload small hot assets and generated variants.
+5. For each request, the resolver chooses the best asset or variant.
+6. Delivery uses memory cache for eligible small files, otherwise Fiber `SendFile`.
+7. Served/generated/removed variants are propagated through the event bus for decoupled cache and pipeline updates.
 
 ## Quick Start
 
@@ -131,6 +135,7 @@ Important endpoints:
 
 - `/healthz`
 - `/catalog`
+- `/robots.txt` when built-in robots generation is enabled
 - `/prometheus` when debug runtime is enabled
 - `/debug/statsviz` on the debug runtime port
 
@@ -139,6 +144,7 @@ Response behavior:
 - small eligible files can be served from the in-memory asset cache
 - large files and range requests are delivered through Fiber `SendFile`
 - static asset logs include `delivery=memory_cache_hit|memory_cache_fill|sendfile|sendfile_range`
+- `GET /robots.txt` serves the scanned static file when present, otherwise SPACK can generate a simple fallback from config
 - responses include `ETag`, `Last-Modified`, `Cache-Control`, and `Expires`
 - conditional requests support `304 Not Modified`
 - `HEAD` requests reuse the same header selection logic without sending a response body
@@ -163,6 +169,7 @@ CLI flags use config-path names directly, for example:
 - `--assets.root=./dist`
 - `--assets.backend=local`
 - `--assets.fallback.target=index.html`
+- `--robots.disallow=/admin`
 - `--compression.mode=warmup`
 - `--compression.encodings=br,zstd,gzip`
 - `--logger.level=info`
@@ -177,8 +184,8 @@ HTTP:
 
 - `SPACK_HTTP_PORT=80`
 - `SPACK_HTTP_LOW_MEMORY=true`
-- `SPACK_HTTP_MEMORY_CACHE_ENABLE=false`
-- `SPACK_HTTP_MEMORY_CACHE_WARMUP=false`
+- `SPACK_HTTP_MEMORY_CACHE_ENABLE=true`
+- `SPACK_HTTP_MEMORY_CACHE_WARMUP=true`
 - `SPACK_HTTP_MEMORY_CACHE_MAX_ENTRIES=1024`
 - `SPACK_HTTP_MEMORY_CACHE_MAX_FILE_SIZE=65536`
 - `SPACK_HTTP_MEMORY_CACHE_TTL=5m`
@@ -196,6 +203,18 @@ Async:
 - `SPACK_ASYNC_WORKERS=<int>` default `runtime.NumCPU()`
 - used by the shared `ants` worker pool module
 - event bus async dispatch follows the same worker-count setting
+
+Robots:
+
+- `SPACK_ROBOTS_ENABLE=true`
+- `SPACK_ROBOTS_OVERRIDE=false`
+- `SPACK_ROBOTS_USER_AGENT=*`
+- `SPACK_ROBOTS_ALLOW=/`
+- `SPACK_ROBOTS_DISALLOW=`
+- `SPACK_ROBOTS_SITEMAP=`
+- `SPACK_ROBOTS_HOST=`
+- when `SPACK_ROBOTS_OVERRIDE=false`, a scanned `robots.txt` asset is served as-is if present
+- when no scanned `robots.txt` exists, SPACK generates a simple fallback response from the robots config
 
 Compression:
 
@@ -246,6 +265,13 @@ Logger:
 - `SPACK_LOGGER_FILE_MAX_SIZE=<int>`
 - `SPACK_LOGGER_FILE_MAX_AGE=<int>`
 - `SPACK_LOGGER_FILE_MAX_FILES=<int>`
+
+Internal scheduled tasks:
+
+- SPACK runs an internal source rescan every 5 minutes
+- the rescan reconciles mounted source files with the in-memory catalog
+- removed or changed source assets cause stale generated variants and cache entries to be invalidated
+- this scheduler is internal runtime behavior and is not exposed as user configuration
 
 Example startup commands:
 

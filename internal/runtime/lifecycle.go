@@ -108,26 +108,6 @@ func stopDebugRuntime(ctx context.Context, runtime *debugRuntime) error {
 	return server.Shutdown(ctx)
 }
 
-func startRuntime(ctx context.Context, bootstrap catalogBootstrapRuntime, http httpRuntime, debug *debugRuntime) error {
-	if err := logConfigOnStart(ctx, bootstrap); err != nil {
-		return err
-	}
-	if err := bootstrapCatalogOnStart(ctx, bootstrap); err != nil {
-		return err
-	}
-	if err := startHTTPRuntime(ctx, http); err != nil {
-		return err
-	}
-	return startDebugRuntime(ctx, bootstrap.logger, debug)
-}
-
-func stopRuntime(ctx context.Context, http httpRuntime, debug *debugRuntime) error {
-	if err := stopDebugRuntime(ctx, debug); err != nil {
-		return err
-	}
-	return stopHTTPRuntime(ctx, http)
-}
-
 func debugServer(runtime *debugRuntime) mo.Option[*http.Server] {
 	if runtime == nil || !runtime.enabled || runtime.server == nil {
 		return mo.None[*http.Server]()

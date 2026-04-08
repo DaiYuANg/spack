@@ -56,6 +56,8 @@ type Snapshot struct {
 type Catalog interface {
 	UpsertAsset(asset *Asset) error
 	UpsertVariant(variant *Variant) error
+	DeleteAsset(assetPath string) collectionx.List[*Variant]
+	DeleteVariants(assetPath string) collectionx.List[*Variant]
 	DeleteVariantByArtifactPath(artifactPath string) bool
 	FindAsset(assetPath string) (*Asset, bool)
 	ListVariants(assetPath string) collectionx.List[*Variant]

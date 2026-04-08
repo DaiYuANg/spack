@@ -39,6 +39,7 @@ func newConfigFlagSet() *pflag.FlagSet {
 	bindImageFlags(flags, defaults.Image)
 	bindMetricsFlags(flags, defaults.Metrics)
 	bindLoggerFlags(flags, defaults.Logger)
+	bindRobotsFlags(flags, defaults.Robots)
 	bindCompressionFlags(flags, defaults.Compression)
 
 	return flags
@@ -91,6 +92,16 @@ func bindLoggerFlags(flags *pflag.FlagSet, defaults config.Logger) {
 	flags.Int("logger.file.max_size", defaults.File.MaxSize, "Maximum log file size before rotation.")
 	flags.Int("logger.file.max_age", defaults.File.MaxAge, "Maximum age in days for rotated log files.")
 	flags.Int("logger.file.max_files", defaults.File.MaxFiles, "Maximum number of rotated log files to retain.")
+}
+
+func bindRobotsFlags(flags *pflag.FlagSet, defaults config.Robots) {
+	flags.Bool("robots.enable", defaults.Enable, "Enable built-in robots.txt route generation.")
+	flags.Bool("robots.override", defaults.Override, "Prefer generated robots.txt over a scanned robots.txt asset.")
+	flags.String("robots.user_agent", defaults.UserAgent, "Generated robots.txt User-agent value.")
+	flags.String("robots.allow", defaults.Allow, "Generated robots.txt Allow value.")
+	flags.String("robots.disallow", defaults.Disallow, "Generated robots.txt Disallow value.")
+	flags.String("robots.sitemap", defaults.Sitemap, "Generated robots.txt Sitemap value.")
+	flags.String("robots.host", defaults.Host, "Generated robots.txt Host value.")
 }
 
 func bindCompressionFlags(flags *pflag.FlagSet, defaults config.Compression) {

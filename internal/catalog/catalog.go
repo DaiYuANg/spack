@@ -58,6 +58,21 @@ func (c *InMemoryCatalog) FindAsset(assetPath string) (*Asset, bool) {
 	return cloneAsset(asset), ok
 }
 
+func (c *InMemoryCatalog) DeleteAsset(assetPath string) collectionx.List[*Variant] {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.assets.Delete(assetPath)
+	return c.deleteVariantsLocked(assetPath)
+}
+
+func (c *InMemoryCatalog) DeleteVariants(assetPath string) collectionx.List[*Variant] {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.deleteVariantsLocked(assetPath)
+}
+
 func (c *InMemoryCatalog) DeleteVariantByArtifactPath(artifactPath string) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -174,6 +189,28 @@ func (c *InMemoryCatalog) indexArtifactPath(artifactPath, assetPath, id string) 
 		return
 	}
 	c.artifactIndex.Set(artifactPath, variantRef{assetPath: assetPath, id: id})
+}
+
+func (c *InMemoryCatalog) deleteVariantsLocked(assetPath string) collectionx.List[*Variant] {
+	byAsset := c.variants.Row(assetPath)
+	if len(byAsset) == 0 {
+		c.variants.DeleteRow(assetPath)
+		return collectionx.NewList[*Variant]()
+	}
+
+	out := collectionx.MapList(collectionx.NewList(lo.Values(byAsset)...), func(_ int, variant *Variant) *Variant {
+		return cloneVariant(variant)
+	})
+	out.Sort(func(left, right *Variant) int {
+		return cmp.Compare(left.ID, right.ID)
+	})
+
+	out.Range(func(_ int, variant *Variant) bool {
+		c.artifactIndex.Delete(variant.ArtifactPath)
+		return true
+	})
+	c.variants.DeleteRow(assetPath)
+	return out
 }
 
 func defaultVariantID(variant *Variant) string {

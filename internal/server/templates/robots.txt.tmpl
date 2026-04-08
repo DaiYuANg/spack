@@ -1,0 +1,6 @@
+User-agent: {{ .UserAgent }}
+{{ if .Allow }}Allow: {{ .Allow }}
+{{ end }}{{ if .Disallow }}Disallow: {{ .Disallow }}
+{{ end }}{{ if .Host }}Host: {{ .Host }}
+{{ end }}{{ if .Sitemap }}Sitemap: {{ .Sitemap }}
+{{ end }}

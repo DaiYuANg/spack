@@ -21,8 +21,12 @@ var Module = dix.NewModule("runtime",
 		dix.Provider4(newDebugRuntime),
 	),
 	dix.WithModuleHooks(
-		dix.OnStart3(startRuntime),
-		dix.OnStop2(stopRuntime),
+		dix.OnStart(logConfigOnStart),
+		dix.OnStart(bootstrapCatalogOnStart),
+		dix.OnStart(startHTTPRuntime),
+		dix.OnStart2(startDebugRuntime),
+		dix.OnStop(stopDebugRuntime),
+		dix.OnStop(stopHTTPRuntime),
 	),
 )
 

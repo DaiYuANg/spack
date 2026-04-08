@@ -20,8 +20,9 @@ var Module = dix.NewModule("server",
 	dix.WithModuleProviders(
 		dix.Provider3(newMiddlewareRegistration),
 		dix.Provider1(newHealthRoutesRegistration),
+		dix.Provider4(newRobotsRouteRegistration),
 		dix.Provider6(newAssetRouteRegistration),
-		dix.Provider3(newServerRegistrations),
+		dix.Provider4(newServerRegistrations),
 		dix.ProviderErr2(newServerFromDeps),
 	),
 )
@@ -37,6 +38,10 @@ type middlewareRegistration struct {
 }
 
 type healthRoutesRegistration struct {
+	appRegistration
+}
+
+type robotsRouteRegistration struct {
 	appRegistration
 }
 
@@ -68,6 +73,17 @@ func newHealthRoutesRegistration(cat catalog.Catalog) healthRoutesRegistration {
 	})}
 }
 
+func newRobotsRouteRegistration(
+	cfg *config.Config,
+	logger *slog.Logger,
+	cat catalog.Catalog,
+	bodyCache *assetcache.Cache,
+) robotsRouteRegistration {
+	return robotsRouteRegistration{newAppRegistration(250, "robots_route", func(app *fiber.App) {
+		registerRobotsRoute(app, cfg, logger, cat, bodyCache)
+	})}
+}
+
 func newAssetRouteRegistration(
 	cfg *config.Config,
 	logger *slog.Logger,
@@ -84,11 +100,13 @@ func newAssetRouteRegistration(
 func newServerRegistrations(
 	middleware middlewareRegistration,
 	healthRoutes healthRoutesRegistration,
+	robotsRoute robotsRouteRegistration,
 	assetRoute assetRouteRegistration,
 ) collectionx.List[appRegistration] {
 	return collectionx.NewList(
 		middleware.appRegistration,
 		healthRoutes.appRegistration,
+		robotsRoute.appRegistration,
 		assetRoute.appRegistration,
 	).Sort(func(left, right appRegistration) int {
 		if left.Order != right.Order {

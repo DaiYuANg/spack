@@ -36,6 +36,12 @@ func defaultConfig() Config {
 			File: File{Enabled: false},
 		},
 		Metrics: Metrics{Prefix: "/prometheus"},
+		Robots: Robots{
+			Enable:    true,
+			Override:  false,
+			UserAgent: "*",
+			Allow:     "/",
+		},
 		Debug: Debug{
 			Enable:      true,
 			PprofPrefix: "/pprof",
