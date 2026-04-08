@@ -36,17 +36,17 @@ func TestNewPoolUsesConfiguredSize(t *testing.T) {
 
 func TestRunListFallsBackToSerialWithoutPool(t *testing.T) {
 	values := collectionx.NewList(1, 2, 3)
-	visited := make([]int, 0, values.Len())
+	visited := collectionx.NewList[int]()
 
 	err := workerpool.RunList[int](context.Background(), nil, values, func(_ context.Context, value int) error {
-		visited = append(visited, value)
+		visited.Add(value)
 		return nil
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(visited, []int{1, 2, 3}) {
-		t.Fatalf("expected serial visit order [1 2 3], got %v", visited)
+	if !slices.Equal(visited.Values(), []int{1, 2, 3}) {
+		t.Fatalf("expected serial visit order [1 2 3], got %v", visited.Values())
 	}
 }
 

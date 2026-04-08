@@ -6,25 +6,35 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/go-playground/validator/v10"
 )
+
+type validationRule struct {
+	tag string
+	fn  validator.Func
+}
 
 func New() (*validator.Validate, error) {
 	validate := validator.New(validator.WithRequiredStructEnabled())
 
-	rules := []struct {
-		tag string
-		fn  validator.Func
-	}{
-		{tag: "spack_duration", fn: validatePositiveDuration},
-		{tag: "spack_flexible_duration", fn: validatePositiveFlexibleDuration},
-		{tag: "spack_relative_path", fn: validateRelativePath},
-		{tag: "spack_widths", fn: validateWidths},
-	}
-	for _, rule := range rules {
+	rules := collectionx.NewList(
+		validationRule{tag: "spack_duration", fn: validatePositiveDuration},
+		validationRule{tag: "spack_flexible_duration", fn: validatePositiveFlexibleDuration},
+		validationRule{tag: "spack_relative_path", fn: validateRelativePath},
+		validationRule{tag: "spack_widths", fn: validateWidths},
+	)
+
+	var registerErr error
+	rules.Range(func(_ int, rule validationRule) bool {
 		if err := validate.RegisterValidation(rule.tag, rule.fn); err != nil {
-			return nil, fmt.Errorf("register %s validator: %w", rule.tag, err)
+			registerErr = fmt.Errorf("register %s validator: %w", rule.tag, err)
+			return false
 		}
+		return true
+	})
+	if registerErr != nil {
+		return nil, registerErr
 	}
 
 	return validate, nil

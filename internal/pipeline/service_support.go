@@ -160,15 +160,13 @@ func (s *Service) removeExpiredCleanupFiles(
 	now time.Time,
 	result *cleanupResult,
 ) []cleanupFile {
-	remaining := files[:0]
-	for _, file := range files {
+	return lo.Filter(files, func(file cleanupFile, _ int) bool {
 		if s.shouldRemoveExpiredFile(file, now) && s.removeCleanupFile(ctx, file, appEvent.VariantRemovalReasonTTL) {
 			recordExpiredCleanupRemoval(result, file.size)
-			continue
+			return false
 		}
-		remaining = append(remaining, file)
-	}
-	return remaining
+		return true
+	})
 }
 
 func (s *Service) shouldRemoveExpiredFile(file cleanupFile, now time.Time) bool {
@@ -184,15 +182,16 @@ func (s *Service) enforceCleanupCacheLimit(ctx context.Context, files []cleanupF
 		return
 	}
 
-	for _, file := range sortCleanupFilesByLastUsed(files) {
+	collectionx.NewList(sortCleanupFilesByLastUsed(files)...).Range(func(_ int, file cleanupFile) bool {
 		if result.totalBytes <= maxCacheBytes {
-			return
+			return false
 		}
 		if !s.removeCleanupFile(ctx, file, appEvent.VariantRemovalReasonSize) {
-			continue
+			return true
 		}
 		recordSizeCleanupRemoval(result, file.size)
-	}
+		return true
+	})
 }
 
 func sortCleanupFilesByLastUsed(files []cleanupFile) []cleanupFile {
@@ -236,7 +235,7 @@ func (s *Service) clearVariantHit(path string) {
 }
 
 func collectCleanupFiles(root string) ([]cleanupFile, error) {
-	files := make([]cleanupFile, 0, 64)
+	files := collectionx.NewList[cleanupFile]()
 	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
@@ -249,7 +248,7 @@ func collectCleanupFiles(root string) ([]cleanupFile, error) {
 		if err != nil {
 			return fmt.Errorf("read cleanup file info: %w", err)
 		}
-		files = append(files, cleanupFile{
+		files.Add(cleanupFile{
 			path:    path,
 			size:    info.Size(),
 			modTime: info.ModTime(),
@@ -262,5 +261,5 @@ func collectCleanupFiles(root string) ([]cleanupFile, error) {
 		}
 		return nil, fmt.Errorf("walk cleanup directory: %w", err)
 	}
-	return files, nil
+	return files.Values(), nil
 }

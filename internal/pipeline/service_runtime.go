@@ -184,7 +184,14 @@ func (s *Service) executeStageTask(stage Stage, asset *catalog.Asset, task Task)
 }
 
 func buildStageTaskKey(stage Stage, asset *catalog.Asset, task Task) string {
-	return stage.Name() + "|" + asset.Path + "|" + asset.SourceHash + "|" + task.Encoding + "|" + task.Format + "|" + strconv.Itoa(task.Width)
+	return collectionx.NewList(
+		stage.Name(),
+		asset.Path,
+		asset.SourceHash,
+		task.Encoding,
+		task.Format,
+		strconv.Itoa(task.Width),
+	).Join("|")
 }
 
 func (s *Service) logStageFailure(stage Stage, asset *catalog.Asset, err error) {

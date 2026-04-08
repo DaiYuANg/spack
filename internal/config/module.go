@@ -57,18 +57,18 @@ func loadConfig(loadOptions LoadOptions, validate *validator.Validate) (*Config,
 	return &loaded, nil
 }
 
-func Load() (*Config, error) {
-	validate, err := validation.New()
-	if err != nil {
-		return nil, oops.In("config").Wrap(fmt.Errorf("build validator: %w", err))
-	}
-	return loadConfig(LoadOptions{}, validate)
-}
-
-func LoadWithOptions(loadOptions LoadOptions) (*Config, error) {
+func loadConfigWithValidation(loadOptions LoadOptions) (*Config, error) {
 	validate, err := validation.New()
 	if err != nil {
 		return nil, oops.In("config").Wrap(fmt.Errorf("build validator: %w", err))
 	}
 	return loadConfig(loadOptions, validate)
+}
+
+func Load() (*Config, error) {
+	return loadConfigWithValidation(LoadOptions{})
+}
+
+func LoadWithOptions(loadOptions LoadOptions) (*Config, error) {
+	return loadConfigWithValidation(loadOptions)
 }

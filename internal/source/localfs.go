@@ -4,6 +4,7 @@ package source
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -43,25 +44,37 @@ func newLocalFS(cfg *config.Assets, logger *slog.Logger) (Source, error) {
 }
 
 func (s *localFS) Walk(walkFn func(File) error) error {
-	if err := filepath.Walk(s.root, func(fullPath string, info os.FileInfo, err error) error {
-		if err != nil {
-			return oops.Wrap(err)
+	if err := filepath.WalkDir(s.root, func(fullPath string, entry fs.DirEntry, err error) error {
+		file, fileErr := buildWalkFile(s.root, fullPath, entry, err)
+		if fileErr != nil {
+			return fileErr
 		}
-
-		rel, err := filepath.Rel(s.root, fullPath)
-		if err != nil {
-			return oops.Wrap(err)
-		}
-
-		return walkFn(File{
-			Path:     filepath.ToSlash(rel),
-			FullPath: fullPath,
-			Size:     info.Size(),
-			IsDir:    info.IsDir(),
-			ModTime:  info.ModTime(),
-		})
+		return walkFn(file)
 	}); err != nil {
 		return oops.Wrap(err)
 	}
 	return nil
+}
+
+func buildWalkFile(root, fullPath string, entry fs.DirEntry, walkErr error) (File, error) {
+	if walkErr != nil {
+		return File{}, oops.Wrap(walkErr)
+	}
+
+	info, err := entry.Info()
+	if err != nil {
+		return File{}, oops.Wrap(err)
+	}
+	rel, err := filepath.Rel(root, fullPath)
+	if err != nil {
+		return File{}, oops.Wrap(err)
+	}
+
+	return File{
+		Path:     filepath.ToSlash(rel),
+		FullPath: fullPath,
+		Size:     info.Size(),
+		IsDir:    entry.IsDir(),
+		ModTime:  info.ModTime(),
+	}, nil
 }

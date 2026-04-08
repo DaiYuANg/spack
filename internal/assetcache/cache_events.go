@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/eventx"
 	appEvent "github.com/daiyuang/spack/internal/event"
 )
@@ -37,14 +38,9 @@ func (c *Cache) stop(_ context.Context) error {
 	if c == nil {
 		return nil
 	}
-	if c.variantRemovedUnsubscribe != nil {
-		c.variantRemovedUnsubscribe()
-		c.variantRemovedUnsubscribe = nil
-	}
-	if c.variantGeneratedUnsubscribe != nil {
-		c.variantGeneratedUnsubscribe()
-		c.variantGeneratedUnsubscribe = nil
-	}
+	unsubscribeAll(c.variantRemovedUnsubscribe, c.variantGeneratedUnsubscribe)
+	c.variantRemovedUnsubscribe = nil
+	c.variantGeneratedUnsubscribe = nil
 	return nil
 }
 
@@ -74,4 +70,13 @@ func (c *Cache) subscribeVariantGenerated() (func(), error) {
 		return nil, fmt.Errorf("subscribe variant generated: %w", err)
 	}
 	return unsubscribe, nil
+}
+
+func unsubscribeAll(unsubscribes ...func()) {
+	collectionx.NewList(unsubscribes...).Range(func(_ int, unsubscribe func()) bool {
+		if unsubscribe != nil {
+			unsubscribe()
+		}
+		return true
+	})
 }
