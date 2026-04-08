@@ -1,18 +1,16 @@
 package runtime
 
 import (
+	"cmp"
 	"context"
-	"fmt"
 	"log/slog"
-	"strconv"
 	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
-	"github.com/daiyuang/spack/internal/source"
-	"github.com/daiyuang/spack/pkg"
+	"github.com/daiyuang/spack/internal/sourcecatalog"
 	"github.com/samber/oops"
 )
 
@@ -22,7 +20,7 @@ func bootstrapCatalogOnStart(
 ) error {
 	bootstrapErr := oops.In("runtime").Owner("catalog bootstrap")
 	startedAt := time.Now()
-	totalBytes, scanErr := scanCatalogAssets(runtime.src, runtime.cat)
+	totalBytes, scanErr := scanCatalogAssets(ctx, runtime.scanner, runtime.cat)
 	if scanErr != nil {
 		return scanErr
 	}
@@ -45,45 +43,39 @@ func bootstrapCatalogOnStart(
 	return nil
 }
 
-func scanCatalogAssets(src source.Source, cat catalog.Catalog) (int64, error) {
+func scanCatalogAssets(ctx context.Context, scanner sourcecatalog.Scanner, cat catalog.Catalog) (int64, error) {
 	scanErr := oops.In("runtime").Owner("catalog scan")
-	totalBytes := int64(0)
-	if err := src.Walk(func(file source.File) error {
-		if file.IsDir {
-			return nil
-		}
-
-		asset, err := buildCatalogAsset(file)
-		if err != nil {
-			return err
-		}
-		totalBytes += file.Size
-		if err := cat.UpsertAsset(asset); err != nil {
-			return scanErr.With("asset_path", file.Path).Wrap(err)
-		}
-		return nil
-	}); err != nil {
+	snapshot, err := scanner.Scan(ctx)
+	if err != nil {
 		return 0, scanErr.Wrap(err)
 	}
-	return totalBytes, nil
-}
 
-func buildCatalogAsset(file source.File) (*catalog.Asset, error) {
-	sourceHash, err := pkg.HashFile(file.FullPath)
-	if err != nil {
-		return nil, oops.In("runtime").Owner("catalog asset").With("asset_path", file.Path).Wrap(err)
+	var upsertErr error
+	collectionx.NewList(snapshot.Assets.Keys()...).Sort(cmp.Compare[string]).Range(func(_ int, assetPath string) bool {
+		asset, _ := snapshot.Assets.Get(assetPath)
+		if err := cat.UpsertAsset(asset); err != nil {
+			upsertErr = scanErr.With("asset_path", assetPath).Wrap(err)
+			return false
+		}
+		return true
+	})
+	if upsertErr != nil {
+		return 0, upsertErr
 	}
-	return &catalog.Asset{
-		Path:       file.Path,
-		FullPath:   file.FullPath,
-		Size:       file.Size,
-		MediaType:  string(pkg.DetectMIME(file.FullPath)),
-		SourceHash: sourceHash,
-		ETag:       fmt.Sprintf("%q", sourceHash),
-		Metadata: collectionx.NewMapFrom(map[string]string{
-			"mtime_unix": strconv.FormatInt(file.ModTime.Unix(), 10),
-		}),
-	}, nil
+
+	collectionx.NewList(snapshot.Variants.Keys()...).Sort(cmp.Compare[string]).Range(func(_ int, variantID string) bool {
+		variant, _ := snapshot.Variants.Get(variantID)
+		if err := cat.UpsertVariant(variant); err != nil {
+			upsertErr = scanErr.With("variant_id", variantID).With("asset_path", variant.AssetPath).Wrap(err)
+			return false
+		}
+		return true
+	})
+	if upsertErr != nil {
+		return 0, upsertErr
+	}
+
+	return snapshot.TotalBytes, nil
 }
 
 func logConfigOnStart(ctx context.Context, runtime catalogBootstrapRuntime) error {

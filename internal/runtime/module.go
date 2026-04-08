@@ -10,7 +10,7 @@ import (
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/pipeline"
-	"github.com/daiyuang/spack/internal/source"
+	"github.com/daiyuang/spack/internal/sourcecatalog"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -32,7 +32,7 @@ var Module = dix.NewModule("runtime",
 
 type catalogBootstrapRuntime struct {
 	cfg         *config.Config
-	src         source.Source
+	scanner     sourcecatalog.Scanner
 	cat         catalog.Catalog
 	bodyCache   *assetcache.Cache
 	pipelineSvc *pipeline.Service
@@ -41,7 +41,7 @@ type catalogBootstrapRuntime struct {
 
 func newCatalogBootstrapRuntime(
 	cfg *config.Config,
-	src source.Source,
+	scanner sourcecatalog.Scanner,
 	cat catalog.Catalog,
 	bodyCache *assetcache.Cache,
 	pipelineSvc *pipeline.Service,
@@ -49,7 +49,7 @@ func newCatalogBootstrapRuntime(
 ) catalogBootstrapRuntime {
 	return catalogBootstrapRuntime{
 		cfg:         cfg,
-		src:         src,
+		scanner:     scanner,
 		cat:         cat,
 		bodyCache:   bodyCache,
 		pipelineSvc: pipelineSvc,

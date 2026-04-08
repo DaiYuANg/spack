@@ -7,7 +7,9 @@ import (
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/contentcoding"
 	"github.com/daiyuang/spack/internal/source"
+	"github.com/daiyuang/spack/internal/sourcecatalog"
 )
 
 // SyncSourceCatalogForTest exposes source/catalog reconciliation for black-box tests.
@@ -17,7 +19,13 @@ func SyncSourceCatalogForTest(
 	cat catalog.Catalog,
 	bodyCache *assetcache.Cache,
 ) (SourceRescanReport, error) {
-	return syncSourceCatalog(ctx, src, cat, bodyCache)
+	cfg := config.DefaultConfigForTest()
+	scanner := sourcecatalog.NewScanner(src, contentcoding.NewRegistry(contentcoding.Options{
+		BrotliQuality: cfg.Compression.BrotliQuality,
+		GzipLevel:     cfg.Compression.GzipLevel,
+		ZstdLevel:     cfg.Compression.ZstdLevel,
+	}, cfg.Compression.NormalizedEncodings()))
+	return syncSourceCatalog(ctx, scanner, cat, bodyCache)
 }
 
 // SyncArtifactCatalogForTest exposes artifact/catalog reconciliation for black-box tests.

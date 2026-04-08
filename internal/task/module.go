@@ -13,9 +13,8 @@ import (
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
-	"github.com/daiyuang/spack/internal/source"
+	"github.com/daiyuang/spack/internal/sourcecatalog"
 	"github.com/go-co-op/gocron/v2"
-	"github.com/samber/lo"
 	"github.com/samber/oops"
 )
 
@@ -94,20 +93,20 @@ func newTaskRegistrations(
 }
 
 type sourceRescanRuntime struct {
-	src       source.Source
+	scanner   sourcecatalog.Scanner
 	catalog   catalog.Catalog
 	bodyCache *assetcache.Cache
 	logger    *slog.Logger
 }
 
 func newSourceRescanRuntime(
-	src source.Source,
+	scanner sourcecatalog.Scanner,
 	cat catalog.Catalog,
 	bodyCache *assetcache.Cache,
 	logger *slog.Logger,
 ) *sourceRescanRuntime {
 	return &sourceRescanRuntime{
-		src:       src,
+		scanner:   scanner,
 		catalog:   cat,
 		bodyCache: bodyCache,
 		logger:    logger,
@@ -179,25 +178,31 @@ func startScheduledTasks(
 	scheduler gocron.Scheduler,
 	registrations collectionx.List[taskRegistration],
 ) error {
-	registered := lo.FilterMap(registrations.Values(), func(registration taskRegistration, _ int) (taskRegistration, bool) {
+	registered := collectionx.FilterMapList(registrations, func(_ int, registration taskRegistration) (taskRegistration, bool) {
 		if registration.Register == nil {
 			return taskRegistration{}, false
 		}
 		return registration, true
 	})
-	if len(registered) == 0 {
+	if registered.IsEmpty() {
 		return nil
 	}
 
 	started := false
-	for _, registration := range registered {
+	var registerErr error
+	registered.Range(func(_ int, registration taskRegistration) bool {
 		enabled, err := registration.Register(ctx, scheduler)
 		if err != nil {
-			return oops.In("task").Owner(registration.Name).Wrap(err)
+			registerErr = oops.In("task").Owner(registration.Name).Wrap(err)
+			return false
 		}
 		if enabled {
 			started = true
 		}
+		return true
+	})
+	if registerErr != nil {
+		return registerErr
 	}
 	if started {
 		scheduler.Start()

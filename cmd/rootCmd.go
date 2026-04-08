@@ -13,6 +13,7 @@ import (
 	"github.com/daiyuang/spack/internal/resolver"
 	"github.com/daiyuang/spack/internal/server"
 	"github.com/daiyuang/spack/internal/source"
+	"github.com/daiyuang/spack/internal/sourcecatalog"
 	"github.com/daiyuang/spack/internal/workerpool"
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
@@ -29,6 +30,7 @@ var rootCmd = &cobra.Command{
 			workerpool.Module,
 			event.Module,
 			source.Module,
+			sourcecatalog.Module,
 			artifact.Module,
 			contentcoding.Module,
 			assetcache.Module,

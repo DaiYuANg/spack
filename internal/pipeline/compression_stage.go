@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
@@ -15,6 +14,7 @@ import (
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/contentcoding"
 	contentcodingspec "github.com/daiyuang/spack/internal/contentcoding/spec"
+	"github.com/daiyuang/spack/internal/media"
 	"github.com/samber/lo"
 	"github.com/samber/oops"
 )
@@ -147,40 +147,7 @@ func hasEncodingVariant(variants collectionx.List[*catalog.Variant], sourceHash,
 }
 
 func isCompressible(asset *catalog.Asset) bool {
-	mime := strings.ToLower(strings.TrimSpace(asset.MediaType))
-	switch {
-	case mime == "":
-		return false
-	case strings.HasPrefix(mime, "text/"):
-		return true
-	case isNonCompressibleMediaType(mime):
-		return false
-	default:
-		return isKnownCompressibleType(mime)
-	}
-}
-
-func isNonCompressibleMediaType(mime string) bool {
-	if strings.HasPrefix(mime, "image/") && mime != "image/svg+xml" {
-		return true
-	}
-	if strings.HasPrefix(mime, "audio/") || strings.HasPrefix(mime, "video/") {
-		return true
-	}
-	return strings.Contains(mime, "zip") || strings.Contains(mime, "gzip")
-}
-
-func isKnownCompressibleType(mime string) bool {
-	switch mime {
-	case "application/javascript",
-		"application/json",
-		"application/wasm",
-		"application/xml",
-		"image/svg+xml":
-		return true
-	default:
-		return false
-	}
+	return media.IsCompressibleMediaType(asset.MediaType)
 }
 
 func normalizeEncodings(encodings collectionx.List[string]) collectionx.List[string] {

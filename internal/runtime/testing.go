@@ -9,10 +9,16 @@ import (
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/source"
+	"github.com/daiyuang/spack/internal/sourcecatalog"
+	"github.com/samber/oops"
 )
 
 func BuildCatalogAssetForTest(file source.File) (*catalog.Asset, error) {
-	return buildCatalogAsset(file)
+	asset, err := sourcecatalog.BuildAsset(file)
+	if err != nil {
+		return nil, oops.In("runtime").Owner("testing").Wrap(err)
+	}
+	return asset, nil
 }
 
 func CatalogReadyAttrsForTest(

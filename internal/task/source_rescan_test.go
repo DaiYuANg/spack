@@ -7,9 +7,11 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/source"
+	"github.com/daiyuang/spack/internal/sourcecatalog"
 	"github.com/daiyuang/spack/internal/task"
 )
 
@@ -81,6 +83,119 @@ func TestSyncSourceCatalogRemovesVariantsForChangedAsset(t *testing.T) {
 	assertFileRemoved(t, artifactPath)
 }
 
+func TestSyncSourceCatalogRecognizesSourceCompressionSidecars(t *testing.T) {
+	root := t.TempDir()
+	writeFileForTest(t, filepath.Join(root, "app.js"), []byte("console.log('new');"))
+	sidecarPath := filepath.Join(root, "app.js.br")
+	writeFileForTest(t, sidecarPath, []byte("compressed"))
+
+	src := newLocalSourceForTest(t, root)
+	cat := catalog.NewInMemoryCatalog()
+
+	report, err := task.SyncSourceCatalogForTest(context.Background(), src, cat, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if report.Added != 1 {
+		t.Fatalf("expected one added asset, got %d", report.Added)
+	}
+	if _, ok := cat.FindAsset("app.js"); !ok {
+		t.Fatal("expected app.js asset to be present")
+	}
+	if _, ok := cat.FindAsset("app.js.br"); ok {
+		t.Fatal("expected app.js.br not to be registered as plain asset")
+	}
+
+	variants := cat.ListVariants("app.js")
+	if variants.Len() != 1 {
+		t.Fatalf("expected one source sidecar variant, got %d", variants.Len())
+	}
+	variant := singleVariantForTest(t, variants)
+	if variant.ArtifactPath != sidecarPath {
+		t.Fatalf("expected sidecar artifact path %q, got %q", sidecarPath, variant.ArtifactPath)
+	}
+	if variant.Encoding != "br" {
+		t.Fatalf("expected br encoding, got %q", variant.Encoding)
+	}
+	if !sourcecatalog.IsSourceSidecarVariant(variant) {
+		t.Fatal("expected source sidecar metadata marker")
+	}
+}
+
+func TestSyncSourceCatalogRemovesMissingSourceSidecarVariant(t *testing.T) {
+	root := t.TempDir()
+	writeFileForTest(t, filepath.Join(root, "app.js"), []byte("console.log('new');"))
+	sidecarPath := filepath.Join(root, "app.js.br")
+	writeFileForTest(t, sidecarPath, []byte("compressed"))
+
+	src := newLocalSourceForTest(t, root)
+	cat := catalog.NewInMemoryCatalog()
+
+	if _, err := task.SyncSourceCatalogForTest(context.Background(), src, cat, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(sidecarPath); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := task.SyncSourceCatalogForTest(context.Background(), src, cat, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertOne(t, report.RemovedVariants, "removed variant")
+	if report.RemovedArtifacts != 0 {
+		t.Fatalf("expected no artifact deletions for missing source sidecar, got %d", report.RemovedArtifacts)
+	}
+	if cat.ListVariants("app.js").Len() != 0 {
+		t.Fatalf("expected no variants after removing source sidecar, got %#v", cat.ListVariants("app.js"))
+	}
+	if _, ok := cat.FindAsset("app.js"); !ok {
+		t.Fatal("expected app.js asset to remain in catalog")
+	}
+}
+
+func TestSyncSourceCatalogKeepsSourceSidecarFileOnAssetRefresh(t *testing.T) {
+	root := t.TempDir()
+	assetPath := filepath.Join(root, "app.js")
+	sidecarPath := filepath.Join(root, "app.js.br")
+	writeFileForTest(t, assetPath, []byte("console.log('old');"))
+	writeFileForTest(t, sidecarPath, []byte("compressed"))
+
+	src := newLocalSourceForTest(t, root)
+	cat := catalog.NewInMemoryCatalog()
+
+	if _, err := task.SyncSourceCatalogForTest(context.Background(), src, cat, nil); err != nil {
+		t.Fatal(err)
+	}
+	originalVariant := singleVariantForTest(t, cat.ListVariants("app.js"))
+	writeFileForTest(t, assetPath, []byte("console.log('new');"))
+
+	report, err := task.SyncSourceCatalogForTest(context.Background(), src, cat, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertOne(t, report.Updated, "updated asset")
+	assertOne(t, report.RemovedVariants, "removed variant")
+	if report.RemovedArtifacts != 0 {
+		t.Fatalf("expected no artifact deletions for source sidecars, got %d", report.RemovedArtifacts)
+	}
+	if _, err := os.Stat(sidecarPath); err != nil {
+		t.Fatalf("expected source sidecar file to remain on disk, got err=%v", err)
+	}
+
+	variants := cat.ListVariants("app.js")
+	if variants.Len() != 1 {
+		t.Fatalf("expected sidecar variant to be re-added, got %d", variants.Len())
+	}
+	refreshedVariant := singleVariantForTest(t, variants)
+	if refreshedVariant.SourceHash == originalVariant.SourceHash {
+		t.Fatal("expected source sidecar variant to refresh with new asset source hash")
+	}
+}
+
 func newLocalSourceForTest(t *testing.T, root string) source.Source {
 	t.Helper()
 
@@ -137,4 +252,13 @@ func assertFileRemoved(t *testing.T, path string) {
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Fatalf("expected %s to be deleted, got err=%v", path, err)
 	}
+}
+
+func singleVariantForTest(t *testing.T, variants collectionx.List[*catalog.Variant]) *catalog.Variant {
+	t.Helper()
+	variant, ok := variants.Get(0)
+	if !ok || variant == nil {
+		t.Fatalf("expected first variant, got %#v", variants)
+	}
+	return variant
 }

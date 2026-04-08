@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
@@ -69,21 +70,22 @@ func TestCatalogReadyAttrsIncludeCacheAndCompressionState(t *testing.T) {
 	}
 
 	attrs := runtime.CatalogReadyAttrsForTest(&cfg, cat, bodyCache, assetcache.WarmStats{Entries: 2, Bytes: 128}, 2048, 50*time.Millisecond)
-	attrMap := make(map[string]any, len(attrs.Values()))
-	for _, attr := range attrs.Values() {
-		attrMap[attr.Key] = attr.Value.Any()
-	}
+	attrMap := collectionx.NewMapWithCapacity[string, any](attrs.Len())
+	attrs.Range(func(_ int, attr slog.Attr) bool {
+		attrMap.Set(attr.Key, attr.Value.Any())
+		return true
+	})
 
-	if attrMap["assets"] != int64(1) {
-		t.Fatalf("expected assets attr to be 1, got %#v", attrMap["assets"])
+	if got, _ := attrMap.Get("assets"); got != int64(1) {
+		t.Fatalf("expected assets attr to be 1, got %#v", got)
 	}
-	if attrMap["variants"] != int64(1) {
-		t.Fatalf("expected variants attr to be 1, got %#v", attrMap["variants"])
+	if got, _ := attrMap.Get("variants"); got != int64(1) {
+		t.Fatalf("expected variants attr to be 1, got %#v", got)
 	}
-	if attrMap["memory_cache_enable"] != true {
-		t.Fatalf("expected memory_cache_enable true, got %#v", attrMap["memory_cache_enable"])
+	if got, _ := attrMap.Get("memory_cache_enable"); got != true {
+		t.Fatalf("expected memory_cache_enable true, got %#v", got)
 	}
-	if attrMap["compression_mode"] != cfg.Compression.NormalizedMode() {
-		t.Fatalf("expected compression_mode %q, got %#v", cfg.Compression.NormalizedMode(), attrMap["compression_mode"])
+	if got, _ := attrMap.Get("compression_mode"); got != cfg.Compression.NormalizedMode() {
+		t.Fatalf("expected compression_mode %q, got %#v", cfg.Compression.NormalizedMode(), got)
 	}
 }

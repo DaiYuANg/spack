@@ -142,21 +142,7 @@ func memorySubjectPath(request MemoryRequest) string {
 }
 
 func isTextLikeMediaType(mediaType string) bool {
-	mediaType = strings.ToLower(strings.TrimSpace(mediaType))
-	switch {
-	case strings.HasPrefix(mediaType, "text/"):
-		return true
-	case mediaType == "application/javascript",
-		mediaType == "application/x-javascript",
-		mediaType == "application/json",
-		mediaType == "application/manifest+json",
-		mediaType == "application/xml",
-		mediaType == "application/xhtml+xml",
-		mediaType == "image/svg+xml":
-		return true
-	default:
-		return !media.IsImageMediaType(mediaType) && strings.Contains(mediaType, "json")
-	}
+	return media.IsTextLikeMediaType(mediaType)
 }
 
 func isTextLikeRequest(request MemoryRequest) bool {

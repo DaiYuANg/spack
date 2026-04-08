@@ -1,18 +1,16 @@
 package task
 
 import (
+	"cmp"
 	"context"
-	"fmt"
 	"log/slog"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"
-	"github.com/daiyuang/spack/internal/source"
-	"github.com/daiyuang/spack/pkg"
+	"github.com/daiyuang/spack/internal/sourcecatalog"
 	"github.com/go-co-op/gocron/v2"
 	"github.com/samber/oops"
 )
@@ -53,7 +51,7 @@ func registerSourceRescanTask(ctx context.Context, scheduler gocron.Scheduler, r
 
 func runSourceRescan(ctx context.Context, runtime *sourceRescanRuntime) {
 	startedAt := time.Now()
-	report, err := syncSourceCatalog(ctx, runtime.src, runtime.catalog, runtime.bodyCache)
+	report, err := syncSourceCatalog(ctx, runtime.scanner, runtime.catalog, runtime.bodyCache)
 	if err != nil {
 		runtime.logger.Error("Task source rescan failed", slog.String("err", err.Error()))
 		return
@@ -73,54 +71,39 @@ func runSourceRescan(ctx context.Context, runtime *sourceRescanRuntime) {
 
 func syncSourceCatalog(
 	ctx context.Context,
-	src source.Source,
+	scanner sourcecatalog.Scanner,
 	cat catalog.Catalog,
 	bodyCache *assetcache.Cache,
 ) (SourceRescanReport, error) {
-	scannedAssets, report, err := collectScannedAssets(ctx, src)
+	snapshot, report, err := collectScannedSnapshot(ctx, scanner)
 	if err != nil {
 		return SourceRescanReport{}, err
 	}
 
 	existingByPath := indexAssetsByPath(cat.AllAssets())
-	if err := reconcileScannedAssets(&report, scannedAssets, existingByPath, cat, bodyCache); err != nil {
+	if err := reconcileScannedAssets(&report, snapshot.Assets, existingByPath, cat, bodyCache); err != nil {
 		return SourceRescanReport{}, err
 	}
 	reconcileRemovedAssets(&report, existingByPath, cat, bodyCache)
+	if err := reconcileSourceSidecars(&report, snapshot.Variants, cat, bodyCache); err != nil {
+		return SourceRescanReport{}, err
+	}
 	return report, nil
 }
 
-func collectScannedAssets(ctx context.Context, src source.Source) (map[string]*catalog.Asset, SourceRescanReport, error) {
+func collectScannedSnapshot(ctx context.Context, scanner sourcecatalog.Scanner) (sourcecatalog.Snapshot, SourceRescanReport, error) {
 	scanErr := oops.In("task").Owner("source rescan")
-	report := SourceRescanReport{}
-	scannedAssets := map[string]*catalog.Asset{}
-
-	if err := src.Walk(func(file source.File) error {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		if file.IsDir {
-			return nil
-		}
-
-		asset, err := buildCatalogAsset(file)
-		if err != nil {
-			return err
-		}
-		scannedAssets[asset.Path] = asset
-		report.Scanned++
-		return nil
-	}); err != nil {
-		return nil, SourceRescanReport{}, scanErr.Wrap(err)
+	snapshot, err := scanner.Scan(ctx)
+	if err != nil {
+		return sourcecatalog.Snapshot{}, SourceRescanReport{}, scanErr.Wrap(err)
 	}
-
-	return scannedAssets, report, nil
+	return snapshot, SourceRescanReport{Scanned: snapshot.Assets.Len()}, nil
 }
 
-func indexAssetsByPath(assets collectionx.List[*catalog.Asset]) map[string]*catalog.Asset {
-	byPath := map[string]*catalog.Asset{}
+func indexAssetsByPath(assets collectionx.List[*catalog.Asset]) collectionx.Map[string, *catalog.Asset] {
+	byPath := collectionx.NewMapWithCapacity[string, *catalog.Asset](assets.Len())
 	assets.Range(func(_ int, asset *catalog.Asset) bool {
-		byPath[asset.Path] = asset
+		byPath.Set(asset.Path, asset)
 		return true
 	})
 	return byPath
@@ -128,30 +111,34 @@ func indexAssetsByPath(assets collectionx.List[*catalog.Asset]) map[string]*cata
 
 func reconcileScannedAssets(
 	report *SourceRescanReport,
-	scannedAssets map[string]*catalog.Asset,
-	existingByPath map[string]*catalog.Asset,
+	scannedAssets collectionx.Map[string, *catalog.Asset],
+	existingByPath collectionx.Map[string, *catalog.Asset],
 	cat catalog.Catalog,
 	bodyCache *assetcache.Cache,
 ) error {
-	for assetPath, asset := range scannedAssets {
+	var syncErr error
+	collectionx.NewList(scannedAssets.Keys()...).Sort(cmp.Compare[string]).Range(func(_ int, assetPath string) bool {
+		asset, _ := scannedAssets.Get(assetPath)
 		if err := syncScannedAsset(report, assetPath, asset, existingByPath, cat, bodyCache); err != nil {
-			return err
+			syncErr = err
+			return false
 		}
-	}
-	return nil
+		return true
+	})
+	return syncErr
 }
 
 func syncScannedAsset(
 	report *SourceRescanReport,
 	assetPath string,
 	asset *catalog.Asset,
-	existingByPath map[string]*catalog.Asset,
+	existingByPath collectionx.Map[string, *catalog.Asset],
 	cat catalog.Catalog,
 	bodyCache *assetcache.Cache,
 ) error {
-	existing, found := existingByPath[assetPath]
+	existing, found := existingByPath.Get(assetPath)
 	if found {
-		delete(existingByPath, assetPath)
+		existingByPath.Delete(assetPath)
 	}
 
 	if !found {
@@ -169,14 +156,65 @@ func syncScannedAsset(
 
 func reconcileRemovedAssets(
 	report *SourceRescanReport,
-	existingByPath map[string]*catalog.Asset,
+	existingByPath collectionx.Map[string, *catalog.Asset],
 	cat catalog.Catalog,
 	bodyCache *assetcache.Cache,
 ) {
-	for _, asset := range existingByPath {
+	collectionx.NewList(existingByPath.Values()...).Sort(func(left, right *catalog.Asset) int {
+		return cmp.Compare(left.Path, right.Path)
+	}).Range(func(_ int, asset *catalog.Asset) bool {
 		report.Removed++
 		invalidateAssetAndVariants(report, asset.FullPath, cat.DeleteAsset(asset.Path), bodyCache)
+		return true
+	})
+}
+
+func reconcileSourceSidecars(
+	report *SourceRescanReport,
+	scannedVariants collectionx.Map[string, *catalog.Variant],
+	cat catalog.Catalog,
+	bodyCache *assetcache.Cache,
+) error {
+	existingByID := indexSourceSidecarVariants(cat)
+	var syncErr error
+	collectionx.NewList(scannedVariants.Keys()...).Sort(cmp.Compare[string]).Range(func(_ int, variantID string) bool {
+		variant, _ := scannedVariants.Get(variantID)
+		if err := cat.UpsertVariant(variant); err != nil {
+			syncErr = oops.In("task").Owner("source rescan").With("variant_id", variantID).With("asset_path", variant.AssetPath).Wrap(err)
+			return false
+		}
+		existingByID.Delete(variantID)
+		return true
+	})
+	if syncErr != nil {
+		return syncErr
 	}
+
+	collectionx.NewList(existingByID.Values()...).Sort(func(left, right *catalog.Variant) int {
+		return cmp.Compare(left.ID, right.ID)
+	}).Range(func(_ int, variant *catalog.Variant) bool {
+		if !cat.DeleteVariantByArtifactPath(variant.ArtifactPath) {
+			return true
+		}
+		report.RemovedVariants++
+		report.CacheInvalidations += invalidateAssetCache(bodyCache, variant.ArtifactPath)
+		return true
+	})
+	return nil
+}
+
+func indexSourceSidecarVariants(cat catalog.Catalog) collectionx.Map[string, *catalog.Variant] {
+	variantsByID := collectionx.NewMap[string, *catalog.Variant]()
+	cat.AllAssets().Range(func(_ int, asset *catalog.Asset) bool {
+		cat.ListVariants(asset.Path).Range(func(_ int, variant *catalog.Variant) bool {
+			if sourcecatalog.IsSourceSidecarVariant(variant) {
+				variantsByID.Set(variant.ID, variant)
+			}
+			return true
+		})
+		return true
+	})
+	return variantsByID
 }
 
 func invalidateAssetAndVariants(
@@ -202,11 +240,18 @@ func removeAssetVariants(
 		removed++
 		if report != nil {
 			report.CacheInvalidations += invalidateAssetCache(bodyCache, variant.ArtifactPath)
-			report.RemovedArtifacts += removeArtifactFile(variant.ArtifactPath)
+			report.RemovedArtifacts += removeVariantArtifact(variant)
 		}
 		return true
 	})
 	return removed
+}
+
+func removeVariantArtifact(variant *catalog.Variant) int {
+	if sourcecatalog.IsSourceSidecarVariant(variant) {
+		return 0
+	}
+	return removeArtifactFile(variant.ArtifactPath)
 }
 
 func invalidateAssetCache(bodyCache *assetcache.Cache, path string) int {
@@ -235,22 +280,4 @@ func assetChanged(existing, next *catalog.Asset) bool {
 		existing.MediaType != next.MediaType ||
 		existing.SourceHash != next.SourceHash ||
 		existing.ETag != next.ETag
-}
-
-func buildCatalogAsset(file source.File) (*catalog.Asset, error) {
-	sourceHash, err := pkg.HashFile(file.FullPath)
-	if err != nil {
-		return nil, oops.In("task").Owner("source rescan").With("asset_path", file.Path).Wrap(err)
-	}
-	return &catalog.Asset{
-		Path:       file.Path,
-		FullPath:   file.FullPath,
-		Size:       file.Size,
-		MediaType:  string(pkg.DetectMIME(file.FullPath)),
-		SourceHash: sourceHash,
-		ETag:       fmt.Sprintf("%q", sourceHash),
-		Metadata: collectionx.NewMapFrom(map[string]string{
-			"mtime_unix": strconv.FormatInt(file.ModTime.Unix(), 10),
-		}),
-	}, nil
 }
