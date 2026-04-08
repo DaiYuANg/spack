@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/DaiYuANg/arcgo/observabilityx"
 	"github.com/daiyuang/spack/internal/assetcache"
@@ -49,9 +50,10 @@ func NewAppForTest(
 	pipelineSvc *pipeline.Service,
 	bus eventx.BusRuntime,
 ) *fiber.App {
+	healthChecks := newHealthCheckDefinitions(cfg, cat)
 	app, err := newServerFromDeps(cfg, newServerRegistrations(
 		newMiddlewareRegistration(cfg, logger, nil),
-		newHealthRoutesRegistration(cat),
+		newHealthRoutesRegistration(cat, healthChecks),
 		newRobotsRouteRegistration(cfg, logger, cat, bodyCache),
 		newAssetRouteRegistration(cfg, logger, assetResolver, pipelineSvc, bodyCache, bus),
 	))
@@ -59,4 +61,18 @@ func NewAppForTest(
 		panic(err)
 	}
 	return app
+}
+
+// NewHealthModuleForTest exposes the dix health-check setup for external tests.
+func NewHealthModuleForTest(cfg *config.Config, cat catalog.Catalog) dix.Module {
+	return dix.NewModule("server_health_test",
+		dix.WithModuleProviders(
+			dix.Provider0(func() *config.Config { return cfg }),
+			dix.Provider0(func() catalog.Catalog { return cat }),
+			dix.Provider2(newHealthCheckDefinitions),
+		),
+		dix.WithModuleSetups(
+			dix.Setup(registerHealthCheckSetup),
+		),
+	)
 }

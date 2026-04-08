@@ -12,7 +12,6 @@ import (
 	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/DaiYuANg/arcgo/observabilityx"
 	"github.com/daiyuang/spack/internal/assetcache"
-	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/media"
 	"github.com/daiyuang/spack/internal/pipeline"
@@ -21,7 +20,6 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/etag"
 	expvarmw "github.com/gofiber/fiber/v3/middleware/expvar"
-	"github.com/gofiber/fiber/v3/middleware/healthcheck"
 	"github.com/gofiber/fiber/v3/middleware/helmet"
 	"github.com/gofiber/fiber/v3/middleware/pprof"
 	recoverer "github.com/gofiber/fiber/v3/middleware/recover"
@@ -63,7 +61,6 @@ func registerMiddleware(
 	app.Use(helmet.New())
 	app.Use(requestLogMiddleware(logger))
 	app.Use(metricsMiddleware(obs))
-	app.Get(healthcheck.LivenessEndpoint, healthcheck.New())
 
 	if cfg.Debug.Enable {
 		app.Use(expvarmw.New())
@@ -73,12 +70,6 @@ func registerMiddleware(
 	recoverConfig := recoverer.ConfigDefault
 	recoverConfig.EnableStackTrace = true
 	app.Use(recoverer.New(recoverConfig))
-}
-
-func registerHealthRoutes(app *fiber.App, cat catalog.Catalog) {
-	app.Get("/catalog", func(c fiber.Ctx) error {
-		return c.JSON(cat.Snapshot())
-	})
 }
 
 func registerAssetRoute(

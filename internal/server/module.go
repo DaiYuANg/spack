@@ -19,11 +19,15 @@ import (
 var Module = dix.NewModule("server",
 	dix.WithModuleProviders(
 		dix.Provider3(newMiddlewareRegistration),
-		dix.Provider1(newHealthRoutesRegistration),
+		dix.Provider2(newHealthCheckDefinitions),
+		dix.Provider2(newHealthRoutesRegistration),
 		dix.Provider4(newRobotsRouteRegistration),
 		dix.Provider6(newAssetRouteRegistration),
 		dix.Provider4(newServerRegistrations),
 		dix.ProviderErr2(newServerFromDeps),
+	),
+	dix.WithModuleSetups(
+		dix.Setup(registerHealthCheckSetup),
 	),
 )
 
@@ -67,9 +71,12 @@ func newMiddlewareRegistration(
 	})}
 }
 
-func newHealthRoutesRegistration(cat catalog.Catalog) healthRoutesRegistration {
+func newHealthRoutesRegistration(
+	cat catalog.Catalog,
+	checks collectionx.List[healthCheckDefinition],
+) healthRoutesRegistration {
 	return healthRoutesRegistration{newAppRegistration(200, "health_routes", func(app *fiber.App) {
-		registerHealthRoutes(app, cat)
+		registerHealthRoutes(app, cat, checks)
 	})}
 }
 

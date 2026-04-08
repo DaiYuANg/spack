@@ -134,6 +134,8 @@ go run . --config .\spack.yaml --http.port=8080 --assets.root=.\dist
 Important endpoints:
 
 - `/healthz`
+- `/livez`
+- `/readyz`
 - `/catalog`
 - `/robots.txt` when built-in robots generation is enabled
 - `/prometheus` when debug runtime is enabled
