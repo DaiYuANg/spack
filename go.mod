@@ -1,6 +1,6 @@
 module github.com/daiyuang/spack
 
-go 1.26.1
+go 1.26.2
 
 require (
 	github.com/DaiYuANg/arcgo/collectionx v0.1.3
