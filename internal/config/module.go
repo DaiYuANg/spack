@@ -10,8 +10,6 @@ import (
 	"github.com/samber/oops"
 )
 
-var Module = NewModule(LoadOptions{})
-
 func NewModule(loadOptions LoadOptions) dix.Module {
 	return dix.NewModule("config",
 		dix.WithModuleProviders(
@@ -46,10 +44,6 @@ func loadConfigWithValidation(loadOptions LoadOptions) (*Config, error) {
 		return nil, oops.In("config").Wrap(fmt.Errorf("build validator: %w", err))
 	}
 	return loadConfig(loadOptions, validate)
-}
-
-func Load() (*Config, error) {
-	return loadConfigWithValidation(LoadOptions{})
 }
 
 func LoadWithOptions(loadOptions LoadOptions) (*Config, error) {

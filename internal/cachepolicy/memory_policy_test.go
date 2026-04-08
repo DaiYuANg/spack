@@ -58,8 +58,7 @@ func TestMemoryPolicyKeepsLowValueBinaryAssetsOutOfWarmup(t *testing.T) {
 }
 
 func TestMemoryPolicyWarmsVariantsFromEvents(t *testing.T) {
-	cfg := config.DefaultConfigForTest()
-	policy := cachepolicy.NewMemoryPolicy(&cfg)
+	policy := cachepolicy.NewMemoryPolicy(new(config.DefaultConfigForTest()))
 
 	request := cachepolicy.MemoryRequest{
 		Path:      "app.js.br",
@@ -81,8 +80,7 @@ func TestMemoryPolicyWarmsVariantsFromEvents(t *testing.T) {
 }
 
 func TestMemoryPolicyRejectsRangeRequests(t *testing.T) {
-	cfg := config.DefaultConfigForTest()
-	policy := cachepolicy.NewMemoryPolicy(&cfg)
+	policy := cachepolicy.NewMemoryPolicy(new(config.DefaultConfigForTest()))
 
 	if policy.ShouldServe(cachepolicy.MemoryRequest{
 		Path:           "index.html",
