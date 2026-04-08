@@ -1,3 +1,4 @@
+// Package spec defines the supported content-coding names and normalization helpers.
 package spec
 
 import (

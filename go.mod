@@ -4,7 +4,6 @@ go 1.26.1
 
 tool (
 	github.com/air-verse/air
-	github.com/go-task/task/v3/cmd/task
 	github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 	honnef.co/go/tools/cmd/staticcheck
 )
@@ -402,4 +401,10 @@ require (
 	mvdan.cc/sh/moreinterp v0.0.0-20260120230322-19def062a997 // indirect
 	mvdan.cc/sh/v3 v3.13.0 // indirect
 	mvdan.cc/unparam v0.0.0-20251027182757-5beb8c8f8f15 // indirect
+)
+
+replace (
+	github.com/charmbracelet/colorprofile => github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc
+	github.com/charmbracelet/x/ansi => github.com/charmbracelet/x/ansi v0.10.1
+	github.com/charmbracelet/x/term => github.com/charmbracelet/x/term v0.2.1
 )

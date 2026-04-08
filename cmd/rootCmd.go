@@ -46,7 +46,9 @@ var rootCmd = &cobra.Command{
 		return container.Run()
 	},
 	PostRun: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("%s", container.Meta())
+		if _, err := fmt.Printf("%s", container.Meta()); err != nil {
+			cmd.PrintErrln(err)
+		}
 	},
 }
 

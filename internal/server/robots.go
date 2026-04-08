@@ -83,7 +83,10 @@ func sendGeneratedRobots(c fiber.Ctx, cfg config.Robots) error {
 	if c.Method() == fiber.MethodHead {
 		return nil
 	}
-	return c.SendString(body)
+	if err := c.SendString(body); err != nil {
+		return fmt.Errorf("send generated robots.txt: %w", err)
+	}
+	return nil
 }
 
 func renderRobotsContent(cfg config.Robots) (string, error) {
@@ -102,7 +105,7 @@ func renderRobotsContent(cfg config.Robots) (string, error) {
 		Sitemap:   strings.TrimSpace(cfg.Sitemap),
 	})
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("execute robots.txt template: %w", err)
 	}
 
 	return strings.TrimRight(body.String(), "\n") + "\n", nil

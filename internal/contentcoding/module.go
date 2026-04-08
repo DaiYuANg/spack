@@ -1,3 +1,4 @@
+// Package contentcoding provides configurable content-coding strategy registration.
 package contentcoding
 
 import (

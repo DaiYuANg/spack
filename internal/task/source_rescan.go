@@ -18,19 +18,19 @@ import (
 
 const sourceRescanInterval = 5 * time.Minute
 
-type sourceRescanReport struct {
-	scanned            int
-	added              int
-	updated            int
-	removed            int
-	removedVariants    int
-	removedArtifacts   int
-	cacheInvalidations int
+type SourceRescanReport struct {
+	Scanned            int
+	Added              int
+	Updated            int
+	Removed            int
+	RemovedVariants    int
+	RemovedArtifacts   int
+	CacheInvalidations int
 }
 
-func startScheduledTasks(scheduler gocron.Scheduler, runtime *sourceRescanRuntime) error {
+func startScheduledTasks(ctx context.Context, scheduler gocron.Scheduler, runtime *sourceRescanRuntime) error {
 	started := false
-	if enabled, err := registerSourceRescanTask(scheduler, runtime); err != nil {
+	if enabled, err := registerSourceRescanTask(ctx, scheduler, runtime); err != nil {
 		return err
 	} else if enabled {
 		started = true
@@ -42,7 +42,7 @@ func startScheduledTasks(scheduler gocron.Scheduler, runtime *sourceRescanRuntim
 	return nil
 }
 
-func registerSourceRescanTask(scheduler gocron.Scheduler, runtime *sourceRescanRuntime) (bool, error) {
+func registerSourceRescanTask(ctx context.Context, scheduler gocron.Scheduler, runtime *sourceRescanRuntime) (bool, error) {
 	if runtime == nil {
 		return false, nil
 	}
@@ -50,7 +50,7 @@ func registerSourceRescanTask(scheduler gocron.Scheduler, runtime *sourceRescanR
 	job, err := scheduler.NewJob(
 		gocron.DurationJob(sourceRescanInterval),
 		gocron.NewTask(func() {
-			runSourceRescan(context.Background(), runtime)
+			runSourceRescan(ctx, runtime)
 		}),
 	)
 	if err != nil {
@@ -73,13 +73,13 @@ func runSourceRescan(ctx context.Context, runtime *sourceRescanRuntime) {
 	}
 
 	runtime.logger.Info("Task source rescan completed",
-		slog.Int("scanned", report.scanned),
-		slog.Int("added", report.added),
-		slog.Int("updated", report.updated),
-		slog.Int("removed", report.removed),
-		slog.Int("removed_variants", report.removedVariants),
-		slog.Int("removed_artifacts", report.removedArtifacts),
-		slog.Int("cache_invalidations", report.cacheInvalidations),
+		slog.Int("scanned", report.Scanned),
+		slog.Int("added", report.Added),
+		slog.Int("updated", report.Updated),
+		slog.Int("removed", report.Removed),
+		slog.Int("removed_variants", report.RemovedVariants),
+		slog.Int("removed_artifacts", report.RemovedArtifacts),
+		slog.Int("cache_invalidations", report.CacheInvalidations),
 		slog.Duration("duration", time.Since(startedAt)),
 	)
 }
@@ -89,8 +89,22 @@ func syncSourceCatalog(
 	src source.Source,
 	cat catalog.Catalog,
 	bodyCache *assetcache.Cache,
-) (sourceRescanReport, error) {
-	report := sourceRescanReport{}
+) (SourceRescanReport, error) {
+	scannedAssets, report, err := collectScannedAssets(ctx, src)
+	if err != nil {
+		return SourceRescanReport{}, err
+	}
+
+	existingByPath := indexAssetsByPath(cat.AllAssets())
+	if err := reconcileScannedAssets(&report, scannedAssets, existingByPath, cat, bodyCache); err != nil {
+		return SourceRescanReport{}, err
+	}
+	reconcileRemovedAssets(&report, existingByPath, cat, bodyCache)
+	return report, nil
+}
+
+func collectScannedAssets(ctx context.Context, src source.Source) (map[string]*catalog.Asset, SourceRescanReport, error) {
+	report := SourceRescanReport{}
 	scannedAssets := map[string]*catalog.Asset{}
 
 	if err := src.Walk(func(file source.File) error {
@@ -106,58 +120,101 @@ func syncSourceCatalog(
 			return err
 		}
 		scannedAssets[asset.Path] = asset
-		report.scanned++
+		report.Scanned++
 		return nil
 	}); err != nil {
-		return sourceRescanReport{}, fmt.Errorf("walk source assets: %w", err)
+		return nil, SourceRescanReport{}, fmt.Errorf("walk source assets: %w", err)
 	}
 
-	existingAssets := cat.AllAssets()
-	existingByPath := map[string]*catalog.Asset{}
-	existingAssets.Range(func(_ int, asset *catalog.Asset) bool {
-		existingByPath[asset.Path] = asset
+	return scannedAssets, report, nil
+}
+
+func indexAssetsByPath(assets collectionx.List[*catalog.Asset]) map[string]*catalog.Asset {
+	byPath := map[string]*catalog.Asset{}
+	assets.Range(func(_ int, asset *catalog.Asset) bool {
+		byPath[asset.Path] = asset
 		return true
 	})
+	return byPath
+}
 
+func reconcileScannedAssets(
+	report *SourceRescanReport,
+	scannedAssets map[string]*catalog.Asset,
+	existingByPath map[string]*catalog.Asset,
+	cat catalog.Catalog,
+	bodyCache *assetcache.Cache,
+) error {
 	for assetPath, asset := range scannedAssets {
-		existing, found := existingByPath[assetPath]
-		if found {
-			delete(existingByPath, assetPath)
-		}
-
-		if !found {
-			report.added++
-		} else if assetChanged(existing, asset) {
-			report.updated++
-			report.cacheInvalidations += invalidateAssetCache(bodyCache, existing.FullPath)
-			report.removedVariants += removeAssetVariants(cat.DeleteVariants(assetPath), bodyCache, &report)
-		}
-
-		if err := cat.UpsertAsset(asset); err != nil {
-			return sourceRescanReport{}, fmt.Errorf("upsert asset %s: %w", asset.Path, err)
+		if err := syncScannedAsset(report, assetPath, asset, existingByPath, cat, bodyCache); err != nil {
+			return err
 		}
 	}
+	return nil
+}
 
+func syncScannedAsset(
+	report *SourceRescanReport,
+	assetPath string,
+	asset *catalog.Asset,
+	existingByPath map[string]*catalog.Asset,
+	cat catalog.Catalog,
+	bodyCache *assetcache.Cache,
+) error {
+	existing, found := existingByPath[assetPath]
+	if found {
+		delete(existingByPath, assetPath)
+	}
+
+	if !found {
+		report.Added++
+	} else if assetChanged(existing, asset) {
+		report.Updated++
+		invalidateAssetAndVariants(report, existing.FullPath, cat.DeleteVariants(assetPath), bodyCache)
+	}
+
+	if err := cat.UpsertAsset(asset); err != nil {
+		return fmt.Errorf("upsert asset %s: %w", asset.Path, err)
+	}
+	return nil
+}
+
+func reconcileRemovedAssets(
+	report *SourceRescanReport,
+	existingByPath map[string]*catalog.Asset,
+	cat catalog.Catalog,
+	bodyCache *assetcache.Cache,
+) {
 	for _, asset := range existingByPath {
-		report.removed++
-		report.cacheInvalidations += invalidateAssetCache(bodyCache, asset.FullPath)
-		report.removedVariants += removeAssetVariants(cat.DeleteAsset(asset.Path), bodyCache, &report)
+		report.Removed++
+		invalidateAssetAndVariants(report, asset.FullPath, cat.DeleteAsset(asset.Path), bodyCache)
 	}
+}
 
-	return report, nil
+func invalidateAssetAndVariants(
+	report *SourceRescanReport,
+	assetPath string,
+	variants collectionx.List[*catalog.Variant],
+	bodyCache *assetcache.Cache,
+) {
+	if report == nil {
+		return
+	}
+	report.CacheInvalidations += invalidateAssetCache(bodyCache, assetPath)
+	report.RemovedVariants += removeAssetVariants(variants, bodyCache, report)
 }
 
 func removeAssetVariants(
 	variants collectionx.List[*catalog.Variant],
 	bodyCache *assetcache.Cache,
-	report *sourceRescanReport,
+	report *SourceRescanReport,
 ) int {
 	removed := 0
 	variants.Range(func(_ int, variant *catalog.Variant) bool {
 		removed++
 		if report != nil {
-			report.cacheInvalidations += invalidateAssetCache(bodyCache, variant.ArtifactPath)
-			report.removedArtifacts += removeArtifactFile(variant.ArtifactPath)
+			report.CacheInvalidations += invalidateAssetCache(bodyCache, variant.ArtifactPath)
+			report.RemovedArtifacts += removeArtifactFile(variant.ArtifactPath)
 		}
 		return true
 	})

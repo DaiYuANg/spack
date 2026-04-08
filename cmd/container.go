@@ -2,6 +2,7 @@
 package cmd
 
 import (
+	"fmt"
 	"log/slog"
 	"runtime/debug"
 
@@ -39,7 +40,7 @@ func createContainer(loadOptions config.LoadOptions, userModules ...dix.Module) 
 	)
 	err := instance.Validate()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("validate dix container: %w", err)
 	}
 	return instance, nil
 }

@@ -35,8 +35,6 @@ func TestRobotsRouteGeneratesConfiguredContent(t *testing.T) {
 		cat,
 		assetcache.NewCacheForTest(cfg.HTTP.MemoryCache, slog.New(slog.DiscardHandler)),
 		resolver.NewResolverForTest(&cfg.Assets, cat, slog.New(slog.DiscardHandler)),
-		nil,
-		nil,
 	)
 
 	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/robots.txt", http.NoBody)
@@ -100,8 +98,6 @@ func TestRobotsRoutePrefersStaticAssetWhenAvailable(t *testing.T) {
 		cat,
 		assetcache.NewCacheForTest(cfg.HTTP.MemoryCache, slog.New(slog.DiscardHandler)),
 		resolver.NewResolverForTest(&cfg.Assets, cat, slog.New(slog.DiscardHandler)),
-		nil,
-		nil,
 	)
 
 	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/robots.txt", http.NoBody)

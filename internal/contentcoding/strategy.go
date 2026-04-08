@@ -120,11 +120,12 @@ func (s ZstdStrategy) Compress(raw []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create zstd encoder: %w", err)
 	}
-	defer func() {
-		_ = encoder.Close()
-	}()
+	compressed := encoder.EncodeAll(raw, nil)
+	if err := encoder.Close(); err != nil {
+		return nil, fmt.Errorf("close zstd encoder: %w", err)
+	}
 
-	return encoder.EncodeAll(raw, nil), nil
+	return compressed, nil
 }
 
 type GzipStrategy struct {

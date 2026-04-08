@@ -44,7 +44,10 @@ func startHTTPRuntime(_ context.Context, runtime httpRuntime) error {
 }
 
 func stopHTTPRuntime(ctx context.Context, runtime httpRuntime) error {
-	return runtime.app.ShutdownWithContext(ctx)
+	if err := runtime.app.ShutdownWithContext(ctx); err != nil {
+		return fmt.Errorf("shutdown http runtime: %w", err)
+	}
+	return nil
 }
 
 func buildDebugRuntime(
@@ -105,7 +108,10 @@ func stopDebugRuntime(ctx context.Context, runtime *debugRuntime) error {
 	if !ok {
 		return nil
 	}
-	return server.Shutdown(ctx)
+	if err := server.Shutdown(ctx); err != nil {
+		return fmt.Errorf("shutdown debug runtime: %w", err)
+	}
+	return nil
 }
 
 func debugServer(runtime *debugRuntime) mo.Option[*http.Server] {

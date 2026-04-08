@@ -12,11 +12,9 @@ import (
 	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
-	"github.com/daiyuang/spack/internal/pipeline"
 	"github.com/daiyuang/spack/internal/resolver"
 	"github.com/daiyuang/spack/internal/server"
 	"github.com/gofiber/fiber/v3"
@@ -56,8 +54,6 @@ func TestAssetRouteReturnsNotModifiedForFreshValidator(t *testing.T) {
 		cat,
 		assetcache.NewCacheForTest(cfg.HTTP.MemoryCache, slog.New(slog.DiscardHandler)),
 		resolver.NewResolverForTest(&cfg.Assets, cat, slog.New(slog.DiscardHandler)),
-		nil,
-		nil,
 	)
 
 	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/app.js", http.NoBody)
@@ -175,8 +171,6 @@ func newVariantTestApp(t *testing.T) *fiber.App {
 		cat,
 		assetcache.NewCacheForTest(cfg.HTTP.MemoryCache, slog.New(slog.DiscardHandler)),
 		resolver.NewResolverForTest(&cfg.Assets, cat, slog.New(slog.DiscardHandler)),
-		nil,
-		nil,
 	)
 }
 
@@ -187,12 +181,10 @@ func newHTTPTestApp(
 	cat catalog.Catalog,
 	bodyCache *assetcache.Cache,
 	assetResolver *resolver.Resolver,
-	pipelineSvc *pipeline.Service,
-	bus eventx.BusRuntime,
 ) *fiber.App {
 	t.Helper()
 
-	app := server.NewAppForTest(cfg, logger, cat, bodyCache, assetResolver, pipelineSvc, bus)
+	app := server.NewAppForTest(cfg, logger, cat, bodyCache, assetResolver, nil, nil)
 	t.Cleanup(func() {
 		if err := app.Shutdown(); err != nil {
 			t.Fatalf("shutdown test app: %v", err)

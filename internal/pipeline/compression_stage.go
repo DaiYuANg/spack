@@ -115,7 +115,7 @@ func (s *compressionStage) compress(raw []byte, encoding string) ([]byte, string
 
 	compressed, err := strategy.Compress(raw)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("compress using %s strategy: %w", encoding, err)
 	}
 	return compressed, strategy.Suffix(), nil
 }
