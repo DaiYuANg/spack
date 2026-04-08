@@ -19,18 +19,22 @@ var Module = dix.NewModule("task",
 			}
 			return s
 		}),
+		dix.Provider2(newTaskRuntime),
 	),
-	dix.WithModuleSetups(
-		dix.SetupWithMetadata(
-			setup, dix.SetupMetadata{
-				Label: "taskRuntime",
-				Dependencies: dix.ServiceRefs(
-					dix.TypedService[gocron.Scheduler](),
-					dix.TypedService[*slog.Logger](),
-				),
-			}),
+	dix.WithModuleHooks(
+		dix.OnStart(startTaskRuntime),
+		dix.OnStop(stopTaskRuntime),
 	),
-	dix.WithModuleInvokes(dix.Invoke1[gocron.Scheduler](func(scheduler gocron.Scheduler) {
-		scheduler.Start()
-	})),
 )
+
+type taskRuntime struct {
+	scheduler gocron.Scheduler
+	logger    *slog.Logger
+}
+
+func newTaskRuntime(scheduler gocron.Scheduler, logger *slog.Logger) *taskRuntime {
+	return &taskRuntime{
+		scheduler: scheduler,
+		logger:    logger,
+	}
+}

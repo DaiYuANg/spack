@@ -36,10 +36,3 @@ type Resolver struct {
 	catalog            catalog.Catalog
 	logger             *slog.Logger
 }
-
-type resolverIn struct {
-	Config      *config.Assets
-	Compression *config.Compression
-	Catalog     catalog.Catalog
-	Logger      *slog.Logger
-}

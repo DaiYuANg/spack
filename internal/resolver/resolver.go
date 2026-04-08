@@ -16,26 +16,18 @@ import (
 
 var ErrNotFound = errors.New("asset not found")
 
-func newResolver(in resolverIn) *Resolver {
-	supportedEncodings := contentcoding.DefaultNames()
-	if in.Compression != nil {
-		supportedEncodings = in.Compression.NormalizedEncodings()
-	}
+func newResolver(
+	cfg *config.Assets,
+	registry contentcoding.Registry,
+	cat catalog.Catalog,
+	logger *slog.Logger,
+) *Resolver {
 	return &Resolver{
-		cfg:                in.Config,
-		supportedEncodings: supportedEncodings,
-		catalog:            in.Catalog,
-		logger:             in.Logger,
+		cfg:                cfg,
+		supportedEncodings: registry.Names(),
+		catalog:            cat,
+		logger:             logger,
 	}
-}
-
-func newResolverFromDeps(cfg *config.Assets, compression *config.Compression, cat catalog.Catalog, logger *slog.Logger) *Resolver {
-	return newResolver(resolverIn{
-		Config:      cfg,
-		Compression: compression,
-		Catalog:     cat,
-		Logger:      logger,
-	})
 }
 
 func (r *Resolver) Resolve(request Request) (*Result, error) {

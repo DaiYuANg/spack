@@ -8,49 +8,40 @@ import (
 	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
-	"github.com/daiyuang/spack/internal/pipeline"
 	"github.com/daiyuang/spack/internal/source"
 	"github.com/daiyuang/spack/pkg"
 	"github.com/samber/oops"
 )
 
-func bootstrapCatalog(
-	lc dix.Lifecycle,
-	cfg *config.Config,
-	src source.Source,
-	cat catalog.Catalog,
-	bodyCache *assetcache.Cache,
-	pipelineSvc *pipeline.Service,
-	logger *slog.Logger,
-) {
-	lc.OnStart(func(ctx context.Context) error {
-		startedAt := time.Now()
-		totalBytes, scanErr := scanCatalogAssets(src, cat)
-		if scanErr != nil {
-			return scanErr
-		}
+func bootstrapCatalogOnStart(
+	ctx context.Context,
+	runtime catalogBootstrapRuntime,
+) error {
+	startedAt := time.Now()
+	totalBytes, scanErr := scanCatalogAssets(runtime.src, runtime.cat)
+	if scanErr != nil {
+		return scanErr
+	}
 
-		warmErr := pipelineSvc.Warm(ctx)
-		if warmErr != nil {
-			return oops.In("pipeline").Wrap(fmt.Errorf("warm pipeline: %w", warmErr))
-		}
-		cacheStats, cacheErr := bodyCache.Warm(ctx, cat)
-		if cacheErr != nil {
-			return fmt.Errorf("warm asset memory cache: %w", cacheErr)
-		}
+	warmErr := runtime.pipelineSvc.Warm(ctx)
+	if warmErr != nil {
+		return oops.In("pipeline").Wrap(fmt.Errorf("warm pipeline: %w", warmErr))
+	}
+	cacheStats, cacheErr := runtime.bodyCache.Warm(ctx, runtime.cat)
+	if cacheErr != nil {
+		return fmt.Errorf("warm asset memory cache: %w", cacheErr)
+	}
 
-		logger.LogAttrs(
-			ctx,
-			slog.LevelInfo,
-			"Catalog ready",
-			catalogReadyAttrs(cfg, cat, bodyCache, cacheStats, totalBytes, time.Since(startedAt)).Values()...,
-		)
-		return nil
-	})
+	runtime.logger.LogAttrs(
+		ctx,
+		slog.LevelInfo,
+		"Catalog ready",
+		catalogReadyAttrs(runtime.cfg, runtime.cat, runtime.bodyCache, cacheStats, totalBytes, time.Since(startedAt)).Values()...,
+	)
+	return nil
 }
 
 func scanCatalogAssets(src source.Source, cat catalog.Catalog) (int64, error) {
@@ -93,11 +84,9 @@ func buildCatalogAsset(file source.File) (*catalog.Asset, error) {
 	}, nil
 }
 
-func logConfigLifecycle(lc dix.Lifecycle, cfg *config.Config, logger *slog.Logger) {
-	lc.OnStart(func(ctx context.Context) error {
-		logger.LogAttrs(ctx, slog.LevelInfo, "Config loaded", configLogAttrs(cfg).Values()...)
-		return nil
-	})
+func logConfigOnStart(ctx context.Context, runtime catalogBootstrapRuntime) error {
+	runtime.logger.LogAttrs(ctx, slog.LevelInfo, "Config loaded", configLogAttrs(runtime.cfg).Values()...)
+	return nil
 }
 
 func catalogReadyAttrs(

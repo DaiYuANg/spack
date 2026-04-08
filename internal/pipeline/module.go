@@ -16,12 +16,12 @@ import (
 var Module = dix.NewModule("pipeline",
 	dix.WithModuleProviders(
 		dix.Provider0(newMetrics),
-		dix.Provider3(newImageStageFromDeps),
-		dix.Provider3(newCompressionStageFromDeps),
+		dix.Provider3(newImageStage),
+		dix.Provider4(newCompressionStage),
 		dix.Provider2(newStageRegistrations),
 		dix.Provider1(newStages),
 		dix.Provider4(newServiceDeps),
-		dix.Provider4(newServiceFromDeps),
+		dix.Provider4(newService),
 	),
 	dix.WithModuleHooks(
 		dix.OnStart(startServiceLifecycle),
@@ -63,7 +63,7 @@ func newServiceDeps(
 	}
 }
 
-func newServiceFromDeps(
+func newService(
 	cfg *config.Compression,
 	logger *slog.Logger,
 	cat catalog.Catalog,

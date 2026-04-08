@@ -7,12 +7,17 @@ import (
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/contentcoding"
+	contentcodingspec "github.com/daiyuang/spack/internal/contentcoding/spec"
 )
 
 // NewResolverForTest exposes resolver construction for external tests.
 func NewResolverForTest(cfg *config.Assets, cat catalog.Catalog, logger *slog.Logger) *Resolver {
-	compression := config.DefaultConfig().Compression
-	return newResolverFromDeps(cfg, &compression, cat, logger)
+	defaults := config.DefaultConfig().Compression
+	return newResolver(cfg, contentcoding.NewRegistry(contentcoding.Options{
+		BrotliQuality: defaults.BrotliQuality,
+		GzipLevel:     defaults.GzipLevel,
+		ZstdLevel:     defaults.ZstdLevel,
+	}, defaults.NormalizedEncodings()), cat, logger)
 }
 
 // NewResolverWithCompressionForTest exposes resolver construction with compression config for external tests.
@@ -22,12 +27,16 @@ func NewResolverWithCompressionForTest(
 	cat catalog.Catalog,
 	logger *slog.Logger,
 ) *Resolver {
-	return newResolverFromDeps(cfg, compression, cat, logger)
+	return newResolver(cfg, contentcoding.NewRegistry(contentcoding.Options{
+		BrotliQuality: compression.BrotliQuality,
+		GzipLevel:     compression.GzipLevel,
+		ZstdLevel:     compression.ZstdLevel,
+	}, compression.NormalizedEncodings()), cat, logger)
 }
 
 // ParseAcceptEncodingForTest exposes encoding preference parsing for external tests.
 func ParseAcceptEncodingForTest(header string) collectionx.List[string] {
-	return parseAcceptEncoding(header, contentcoding.DefaultNames())
+	return parseAcceptEncoding(header, contentcodingspec.DefaultNames())
 }
 
 // ParseAcceptEncodingWithSupportedForTest exposes encoding preference parsing with a custom support list for external tests.

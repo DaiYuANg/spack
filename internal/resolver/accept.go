@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/daiyuang/spack/internal/contentcoding"
+	contentcodingspec "github.com/daiyuang/spack/internal/contentcoding/spec"
 	"github.com/daiyuang/spack/internal/media"
 	"github.com/samber/lo"
 )
@@ -116,9 +116,9 @@ func buildEncodingCandidates(prefs encodingPreferences, supported collectionx.Li
 		priority int
 	}
 
-	supported = contentcoding.NormalizeNames(supported)
+	supported = contentcodingspec.NormalizeNames(supported)
 	if supported.IsEmpty() {
-		supported = contentcoding.DefaultNames()
+		supported = contentcodingspec.DefaultNames()
 	}
 	choices := collectionx.FilterMapList(supported, func(index int, encoding string) (candidate, bool) {
 		q, ok := encodingQuality(prefs, encoding)

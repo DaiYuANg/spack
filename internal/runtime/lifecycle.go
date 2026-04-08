@@ -8,55 +8,52 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/DaiYuANg/arcgo/dix"
 	obsprom "github.com/DaiYuANg/arcgo/observabilityx/prometheus"
 	"github.com/arl/statsviz"
-	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/pipeline"
 	"github.com/gofiber/fiber/v3"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-func httpLifecycle(
-	lc dix.Lifecycle,
-	app *fiber.App,
-	cfg *config.Config,
-	cat catalog.Catalog,
-	logger *slog.Logger,
-) {
-	lc.OnStart(func(ctx context.Context) error {
-		go func() {
-			address := "127.0.0.1:" + cfg.HTTP.GetPort()
-			logger.Info("HTTP runtime listening",
-				slog.String("address", "http://"+address),
-				slog.String("mount_path", cfg.Assets.Path),
-				slog.Int("assets", cat.AssetCount()),
-				slog.Int("variants", cat.VariantCount()),
-			)
-			if err := app.Listen(":"+cfg.HTTP.GetPort(), fiber.ListenConfig{
-				DisableStartupMessage: true,
-			}); err != nil {
-				logger.Error("HTTP runtime stopped", slog.String("err", err.Error()))
-			}
-		}()
-		return nil
-	})
-
-	lc.OnStop(func(ctx context.Context) error {
-		return app.ShutdownWithContext(ctx)
-	})
+type debugRuntime struct {
+	enabled    bool
+	server     *http.Server
+	liveURL    string
+	metricsURL string
+	statsviz   string
 }
 
-func debugLifecycle(
-	lc dix.Lifecycle,
+func startHTTPRuntime(_ context.Context, runtime httpRuntime) error {
+	go func() {
+		address := "127.0.0.1:" + runtime.cfg.HTTP.GetPort()
+		runtime.logger.Info("HTTP runtime listening",
+			slog.String("address", "http://"+address),
+			slog.String("mount_path", runtime.cfg.Assets.Path),
+			slog.Int("assets", runtime.cat.AssetCount()),
+			slog.Int("variants", runtime.cat.VariantCount()),
+		)
+		if err := runtime.app.Listen(":"+runtime.cfg.HTTP.GetPort(), fiber.ListenConfig{
+			DisableStartupMessage: true,
+		}); err != nil {
+			runtime.logger.Error("HTTP runtime stopped", slog.String("err", err.Error()))
+		}
+	}()
+	return nil
+}
+
+func stopHTTPRuntime(ctx context.Context, runtime httpRuntime) error {
+	return runtime.app.ShutdownWithContext(ctx)
+}
+
+func buildDebugRuntime(
 	cfg *config.Config,
 	logger *slog.Logger,
 	pipelineMetrics *pipeline.Metrics,
 	metricsAdapter *obsprom.Adapter,
-) {
+) *debugRuntime {
 	if !cfg.Debug.Enable {
-		return
+		return &debugRuntime{}
 	}
 
 	mux := http.NewServeMux()
@@ -66,32 +63,64 @@ func debugLifecycle(
 	mux.Handle(cfg.Metrics.Prefix, metricsAdapter.Handler())
 	if err := statsviz.Register(mux); err != nil {
 		logger.Error("Debug runtime registration failed", slog.String("err", err.Error()))
-		return
+		return &debugRuntime{}
 	}
 
 	address := fmt.Sprintf(cfg.Debug.Address+":%d", cfg.Debug.LivePort)
-	logger.Info("Debug runtime listening", slog.String("address", address))
-	server := &http.Server{
-		Addr:              address,
-		Handler:           mux,
-		ReadHeaderTimeout: 5 * time.Second,
+	return &debugRuntime{
+		enabled: true,
+		server: &http.Server{
+			Addr:              address,
+			Handler:           mux,
+			ReadHeaderTimeout: 5 * time.Second,
+		},
+		liveURL:    fmt.Sprintf("http://127.0.0.1:%d", cfg.Debug.LivePort),
+		metricsURL: fmt.Sprintf("http://127.0.0.1:%d%s", cfg.Debug.LivePort, cfg.Metrics.Prefix),
+		statsviz:   fmt.Sprintf("http://127.0.0.1:%d/debug/statsviz", cfg.Debug.LivePort),
+	}
+}
+
+func startDebugRuntime(_ context.Context, logger *slog.Logger, runtime *debugRuntime) error {
+	if runtime == nil || !runtime.enabled || runtime.server == nil {
+		return nil
 	}
 
-	lc.OnStart(func(ctx context.Context) error {
-		go func() {
-			logger.Info("Debug runtime listening",
-				slog.String("address", fmt.Sprintf("http://127.0.0.1:%d", cfg.Debug.LivePort)),
-				slog.String("metrics", fmt.Sprintf("http://127.0.0.1:%d%s", cfg.Debug.LivePort, cfg.Metrics.Prefix)),
-				slog.String("statsviz", fmt.Sprintf("http://127.0.0.1:%d/debug/statsviz", cfg.Debug.LivePort)),
-			)
-			if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				logger.Error("Debug runtime stopped", slog.String("err", err.Error()))
-			}
-		}()
-		return nil
-	})
+	go func() {
+		logger.Info("Debug runtime listening",
+			slog.String("address", runtime.liveURL),
+			slog.String("metrics", runtime.metricsURL),
+			slog.String("statsviz", runtime.statsviz),
+		)
+		if err := runtime.server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("Debug runtime stopped", slog.String("err", err.Error()))
+		}
+	}()
+	return nil
+}
 
-	lc.OnStop(func(ctx context.Context) error {
-		return server.Shutdown(ctx)
-	})
+func stopDebugRuntime(ctx context.Context, runtime *debugRuntime) error {
+	if runtime == nil || !runtime.enabled || runtime.server == nil {
+		return nil
+	}
+	return runtime.server.Shutdown(ctx)
+}
+
+func startRuntime(ctx context.Context, runtime *runtimeState) error {
+	if err := logConfigOnStart(ctx, runtime.bootstrap); err != nil {
+		return err
+	}
+	if err := bootstrapCatalogOnStart(ctx, runtime.bootstrap); err != nil {
+		return err
+	}
+	if err := startHTTPRuntime(ctx, runtime.http); err != nil {
+		return err
+	}
+	return startDebugRuntime(ctx, runtime.bootstrap.logger, runtime.debug)
+}
+
+func stopRuntime(ctx context.Context, runtime *runtimeState) error {
+	if err := stopDebugRuntime(ctx, runtime.debug); err != nil {
+		return err
+	}
+	return stopHTTPRuntime(ctx, runtime.http)
 }

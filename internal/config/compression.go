@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/daiyuang/spack/internal/contentcoding"
+	contentcodingspec "github.com/daiyuang/spack/internal/contentcoding/spec"
 	"github.com/daiyuang/spack/internal/validation"
 )
 
@@ -59,7 +59,7 @@ func (c Compression) QueueCapacity() int {
 }
 
 func (c Compression) NormalizedEncodings() collectionx.List[string] {
-	return contentcoding.ResolveNames(c.Encodings)
+	return contentcodingspec.ResolveNames(c.Encodings)
 }
 
 func (c Compression) ParsedCleanupInterval() time.Duration {

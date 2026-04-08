@@ -6,6 +6,7 @@ import (
 	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/assetcache"
+	"github.com/daiyuang/spack/internal/contentcoding"
 	"github.com/daiyuang/spack/internal/event"
 	"github.com/daiyuang/spack/internal/metrics"
 	"github.com/daiyuang/spack/internal/pipeline"
@@ -29,6 +30,7 @@ var rootCmd = &cobra.Command{
 			event.Module,
 			source.Module,
 			artifact.Module,
+			contentcoding.Module,
 			assetcache.Module,
 			pipeline.Module,
 			resolver.Module,

@@ -22,22 +22,12 @@ type imageStage struct {
 	catalog catalog.Catalog
 }
 
-type imageStageIn struct {
-	Config  *config.Image
-	Store   artifact.Store
-	Catalog catalog.Catalog
-}
-
-func newImageStage(in imageStageIn) *imageStage {
+func newImageStage(cfg *config.Image, store artifact.Store, cat catalog.Catalog) *imageStage {
 	return &imageStage{
-		cfg:     in.Config,
-		store:   in.Store,
-		catalog: in.Catalog,
+		cfg:     cfg,
+		store:   store,
+		catalog: cat,
 	}
-}
-
-func newImageStageFromDeps(cfg *config.Image, store artifact.Store, cat catalog.Catalog) *imageStage {
-	return newImageStage(imageStageIn{Config: cfg, Store: store, Catalog: cat})
 }
 
 func (s *imageStage) Name() string {

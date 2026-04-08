@@ -4,12 +4,11 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
-	"strings"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/andybalholm/brotli"
+	"github.com/daiyuang/spack/internal/contentcoding/spec"
 	"github.com/klauspost/compress/zstd"
-	"github.com/samber/lo"
 )
 
 type Options struct {
@@ -26,6 +25,7 @@ type Strategy interface {
 
 type Registry struct {
 	strategies collectionx.Map[string, Strategy]
+	names      collectionx.List[string]
 }
 
 func NewRegistry(opts Options, enabled collectionx.List[string]) Registry {
@@ -34,9 +34,9 @@ func NewRegistry(opts Options, enabled collectionx.List[string]) Registry {
 		all.Set(strategy.Name(), strategy)
 	})
 
-	enabled = NormalizeNames(enabled)
+	enabled = spec.NormalizeNames(enabled)
 	if enabled.IsEmpty() {
-		enabled = DefaultNames()
+		enabled = spec.DefaultNames()
 	}
 
 	strategies := collectionx.NewMapWithCapacity[string, Strategy](enabled.Len())
@@ -45,49 +45,18 @@ func NewRegistry(opts Options, enabled collectionx.List[string]) Registry {
 			strategies.Set(name, strategy)
 		}
 	})
-	return Registry{strategies: strategies}
+	return Registry{strategies: strategies, names: enabled}
 }
 
 func (r Registry) Lookup(name string) (Strategy, bool) {
 	return r.strategies.Get(name)
 }
 
-func DefaultNames() collectionx.List[string] {
-	return collectionx.NewList("br", "zstd", "gzip")
-}
-
-func IsSupported(name string) bool {
-	return lo.Contains(DefaultNames().Values(), strings.ToLower(strings.TrimSpace(name)))
-}
-
-func ParseNames(raw string) collectionx.List[string] {
-	if strings.TrimSpace(raw) == "" {
-		return collectionx.NewList[string]()
+func (r Registry) Names() collectionx.List[string] {
+	if r.names.IsEmpty() {
+		return spec.DefaultNames()
 	}
-	return NormalizeNames(collectionx.NewList(strings.Split(raw, ",")...))
-}
-
-func ResolveNames(raw string) collectionx.List[string] {
-	names := ParseNames(raw)
-	if names.IsEmpty() {
-		return DefaultNames()
-	}
-	return names
-}
-
-func NormalizeNames(values collectionx.List[string]) collectionx.List[string] {
-	if values.IsEmpty() {
-		return collectionx.NewList[string]()
-	}
-
-	normalized := lo.FilterMap(values.Values(), func(raw string, _ int) (string, bool) {
-		name := strings.ToLower(strings.TrimSpace(raw))
-		return name, IsSupported(name)
-	})
-	if len(normalized) == 0 {
-		return collectionx.NewList[string]()
-	}
-	return collectionx.NewList(collectionx.NewOrderedSet(normalized...).Values()...)
+	return r.names
 }
 
 func newBuiltinStrategies(opts Options) collectionx.List[Strategy] {

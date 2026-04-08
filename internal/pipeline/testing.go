@@ -10,16 +10,26 @@ import (
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/contentcoding"
 )
 
 // NewCompressionStageForTest exposes compression stage construction for external tests.
 func NewCompressionStageForTest(cfg *config.Compression, store artifact.Store, cat catalog.Catalog) Stage {
-	return newCompressionStageFromDeps(cfg, store, cat)
+	return newCompressionStage(
+		cfg,
+		contentcoding.NewRegistry(contentcoding.Options{
+			BrotliQuality: cfg.BrotliQuality,
+			GzipLevel:     cfg.GzipLevel,
+			ZstdLevel:     cfg.ZstdLevel,
+		}, cfg.NormalizedEncodings()),
+		store,
+		cat,
+	)
 }
 
 // NewImageStageForTest exposes image stage construction for external tests.
 func NewImageStageForTest(cfg *config.Image, store artifact.Store, cat catalog.Catalog) Stage {
-	return newImageStageFromDeps(cfg, store, cat)
+	return newImageStage(cfg, store, cat)
 }
 
 // NormalizeEncodingsForTest exposes compression encoding normalization for external tests.

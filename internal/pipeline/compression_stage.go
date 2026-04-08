@@ -13,6 +13,7 @@ import (
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/contentcoding"
+	contentcodingspec "github.com/daiyuang/spack/internal/contentcoding/spec"
 	"github.com/samber/lo"
 )
 
@@ -23,27 +24,18 @@ type compressionStage struct {
 	strategies contentcoding.Registry
 }
 
-type compressionStageIn struct {
-	Config  *config.Compression
-	Store   artifact.Store
-	Catalog catalog.Catalog
-}
-
-func newCompressionStage(in compressionStageIn) *compressionStage {
+func newCompressionStage(
+	cfg *config.Compression,
+	registry contentcoding.Registry,
+	store artifact.Store,
+	cat catalog.Catalog,
+) *compressionStage {
 	return &compressionStage{
-		cfg:     in.Config,
-		store:   in.Store,
-		catalog: in.Catalog,
-		strategies: contentcoding.NewRegistry(contentcoding.Options{
-			BrotliQuality: in.Config.BrotliQuality,
-			GzipLevel:     in.Config.GzipLevel,
-			ZstdLevel:     in.Config.ZstdLevel,
-		}, in.Config.NormalizedEncodings()),
+		cfg:        cfg,
+		store:      store,
+		catalog:    cat,
+		strategies: registry,
 	}
-}
-
-func newCompressionStageFromDeps(cfg *config.Compression, store artifact.Store, cat catalog.Catalog) *compressionStage {
-	return newCompressionStage(compressionStageIn{Config: cfg, Store: store, Catalog: cat})
 }
 
 func (s *compressionStage) Name() string {
@@ -55,7 +47,7 @@ func (s *compressionStage) Plan(asset *catalog.Asset, request Request) []Task {
 		return nil
 	}
 
-	supportedEncodings := s.cfg.NormalizedEncodings()
+	supportedEncodings := s.strategies.Names()
 	encodings := filterConfiguredEncodings(normalizeEncodings(request.PreferredEncodings), supportedEncodings)
 	if encodings.IsEmpty() {
 		encodings = supportedEncodings
@@ -187,7 +179,7 @@ func isKnownCompressibleType(mime string) bool {
 }
 
 func normalizeEncodings(encodings collectionx.List[string]) collectionx.List[string] {
-	return contentcoding.NormalizeNames(encodings)
+	return contentcodingspec.NormalizeNames(encodings)
 }
 
 func filterConfiguredEncodings(encodings, supported collectionx.List[string]) collectionx.List[string] {
