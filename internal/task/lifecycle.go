@@ -2,9 +2,9 @@ package task
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/go-co-op/gocron/v2"
+	"github.com/samber/oops"
 )
 
 func startTaskRuntime(ctx context.Context, scheduler gocron.Scheduler, runtime *sourceRescanRuntime) error {
@@ -13,7 +13,7 @@ func startTaskRuntime(ctx context.Context, scheduler gocron.Scheduler, runtime *
 
 func stopTaskRuntime(ctx context.Context, scheduler gocron.Scheduler) error {
 	if err := scheduler.ShutdownWithContext(ctx); err != nil {
-		return fmt.Errorf("shutdown task scheduler: %w", err)
+		return oops.In("task").Owner("scheduler").Wrap(err)
 	}
 	return nil
 }

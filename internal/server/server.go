@@ -34,7 +34,7 @@ import (
 func newServerApp(cfg *config.Config) (*fiber.App, error) {
 	header, err := buildServerHeader()
 	if err != nil {
-		return nil, err
+		return nil, oops.In("server").Owner("app").Wrap(err)
 	}
 	return fiber.New(fiber.Config{
 		AppName:           "Spack",
@@ -186,7 +186,7 @@ func requestLogMiddleware(logger *slog.Logger) fiber.Handler {
 		err := c.Next()
 		logRequest(logger, c, startedAt)
 		if err != nil {
-			return fmt.Errorf("run request log middleware chain: %w", err)
+			return oops.In("server").Owner("request log middleware").Wrap(err)
 		}
 		return nil
 	}

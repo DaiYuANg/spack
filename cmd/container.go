@@ -2,7 +2,6 @@
 package cmd
 
 import (
-	"fmt"
 	"log/slog"
 	"runtime/debug"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/daiyuang/spack/internal/runtime"
 	"github.com/daiyuang/spack/internal/task"
 	"github.com/daiyuang/spack/internal/validation"
+	"github.com/samber/oops"
 )
 
 func createContainer(loadOptions config.LoadOptions, userModules ...dix.Module) (*dix.App, error) {
@@ -40,7 +40,7 @@ func createContainer(loadOptions config.LoadOptions, userModules ...dix.Module) 
 	)
 	err := instance.Validate()
 	if err != nil {
-		return nil, fmt.Errorf("validate dix container: %w", err)
+		return nil, oops.In("command").Owner("container").Wrap(err)
 	}
 	return instance, nil
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/daiyuang/spack/internal/source"
 	"github.com/daiyuang/spack/pkg"
 	"github.com/go-co-op/gocron/v2"
+	"github.com/samber/oops"
 )
 
 const sourceRescanInterval = 5 * time.Minute
@@ -54,7 +55,7 @@ func registerSourceRescanTask(ctx context.Context, scheduler gocron.Scheduler, r
 		}),
 	)
 	if err != nil {
-		return false, fmt.Errorf("create source rescan job: %w", err)
+		return false, oops.In("task").Owner("source rescan").Wrap(err)
 	}
 
 	runtime.logger.Info("Task source rescan enabled",
@@ -104,6 +105,7 @@ func syncSourceCatalog(
 }
 
 func collectScannedAssets(ctx context.Context, src source.Source) (map[string]*catalog.Asset, SourceRescanReport, error) {
+	scanErr := oops.In("task").Owner("source rescan")
 	report := SourceRescanReport{}
 	scannedAssets := map[string]*catalog.Asset{}
 
@@ -123,7 +125,7 @@ func collectScannedAssets(ctx context.Context, src source.Source) (map[string]*c
 		report.Scanned++
 		return nil
 	}); err != nil {
-		return nil, SourceRescanReport{}, fmt.Errorf("walk source assets: %w", err)
+		return nil, SourceRescanReport{}, scanErr.Wrap(err)
 	}
 
 	return scannedAssets, report, nil
@@ -174,7 +176,7 @@ func syncScannedAsset(
 	}
 
 	if err := cat.UpsertAsset(asset); err != nil {
-		return fmt.Errorf("upsert asset %s: %w", asset.Path, err)
+		return oops.In("task").Owner("source rescan").With("asset_path", asset.Path).Wrap(err)
 	}
 	return nil
 }
@@ -252,7 +254,7 @@ func assetChanged(existing, next *catalog.Asset) bool {
 func buildCatalogAsset(file source.File) (*catalog.Asset, error) {
 	sourceHash, err := pkg.HashFile(file.FullPath)
 	if err != nil {
-		return nil, fmt.Errorf("hash asset %s: %w", file.Path, err)
+		return nil, oops.In("task").Owner("source rescan").With("asset_path", file.Path).Wrap(err)
 	}
 	return &catalog.Asset{
 		Path:       file.Path,

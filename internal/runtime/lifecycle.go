@@ -15,6 +15,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/samber/mo"
+	"github.com/samber/oops"
 )
 
 type debugRuntime struct {
@@ -45,7 +46,7 @@ func startHTTPRuntime(_ context.Context, runtime httpRuntime) error {
 
 func stopHTTPRuntime(ctx context.Context, runtime httpRuntime) error {
 	if err := runtime.app.ShutdownWithContext(ctx); err != nil {
-		return fmt.Errorf("shutdown http runtime: %w", err)
+		return oops.In("runtime").Owner("http runtime").Wrap(err)
 	}
 	return nil
 }
@@ -109,7 +110,7 @@ func stopDebugRuntime(ctx context.Context, runtime *debugRuntime) error {
 		return nil
 	}
 	if err := server.Shutdown(ctx); err != nil {
-		return fmt.Errorf("shutdown debug runtime: %w", err)
+		return oops.In("runtime").Owner("debug runtime").Wrap(err)
 	}
 	return nil
 }

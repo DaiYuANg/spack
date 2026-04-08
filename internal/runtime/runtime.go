@@ -20,6 +20,7 @@ func bootstrapCatalogOnStart(
 	ctx context.Context,
 	runtime catalogBootstrapRuntime,
 ) error {
+	bootstrapErr := oops.In("runtime").Owner("catalog bootstrap")
 	startedAt := time.Now()
 	totalBytes, scanErr := scanCatalogAssets(runtime.src, runtime.cat)
 	if scanErr != nil {
@@ -28,11 +29,11 @@ func bootstrapCatalogOnStart(
 
 	warmErr := runtime.pipelineSvc.Warm(ctx)
 	if warmErr != nil {
-		return oops.In("pipeline").Wrap(fmt.Errorf("warm pipeline: %w", warmErr))
+		return bootstrapErr.With("service", "pipeline").Wrap(warmErr)
 	}
 	cacheStats, cacheErr := runtime.bodyCache.Warm(ctx, runtime.cat)
 	if cacheErr != nil {
-		return fmt.Errorf("warm asset memory cache: %w", cacheErr)
+		return bootstrapErr.With("service", "asset memory cache").Wrap(cacheErr)
 	}
 
 	runtime.logger.LogAttrs(
@@ -45,6 +46,7 @@ func bootstrapCatalogOnStart(
 }
 
 func scanCatalogAssets(src source.Source, cat catalog.Catalog) (int64, error) {
+	scanErr := oops.In("runtime").Owner("catalog scan")
 	totalBytes := int64(0)
 	if err := src.Walk(func(file source.File) error {
 		if file.IsDir {
@@ -57,11 +59,11 @@ func scanCatalogAssets(src source.Source, cat catalog.Catalog) (int64, error) {
 		}
 		totalBytes += file.Size
 		if err := cat.UpsertAsset(asset); err != nil {
-			return fmt.Errorf("upsert asset %s: %w", file.Path, err)
+			return scanErr.With("asset_path", file.Path).Wrap(err)
 		}
 		return nil
 	}); err != nil {
-		return 0, fmt.Errorf("walk source assets: %w", err)
+		return 0, scanErr.Wrap(err)
 	}
 	return totalBytes, nil
 }
@@ -69,7 +71,7 @@ func scanCatalogAssets(src source.Source, cat catalog.Catalog) (int64, error) {
 func buildCatalogAsset(file source.File) (*catalog.Asset, error) {
 	sourceHash, err := pkg.HashFile(file.FullPath)
 	if err != nil {
-		return nil, fmt.Errorf("hash asset %s: %w", file.Path, err)
+		return nil, oops.In("runtime").Owner("catalog asset").With("asset_path", file.Path).Wrap(err)
 	}
 	return &catalog.Asset{
 		Path:       file.Path,

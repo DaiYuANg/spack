@@ -15,6 +15,7 @@ import (
 	"github.com/daiyuang/spack/internal/contentcoding"
 	contentcodingspec "github.com/daiyuang/spack/internal/contentcoding/spec"
 	"github.com/samber/lo"
+	"github.com/samber/oops"
 )
 
 type compressionStage struct {
@@ -66,13 +67,16 @@ func (s *compressionStage) Plan(asset *catalog.Asset, request Request) collectio
 }
 
 func (s *compressionStage) Execute(task Task, asset *catalog.Asset) (*catalog.Variant, error) {
+	stageErr := oops.In("pipeline").Owner("compression stage").
+		With("asset_path", asset.Path).
+		With("encoding", task.Encoding)
 	if asset.SourceHash == "" {
-		return nil, fmt.Errorf("asset %s missing source hash", asset.Path)
+		return nil, stageErr.Wrap(fmt.Errorf("asset missing source hash"))
 	}
 
 	raw, err := os.ReadFile(asset.FullPath)
 	if err != nil {
-		return nil, fmt.Errorf("read asset payload: %w", err)
+		return nil, stageErr.Wrap(err)
 	}
 	if int64(len(raw)) < s.cfg.MinSize {
 		return nil, ErrVariantSkipped
@@ -80,7 +84,7 @@ func (s *compressionStage) Execute(task Task, asset *catalog.Asset) (*catalog.Va
 
 	compressed, suffix, err := s.compress(raw, task.Encoding)
 	if err != nil {
-		return nil, fmt.Errorf("compress asset payload: %w", err)
+		return nil, stageErr.Wrap(err)
 	}
 	if len(compressed) >= len(raw) {
 		return nil, ErrVariantSkipped
@@ -88,7 +92,7 @@ func (s *compressionStage) Execute(task Task, asset *catalog.Asset) (*catalog.Va
 
 	targetPath := s.store.PathFor(asset.Path, asset.SourceHash, "encoding", suffix)
 	if err := s.store.Write(targetPath, compressed); err != nil {
-		return nil, fmt.Errorf("write compressed artifact: %w", err)
+		return nil, stageErr.With("artifact_path", targetPath).Wrap(err)
 	}
 
 	return &catalog.Variant{
@@ -110,12 +114,12 @@ func (s *compressionStage) Execute(task Task, asset *catalog.Asset) (*catalog.Va
 func (s *compressionStage) compress(raw []byte, encoding string) ([]byte, string, error) {
 	strategy, ok := s.strategies.Lookup(encoding)
 	if !ok {
-		return nil, "", fmt.Errorf("unsupported compression encoding: %s", encoding)
+		return nil, "", fmt.Errorf("unsupported compression encoding")
 	}
 
 	compressed, err := strategy.Compress(raw)
 	if err != nil {
-		return nil, "", fmt.Errorf("compress using %s strategy: %w", encoding, err)
+		return nil, "", err
 	}
 	return compressed, strategy.Suffix(), nil
 }

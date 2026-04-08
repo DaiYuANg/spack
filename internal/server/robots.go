@@ -2,7 +2,6 @@ package server
 
 import (
 	"embed"
-	"fmt"
 	"log/slog"
 	"strings"
 	"text/template"
@@ -12,6 +11,7 @@ import (
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/resolver"
 	"github.com/gofiber/fiber/v3"
+	"github.com/samber/oops"
 )
 
 const robotsAssetPath = "robots.txt"
@@ -75,7 +75,7 @@ func staticRobotsAsset(cfg config.Robots, cat catalog.Catalog) (*catalog.Asset, 
 func sendGeneratedRobots(c fiber.Ctx, cfg config.Robots) error {
 	body, err := renderRobotsContent(cfg)
 	if err != nil {
-		return fmt.Errorf("render robots.txt: %w", err)
+		return err
 	}
 
 	c.Set(fiber.HeaderContentType, "text/plain; charset=utf-8")
@@ -84,7 +84,7 @@ func sendGeneratedRobots(c fiber.Ctx, cfg config.Robots) error {
 		return nil
 	}
 	if err := c.SendString(body); err != nil {
-		return fmt.Errorf("send generated robots.txt: %w", err)
+		return oops.In("server").Owner("robots").Wrap(err)
 	}
 	return nil
 }
@@ -105,7 +105,7 @@ func renderRobotsContent(cfg config.Robots) (string, error) {
 		Sitemap:   strings.TrimSpace(cfg.Sitemap),
 	})
 	if err != nil {
-		return "", fmt.Errorf("execute robots.txt template: %w", err)
+		return "", oops.In("server").Owner("robots").Wrap(err)
 	}
 
 	return strings.TrimRight(body.String(), "\n") + "\n", nil

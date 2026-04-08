@@ -2,7 +2,6 @@
 package task
 
 import (
-	"fmt"
 	"log/slog"
 
 	"github.com/DaiYuANg/arcgo/dix"
@@ -10,6 +9,7 @@ import (
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/source"
 	"github.com/go-co-op/gocron/v2"
+	"github.com/samber/oops"
 )
 
 var Module = dix.NewModule("task",
@@ -28,7 +28,7 @@ func newScheduler(logger *slog.Logger) (gocron.Scheduler, error) {
 		gocron.WithLogger(logger),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("create scheduler: %w", err)
+		return nil, oops.In("task").Owner("scheduler").Wrap(err)
 	}
 	return scheduler, nil
 }
