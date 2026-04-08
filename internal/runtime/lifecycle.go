@@ -14,6 +14,7 @@ import (
 	"github.com/daiyuang/spack/internal/pipeline"
 	"github.com/gofiber/fiber/v3"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/samber/mo"
 )
 
 type debugRuntime struct {
@@ -81,7 +82,8 @@ func buildDebugRuntime(
 }
 
 func startDebugRuntime(_ context.Context, logger *slog.Logger, runtime *debugRuntime) error {
-	if runtime == nil || !runtime.enabled || runtime.server == nil {
+	server, ok := debugServer(runtime).Get()
+	if !ok {
 		return nil
 	}
 
@@ -91,7 +93,7 @@ func startDebugRuntime(_ context.Context, logger *slog.Logger, runtime *debugRun
 			slog.String("metrics", runtime.metricsURL),
 			slog.String("statsviz", runtime.statsviz),
 		)
-		if err := runtime.server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("Debug runtime stopped", slog.String("err", err.Error()))
 		}
 	}()
@@ -99,10 +101,11 @@ func startDebugRuntime(_ context.Context, logger *slog.Logger, runtime *debugRun
 }
 
 func stopDebugRuntime(ctx context.Context, runtime *debugRuntime) error {
-	if runtime == nil || !runtime.enabled || runtime.server == nil {
+	server, ok := debugServer(runtime).Get()
+	if !ok {
 		return nil
 	}
-	return runtime.server.Shutdown(ctx)
+	return server.Shutdown(ctx)
 }
 
 func startRuntime(ctx context.Context, runtime *runtimeState) error {
@@ -123,4 +126,11 @@ func stopRuntime(ctx context.Context, runtime *runtimeState) error {
 		return err
 	}
 	return stopHTTPRuntime(ctx, runtime.http)
+}
+
+func debugServer(runtime *debugRuntime) mo.Option[*http.Server] {
+	if runtime == nil || !runtime.enabled || runtime.server == nil {
+		return mo.None[*http.Server]()
+	}
+	return mo.Some(runtime.server)
 }

@@ -31,10 +31,7 @@ func isUsableVariant(variant *catalog.Variant, assetSourceHash string) bool {
 }
 
 func variantFormat(variant *catalog.Variant, sourceFormat string) string {
-	if variant == nil || strings.TrimSpace(variant.Format) == "" {
-		return sourceFormat
-	}
-	return variant.Format
+	return firstNonEmpty(lo.Ternary(variant != nil, variant.Format, ""), sourceFormat)
 }
 
 func firstNonEmpty(values ...string) string {

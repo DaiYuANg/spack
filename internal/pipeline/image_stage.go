@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"image"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
@@ -34,7 +33,7 @@ func (s *imageStage) Name() string {
 	return "image"
 }
 
-func (s *imageStage) Plan(asset *catalog.Asset, request Request) []Task {
+func (s *imageStage) Plan(asset *catalog.Asset, request Request) collectionx.List[Task] {
 	if !s.cfg.Enable || !isResizableImage(asset) {
 		return nil
 	}
@@ -128,37 +127,37 @@ func normalizeImageFormats(formats collectionx.List[string]) collectionx.List[st
 }
 
 func imageVariantSuffix(width int, format, ext string) string {
-	parts := make([]string, 0, 2)
+	parts := collectionx.NewList[string]()
 	if width > 0 {
-		parts = append(parts, fmt.Sprintf("w%d", width))
+		parts.Add(fmt.Sprintf("w%d", width))
 	}
 	if format != "" {
-		parts = append(parts, "f"+format)
+		parts.Add("f" + format)
 	}
-	if len(parts) == 0 {
+	if parts.IsEmpty() {
 		return ext
 	}
-	return "." + strings.Join(parts, ".") + ext
+	return "." + parts.Join(".") + ext
 }
 
 func imageVariantID(assetPath string, width int, format string) string {
-	parts := []string{assetPath}
+	parts := collectionx.NewList(assetPath)
 	if width > 0 {
-		parts = append(parts, fmt.Sprintf("width=%d", width))
+		parts.Add(fmt.Sprintf("width=%d", width))
 	}
 	if format != "" {
-		parts = append(parts, "format="+format)
+		parts.Add("format=" + format)
 	}
-	return strings.Join(parts, "|")
+	return parts.Join("|")
 }
 
 func imageVariantETag(sourceHash string, width int, format string) string {
-	parts := []string{sourceHash}
+	parts := collectionx.NewList(sourceHash)
 	if width > 0 {
-		parts = append(parts, fmt.Sprintf("w%d", width))
+		parts.Add(fmt.Sprintf("w%d", width))
 	}
 	if format != "" {
-		parts = append(parts, format)
+		parts.Add(format)
 	}
-	return "\"" + strings.Join(parts, "-") + "\""
+	return "\"" + parts.Join("-") + "\""
 }

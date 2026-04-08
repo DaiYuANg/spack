@@ -22,19 +22,15 @@ func applyResolvedHeaders(c fiber.Ctx, cfg *config.Config, result *resolver.Resu
 	cacheControl := policy.CacheControl(result)
 
 	c.Set(fiber.HeaderContentType, result.MediaType)
-	if size, ok := resolvedAssetSizeOption(result).Get(); ok {
-		c.Set(fiber.HeaderContentLength, strconv.FormatInt(size, 10))
-	}
+	setIfPresent(c, fiber.HeaderContentLength, resolvedAssetSizeOption(result), func(size int64) string {
+		return strconv.FormatInt(size, 10)
+	})
 	c.Append(fiber.HeaderVary, fiber.HeaderAcceptEncoding)
 	if shouldVaryAccept(result.Asset.MediaType, requestedFormat) {
 		c.Append(fiber.HeaderVary, fiber.HeaderAccept)
 	}
-	if result.ETag != "" {
-		c.Set(fiber.HeaderETag, result.ETag)
-	}
-	if result.ContentEncoding != "" {
-		c.Set(fiber.HeaderContentEncoding, result.ContentEncoding)
-	}
+	setIfNotEmpty(c, fiber.HeaderETag, result.ETag)
+	setIfNotEmpty(c, fiber.HeaderContentEncoding, result.ContentEncoding)
 	if hasLastModified {
 		c.Set(fiber.HeaderLastModified, lastModified.UTC().Format(http.TimeFormat))
 	}
@@ -128,4 +124,16 @@ func firstPresentTime(options ...mo.Option[time.Time]) mo.Option[time.Time] {
 		}
 		return option
 	}, mo.None[time.Time]())
+}
+
+func setIfPresent[T any](c fiber.Ctx, key string, value mo.Option[T], format func(T) string) {
+	if resolved, ok := value.Get(); ok {
+		c.Set(key, format(resolved))
+	}
+}
+
+func setIfNotEmpty(c fiber.Ctx, key, value string) {
+	if strings.TrimSpace(value) != "" {
+		c.Set(key, value)
+	}
 }

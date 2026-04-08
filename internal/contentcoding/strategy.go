@@ -9,6 +9,7 @@ import (
 	"github.com/andybalholm/brotli"
 	"github.com/daiyuang/spack/internal/contentcoding/spec"
 	"github.com/klauspost/compress/zstd"
+	"github.com/samber/lo"
 )
 
 type Options struct {
@@ -40,7 +41,7 @@ func NewRegistry(opts Options, enabled collectionx.List[string]) Registry {
 	}
 
 	strategies := collectionx.NewMapWithCapacity[string, Strategy](enabled.Len())
-	enabled.Each(func(_ int, name string) {
+	lo.ForEach(enabled.Values(), func(name string, _ int) {
 		if strategy, ok := all.Get(name); ok {
 			strategies.Set(name, strategy)
 		}

@@ -113,11 +113,12 @@ func (s *Service) process(ctx context.Context, request Request) {
 	}
 
 	s.stages.Range(func(_ int, stage Stage) bool {
-		for _, task := range stage.Plan(asset, request) {
+		stage.Plan(asset, request).Range(func(_ int, task Task) bool {
 			if variant := s.executeStageTask(stage, asset, task); variant != nil {
 				s.upsertStageVariant(ctx, stage, asset, variant)
 			}
-		}
+			return true
+		})
 		return true
 	})
 }

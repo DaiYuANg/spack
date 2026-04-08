@@ -9,6 +9,7 @@ import (
 	"github.com/DaiYuANg/arcgo/eventx"
 	appEvent "github.com/daiyuang/spack/internal/event"
 	"github.com/daiyuang/spack/internal/resolver"
+	"github.com/samber/lo"
 )
 
 func publishVariantServed(
@@ -20,19 +21,15 @@ func publishVariantServed(
 	if result == nil || result.Variant == nil || bus == nil {
 		return
 	}
-	assetPath := ""
-	if result.Asset != nil {
-		assetPath = result.Asset.Path
-	}
 
 	err := bus.Publish(ctx, appEvent.VariantServed{
-		AssetPath:     assetPath,
+		AssetPath:     lo.Ternary(result.Asset != nil, result.Asset.Path, ""),
 		ArtifactPath:  result.FilePath,
 		ServedAt:      time.Now(),
 		ContentType:   result.MediaType,
 		ContentCoding: result.ContentEncoding,
 	})
-	if err == nil || errors.Is(err, eventx.ErrBusClosed) {
+	if shouldIgnoreVariantServedPublishError(err) {
 		return
 	}
 
@@ -40,4 +37,8 @@ func publishVariantServed(
 		slog.String("path", result.FilePath),
 		slog.String("err", err.Error()),
 	)
+}
+
+func shouldIgnoreVariantServedPublishError(err error) bool {
+	return err == nil || errors.Is(err, eventx.ErrBusClosed)
 }

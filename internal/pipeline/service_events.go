@@ -39,7 +39,7 @@ func (s *Service) unsubscribeVariantServed() {
 }
 
 func (s *Service) publishVariantRemoved(ctx context.Context, path string, reason appEvent.VariantRemovalReason) {
-	if s == nil || s.bus == nil || strings.TrimSpace(path) == "" {
+	if !s.canPublishArtifactEvent(path) {
 		return
 	}
 
@@ -48,7 +48,7 @@ func (s *Service) publishVariantRemoved(ctx context.Context, path string, reason
 		Reason:       reason,
 		RemovedAt:    time.Now(),
 	})
-	if err == nil || errors.Is(err, eventx.ErrBusClosed) {
+	if shouldIgnoreBusPublishError(err) {
 		return
 	}
 
@@ -60,7 +60,7 @@ func (s *Service) publishVariantRemoved(ctx context.Context, path string, reason
 }
 
 func (s *Service) publishVariantGenerated(ctx context.Context, stage string, variant *catalog.Variant) {
-	if s == nil || s.bus == nil || variant == nil || strings.TrimSpace(variant.ArtifactPath) == "" {
+	if s == nil || variant == nil || !s.canPublishArtifactEvent(variant.ArtifactPath) {
 		return
 	}
 
@@ -76,7 +76,7 @@ func (s *Service) publishVariantGenerated(ctx context.Context, stage string, var
 			s.publishVariantGeneratedSync(ctx, event)
 			return
 		}
-		if errors.Is(err, eventx.ErrBusClosed) {
+		if shouldIgnoreBusPublishError(err) {
 			return
 		}
 		s.logger.Debug("Publish variant generated event failed",
@@ -89,7 +89,7 @@ func (s *Service) publishVariantGenerated(ctx context.Context, stage string, var
 
 func (s *Service) publishVariantGeneratedSync(ctx context.Context, event appEvent.VariantGenerated) {
 	err := s.bus.Publish(ctx, event)
-	if err == nil || errors.Is(err, eventx.ErrBusClosed) {
+	if shouldIgnoreBusPublishError(err) {
 		return
 	}
 
@@ -98,4 +98,12 @@ func (s *Service) publishVariantGeneratedSync(ctx context.Context, event appEven
 		slog.String("stage", event.Stage),
 		slog.String("err", err.Error()),
 	)
+}
+
+func (s *Service) canPublishArtifactEvent(path string) bool {
+	return s != nil && s.bus != nil && strings.TrimSpace(path) != ""
+}
+
+func shouldIgnoreBusPublishError(err error) bool {
+	return err == nil || errors.Is(err, eventx.ErrBusClosed)
 }

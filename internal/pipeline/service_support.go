@@ -13,6 +13,7 @@ import (
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	appEvent "github.com/daiyuang/spack/internal/event"
+	"github.com/samber/lo"
 )
 
 func requestKey(request Request) string {
@@ -28,19 +29,16 @@ func normalizeRequestStrings(values collectionx.List[string]) collectionx.List[s
 		return collectionx.NewList[string]()
 	}
 
-	normalized := collectionx.FilterMapList(values, func(_ int, value string) (string, bool) {
+	normalized := lo.FilterMap(values.Values(), func(value string, _ int) (string, bool) {
 		normalized := strings.ToLower(strings.TrimSpace(value))
-		if normalized == "" {
-			return "", false
-		}
-		return normalized, true
+		return normalized, normalized != ""
 	})
-	if normalized.IsEmpty() {
-		return normalized
+	if len(normalized) == 0 {
+		return collectionx.NewList[string]()
 	}
 
-	normalized.Sort(strings.Compare)
-	return collectionx.NewList(collectionx.NewOrderedSet(normalized.Values()...).Values()...)
+	sorted := collectionx.NewList(normalized...).Sort(strings.Compare)
+	return collectionx.NewList(collectionx.NewOrderedSet(sorted.Values()...).Values()...)
 }
 
 func normalizeRequestInts(values collectionx.List[int]) collectionx.List[int] {
@@ -48,18 +46,15 @@ func normalizeRequestInts(values collectionx.List[int]) collectionx.List[int] {
 		return collectionx.NewList[int]()
 	}
 
-	normalized := collectionx.FilterMapList(values, func(_ int, value int) (int, bool) {
-		if value <= 0 {
-			return 0, false
-		}
-		return value, true
+	normalized := lo.FilterMap(values.Values(), func(value int, _ int) (int, bool) {
+		return value, value > 0
 	})
-	if normalized.IsEmpty() {
-		return normalized
+	if len(normalized) == 0 {
+		return collectionx.NewList[int]()
 	}
 
-	normalized.Sort(cmp.Compare[int])
-	return collectionx.NewList(collectionx.NewOrderedSet(normalized.Values()...).Values()...)
+	sorted := collectionx.NewList(normalized...).Sort(cmp.Compare[int])
+	return collectionx.NewList(collectionx.NewOrderedSet(sorted.Values()...).Values()...)
 }
 
 func joinInts(values collectionx.List[int]) string {
@@ -227,20 +222,13 @@ func cleanupNamespace(path, root string) string {
 	if err != nil {
 		return ""
 	}
-	normalized := filepath.ToSlash(relative)
-	parts := strings.Split(normalized, "/")
-	if len(parts) == 0 {
-		return ""
-	}
-	return strings.TrimSpace(parts[0])
+	namespace, _, _ := strings.Cut(filepath.ToSlash(relative), "/")
+	return strings.TrimSpace(namespace)
 }
 
 func (s *Service) effectiveLastUsed(path string, modTime time.Time) time.Time {
 	lastHit, ok := s.variantHits.Get(path)
-	if ok && lastHit.After(modTime) {
-		return lastHit
-	}
-	return modTime
+	return lo.Ternary(ok && lastHit.After(modTime), lastHit, modTime)
 }
 
 func (s *Service) clearVariantHit(path string) {

@@ -25,7 +25,7 @@ type Task struct {
 
 type Stage interface {
 	Name() string
-	Plan(asset *catalog.Asset, request Request) []Task
+	Plan(asset *catalog.Asset, request Request) collectionx.List[Task]
 	Execute(task Task, asset *catalog.Asset) (*catalog.Variant, error)
 }
 

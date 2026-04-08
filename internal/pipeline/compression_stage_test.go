@@ -51,10 +51,11 @@ func TestCompressionStagePlanSkipsExistingVariant(t *testing.T) {
 		AssetPath:          asset.Path,
 		PreferredEncodings: collectionx.NewList("br", "gzip", "zstd"),
 	})
-	if len(tasks) != 2 {
-		t.Fatalf("expected two tasks, got %d", len(tasks))
+	if tasks.Len() != 2 {
+		t.Fatalf("expected two tasks, got %d", tasks.Len())
 	}
-	got := []string{tasks[0].Encoding, tasks[1].Encoding}
+	values := tasks.Values()
+	got := []string{values[0].Encoding, values[1].Encoding}
 	if !slices.Equal(got, []string{"gzip", "zstd"}) {
 		t.Fatalf("expected gzip and zstd tasks, got %#v", got)
 	}
@@ -176,10 +177,11 @@ func TestCompressionStagePlanUsesConfiguredEncodingOrder(t *testing.T) {
 	}, newTestStore(t.TempDir()), cat)
 
 	tasks := stage.Plan(asset, pipeline.Request{AssetPath: asset.Path})
-	if len(tasks) != 2 {
-		t.Fatalf("expected two tasks, got %d", len(tasks))
+	if tasks.Len() != 2 {
+		t.Fatalf("expected two tasks, got %d", tasks.Len())
 	}
-	got := []string{tasks[0].Encoding, tasks[1].Encoding}
+	values := tasks.Values()
+	got := []string{values[0].Encoding, values[1].Encoding}
 	if !slices.Equal(got, []string{"gzip", "zstd"}) {
 		t.Fatalf("expected configured encoding order [gzip zstd], got %#v", got)
 	}
@@ -208,8 +210,9 @@ func TestCompressionStagePlanFiltersDisabledRequestEncodings(t *testing.T) {
 		AssetPath:          asset.Path,
 		PreferredEncodings: collectionx.NewList("zstd", "gzip"),
 	})
-	if len(tasks) != 1 || tasks[0].Encoding != "gzip" {
-		t.Fatalf("expected only enabled gzip task, got %#v", tasks)
+	values := tasks.Values()
+	if tasks.Len() != 1 || values[0].Encoding != "gzip" {
+		t.Fatalf("expected only enabled gzip task, got %#v", values)
 	}
 }
 
@@ -235,8 +238,9 @@ func TestImageStagePlanSchedulesWidthVariant(t *testing.T) {
 		AssetPath:       asset.Path,
 		PreferredWidths: collectionx.NewList(640),
 	})
-	if len(tasks) != 1 || tasks[0].Width != 640 {
-		t.Fatalf("unexpected image tasks: %#v", tasks)
+	values := tasks.Values()
+	if tasks.Len() != 1 || values[0].Width != 640 {
+		t.Fatalf("unexpected image tasks: %#v", values)
 	}
 }
 
@@ -262,11 +266,12 @@ func TestImageStagePlanSchedulesFormatVariant(t *testing.T) {
 		AssetPath:        asset.Path,
 		PreferredFormats: collectionx.NewList("jpeg"),
 	})
-	if len(tasks) != 1 {
-		t.Fatalf("expected one format task, got %d", len(tasks))
+	if tasks.Len() != 1 {
+		t.Fatalf("expected one format task, got %d", tasks.Len())
 	}
-	if tasks[0].Width != 0 || tasks[0].Format != "jpeg" {
-		t.Fatalf("unexpected format task: %#v", tasks[0])
+	values := tasks.Values()
+	if values[0].Width != 0 || values[0].Format != "jpeg" {
+		t.Fatalf("unexpected format task: %#v", values[0])
 	}
 }
 

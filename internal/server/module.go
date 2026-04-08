@@ -3,7 +3,6 @@ package server
 import (
 	"cmp"
 	"log/slog"
-	"slices"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/dix"
@@ -96,18 +95,16 @@ func newServerRegistrations(
 	healthRoutes healthRoutesRegistration,
 	assetRoute assetRouteRegistration,
 ) collectionx.List[appRegistration] {
-	registrations := collectionx.NewList(
+	return collectionx.NewList(
 		middleware.appRegistration,
 		healthRoutes.appRegistration,
 		assetRoute.appRegistration,
-	).Values()
-	slices.SortFunc(registrations, func(left, right appRegistration) int {
+	).Sort(func(left, right appRegistration) int {
 		if left.Order != right.Order {
 			return cmp.Compare(left.Order, right.Order)
 		}
 		return cmp.Compare(left.Name, right.Name)
 	})
-	return collectionx.NewList(registrations...)
 }
 
 func newServerFromDeps(cfg *config.Config, registrations collectionx.List[appRegistration]) (*fiber.App, error) {

@@ -31,9 +31,9 @@ func (s *imageStage) planWidths(request Request) collectionx.List[int] {
 	return s.cfg.ParsedWidths()
 }
 
-func (s *imageStage) planTasks(asset *catalog.Asset, formats collectionx.List[string], widths collectionx.List[int]) []Task {
+func (s *imageStage) planTasks(asset *catalog.Asset, formats collectionx.List[string], widths collectionx.List[int]) collectionx.List[Task] {
 	existing := s.catalog.ListVariants(asset.Path)
-	return lo.FlatMap(formats.Values(), func(format string, _ int) []Task {
+	return collectionx.NewList(lo.FlatMap(formats.Values(), func(format string, _ int) []Task {
 		return lo.FilterMap(widths.Values(), func(width int, _ int) (Task, bool) {
 			if !shouldCreateImageTask(asset, existing, width, format) {
 				return Task{}, false
@@ -44,7 +44,7 @@ func (s *imageStage) planTasks(asset *catalog.Asset, formats collectionx.List[st
 				Width:     width,
 			}, true
 		})
-	})
+	})...)
 }
 
 func shouldCreateImageTask(asset *catalog.Asset, variants collectionx.List[*catalog.Variant], width int, format string) bool {

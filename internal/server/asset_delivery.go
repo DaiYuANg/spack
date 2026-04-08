@@ -7,9 +7,11 @@ import (
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/daiyuang/spack/internal/assetcache"
+	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/resolver"
 	"github.com/gofiber/fiber/v3"
+	"github.com/samber/lo"
 	"github.com/samber/mo"
 )
 
@@ -27,10 +29,8 @@ func sendResolvedAsset(
 		return "", nil
 	}
 
-	if size, ok := resolvedAssetSizeOption(result).Get(); ok {
-		if bodyCache.ShouldServe(size, request.RangeRequested) {
-			return sendCachedResolvedAsset(c, bodyCache, result)
-		}
+	if shouldServeFromMemoryCache(bodyCache, result, request) {
+		return sendCachedResolvedAsset(c, bodyCache, result)
 	}
 
 	return sendResolvedAssetFile(c, cfg, request, result, requestedFormat, logger)
@@ -56,10 +56,7 @@ func sendCachedResolvedAsset(c fiber.Ctx, bodyCache *assetcache.Cache, result *r
 	if err := c.Send(body); err != nil {
 		return "", fmt.Errorf("send cached asset body: %w", err)
 	}
-	if found {
-		return deliveryMemoryCacheHit, nil
-	}
-	return deliveryMemoryCacheFill, nil
+	return lo.Ternary(found, deliveryMemoryCacheHit, deliveryMemoryCacheFill), nil
 }
 
 func sendResolvedAssetFile(
@@ -90,13 +87,10 @@ func resolvedAssetSizeOption(result *resolver.Result) mo.Option[int64] {
 	if result == nil {
 		return mo.None[int64]()
 	}
-	if result.Variant != nil && result.Variant.Size >= 0 {
-		return mo.Some(result.Variant.Size)
-	}
-	if result.Asset != nil && result.Asset.Size >= 0 {
-		return mo.Some(result.Asset.Size)
-	}
-	return mo.None[int64]()
+	return firstPresentInt64(
+		variantSizeOption(result.Variant),
+		assetSizeOption(result.Asset),
+	)
 }
 
 func logRequest(logger *slog.Logger, c fiber.Ctx, startedAt time.Time) {
@@ -111,4 +105,39 @@ func logRequest(logger *slog.Logger, c fiber.Ctx, startedAt time.Time) {
 		attrs.Add(slog.String("delivery", delivery))
 	}
 	logger.LogAttrs(c.RequestCtx(), slog.LevelInfo, "HTTP request", attrs.Values()...)
+}
+
+func shouldServeFromMemoryCache(bodyCache *assetcache.Cache, result *resolver.Result, request resolver.Request) bool {
+	size, ok := resolvedAssetSizeOption(result).Get()
+	return ok && bodyCache.ShouldServe(size, request.RangeRequested)
+}
+
+func nonNegativeSize(size int64) mo.Option[int64] {
+	if size < 0 {
+		return mo.None[int64]()
+	}
+	return mo.Some(size)
+}
+
+func variantSizeOption(variant *catalog.Variant) mo.Option[int64] {
+	if variant == nil {
+		return mo.None[int64]()
+	}
+	return nonNegativeSize(variant.Size)
+}
+
+func assetSizeOption(asset *catalog.Asset) mo.Option[int64] {
+	if asset == nil {
+		return mo.None[int64]()
+	}
+	return nonNegativeSize(asset.Size)
+}
+
+func firstPresentInt64(options ...mo.Option[int64]) mo.Option[int64] {
+	return lo.Reduce(options, func(found mo.Option[int64], option mo.Option[int64], _ int) mo.Option[int64] {
+		if found.IsPresent() {
+			return found
+		}
+		return option
+	}, mo.None[int64]())
 }

@@ -42,7 +42,7 @@ func (s *compressionStage) Name() string {
 	return "compression"
 }
 
-func (s *compressionStage) Plan(asset *catalog.Asset, request Request) []Task {
+func (s *compressionStage) Plan(asset *catalog.Asset, request Request) collectionx.List[Task] {
 	if !s.cfg.PipelineEnabled() || !isCompressible(asset) {
 		return nil
 	}
@@ -54,7 +54,7 @@ func (s *compressionStage) Plan(asset *catalog.Asset, request Request) []Task {
 	}
 
 	existing := s.catalog.ListVariants(asset.Path)
-	return lo.FilterMap(encodings.Values(), func(encoding string, _ int) (Task, bool) {
+	return collectionx.NewList(lo.FilterMap(encodings.Values(), func(encoding string, _ int) (Task, bool) {
 		if hasEncodingVariant(existing, asset.SourceHash, encoding) {
 			return Task{}, false
 		}
@@ -62,7 +62,7 @@ func (s *compressionStage) Plan(asset *catalog.Asset, request Request) []Task {
 			AssetPath: asset.Path,
 			Encoding:  encoding,
 		}, true
-	})
+	})...)
 }
 
 func (s *compressionStage) Execute(task Task, asset *catalog.Asset) (*catalog.Variant, error) {

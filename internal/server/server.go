@@ -27,6 +27,7 @@ import (
 	recoverer "github.com/gofiber/fiber/v3/middleware/recover"
 	"github.com/gofiber/fiber/v3/middleware/requestid"
 	"github.com/gofiber/template/html/v2"
+	"github.com/samber/lo"
 	"github.com/samber/oops"
 )
 
@@ -138,9 +139,7 @@ func enqueuePipelineResult(result *resolver.Result, pipelineSvc *pipeline.Servic
 }
 
 func metricsMiddleware(obs observabilityx.Observability) fiber.Handler {
-	if obs == nil {
-		obs = observabilityx.NopWithLogger(nil)
-	}
+	obs = lo.Ternary(obs != nil, obs, observabilityx.NopWithLogger(nil))
 
 	return func(c fiber.Ctx) error {
 		startedAt := time.Now()
@@ -176,7 +175,9 @@ func assetDeliveryMetricsAttrs(c fiber.Ctx) []observabilityx.Attribute {
 	if delivery == "" {
 		return nil
 	}
-	return append(requestMetricsAttrs(c), observabilityx.String("delivery", delivery))
+	return lo.Concat(requestMetricsAttrs(c), []observabilityx.Attribute{
+		observabilityx.String("delivery", delivery),
+	})
 }
 
 func requestLogMiddleware(logger *slog.Logger) fiber.Handler {
@@ -193,7 +194,7 @@ func requestLogMiddleware(logger *slog.Logger) fiber.Handler {
 
 func routePattern(mountPath string) string {
 	mountPath = strings.TrimSpace(mountPath)
-	if mountPath == "" || mountPath == "/" {
+	if lo.Contains([]string{"", "/"}, mountPath) {
 		return "/*"
 	}
 	return strings.TrimRight(mountPath, "/") + "*"
@@ -201,7 +202,7 @@ func routePattern(mountPath string) string {
 
 func trimMountPath(requestPath, mountPath string) string {
 	mountPath = strings.TrimSpace(mountPath)
-	if mountPath == "" || mountPath == "/" {
+	if lo.Contains([]string{"", "/"}, mountPath) {
 		return strings.TrimPrefix(requestPath, "/")
 	}
 

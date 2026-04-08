@@ -76,7 +76,7 @@ func (s testStage) Name() string {
 	return s.name
 }
 
-func (testStage) Plan(_ *catalog.Asset, _ Request) []Task {
+func (testStage) Plan(_ *catalog.Asset, _ Request) collectionx.List[Task] {
 	return nil
 }
 
