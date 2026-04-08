@@ -2,6 +2,7 @@
 package task
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/DaiYuANg/arcgo/dix"
@@ -10,31 +11,20 @@ import (
 
 var Module = dix.NewModule("task",
 	dix.WithModuleProviders(
-		dix.Provider1(func(logger *slog.Logger) gocron.Scheduler {
-			s, err := gocron.NewScheduler(
-				gocron.WithLogger(logger),
-			)
-			if err != nil {
-				panic(err)
-			}
-			return s
-		}),
-		dix.Provider2(newTaskRuntime),
+		dix.ProviderErr1(newScheduler),
 	),
 	dix.WithModuleHooks(
-		dix.OnStart(startTaskRuntime),
+		dix.OnStart2(startTaskRuntime),
 		dix.OnStop(stopTaskRuntime),
 	),
 )
 
-type taskRuntime struct {
-	scheduler gocron.Scheduler
-	logger    *slog.Logger
-}
-
-func newTaskRuntime(scheduler gocron.Scheduler, logger *slog.Logger) *taskRuntime {
-	return &taskRuntime{
-		scheduler: scheduler,
-		logger:    logger,
+func newScheduler(logger *slog.Logger) (gocron.Scheduler, error) {
+	scheduler, err := gocron.NewScheduler(
+		gocron.WithLogger(logger),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create scheduler: %w", err)
 	}
+	return scheduler, nil
 }

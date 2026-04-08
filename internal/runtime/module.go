@@ -19,11 +19,10 @@ var Module = dix.NewModule("runtime",
 		dix.Provider6(newCatalogBootstrapRuntime),
 		dix.Provider4(newHTTPRuntime),
 		dix.Provider4(newDebugRuntime),
-		dix.Provider3(newRuntimeState),
 	),
 	dix.WithModuleHooks(
-		dix.OnStart(startRuntime),
-		dix.OnStop(stopRuntime),
+		dix.OnStart3(startRuntime),
+		dix.OnStop2(stopRuntime),
 	),
 )
 
@@ -67,24 +66,6 @@ func newHTTPRuntime(app *fiber.App, cfg *config.Config, cat catalog.Catalog, log
 		cfg:    cfg,
 		cat:    cat,
 		logger: logger,
-	}
-}
-
-type runtimeState struct {
-	bootstrap catalogBootstrapRuntime
-	http      httpRuntime
-	debug     *debugRuntime
-}
-
-func newRuntimeState(
-	bootstrap catalogBootstrapRuntime,
-	http httpRuntime,
-	debug *debugRuntime,
-) *runtimeState {
-	return &runtimeState{
-		bootstrap: bootstrap,
-		http:      http,
-		debug:     debug,
 	}
 }
 
