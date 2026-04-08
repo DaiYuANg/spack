@@ -3,12 +3,13 @@ package task
 import (
 	"context"
 
+	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/go-co-op/gocron/v2"
 	"github.com/samber/oops"
 )
 
-func startTaskRuntime(ctx context.Context, scheduler gocron.Scheduler, runtime *sourceRescanRuntime) error {
-	return startScheduledTasks(context.WithoutCancel(ctx), scheduler, runtime)
+func startTaskRuntime(ctx context.Context, scheduler gocron.Scheduler, registrations collectionx.List[taskRegistration]) error {
+	return startScheduledTasks(context.WithoutCancel(ctx), scheduler, registrations)
 }
 
 func stopTaskRuntime(ctx context.Context, scheduler gocron.Scheduler) error {

@@ -29,20 +29,6 @@ type SourceRescanReport struct {
 	CacheInvalidations int
 }
 
-func startScheduledTasks(ctx context.Context, scheduler gocron.Scheduler, runtime *sourceRescanRuntime) error {
-	started := false
-	if enabled, err := registerSourceRescanTask(ctx, scheduler, runtime); err != nil {
-		return err
-	} else if enabled {
-		started = true
-	}
-
-	if started {
-		scheduler.Start()
-	}
-	return nil
-}
-
 func registerSourceRescanTask(ctx context.Context, scheduler gocron.Scheduler, runtime *sourceRescanRuntime) (bool, error) {
 	if runtime == nil {
 		return false, nil

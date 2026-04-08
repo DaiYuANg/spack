@@ -3,6 +3,7 @@ package task
 import (
 	"context"
 
+	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/source"
@@ -16,4 +17,14 @@ func SyncSourceCatalogForTest(
 	bodyCache *assetcache.Cache,
 ) (SourceRescanReport, error) {
 	return syncSourceCatalog(ctx, src, cat, bodyCache)
+}
+
+// SyncArtifactCatalogForTest exposes artifact/catalog reconciliation for black-box tests.
+func SyncArtifactCatalogForTest(
+	ctx context.Context,
+	store artifact.Store,
+	cat catalog.Catalog,
+	bodyCache *assetcache.Cache,
+) (ArtifactJanitorReport, error) {
+	return syncArtifactCatalog(ctx, store, cat, bodyCache)
 }

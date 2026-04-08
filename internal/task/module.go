@@ -2,13 +2,19 @@
 package task
 
 import (
+	"cmp"
+	"context"
 	"log/slog"
+	"strings"
 
+	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/dix"
+	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/source"
 	"github.com/go-co-op/gocron/v2"
+	"github.com/samber/lo"
 	"github.com/samber/oops"
 )
 
@@ -16,6 +22,10 @@ var Module = dix.NewModule("task",
 	dix.WithModuleProviders(
 		dix.ProviderErr1(newScheduler),
 		dix.Provider4(newSourceRescanRuntime),
+		dix.Provider4(newArtifactJanitorRuntime),
+		dix.Provider1(newSourceRescanTaskRegistration),
+		dix.Provider1(newArtifactJanitorTaskRegistration),
+		dix.Provider2(newTaskRegistrations),
 	),
 	dix.WithModuleHooks(
 		dix.OnStart2(startTaskRuntime),
@@ -31,6 +41,47 @@ func newScheduler(logger *slog.Logger) (gocron.Scheduler, error) {
 		return nil, oops.In("task").Owner("scheduler").Wrap(err)
 	}
 	return scheduler, nil
+}
+
+type taskRegistration struct {
+	Order    int
+	Name     string
+	Register func(context.Context, gocron.Scheduler) (bool, error)
+}
+
+type sourceRescanTaskRegistration struct {
+	taskRegistration
+}
+
+type artifactJanitorTaskRegistration struct {
+	taskRegistration
+}
+
+func newTaskRegistration(
+	order int,
+	name string,
+	register func(context.Context, gocron.Scheduler) (bool, error),
+) taskRegistration {
+	return taskRegistration{
+		Order:    order,
+		Name:     strings.TrimSpace(name),
+		Register: register,
+	}
+}
+
+func newTaskRegistrations(
+	sourceRescan sourceRescanTaskRegistration,
+	artifactJanitor artifactJanitorTaskRegistration,
+) collectionx.List[taskRegistration] {
+	return collectionx.NewList(
+		sourceRescan.taskRegistration,
+		artifactJanitor.taskRegistration,
+	).Sort(func(left, right taskRegistration) int {
+		if left.Order != right.Order {
+			return cmp.Compare(left.Order, right.Order)
+		}
+		return cmp.Compare(left.Name, right.Name)
+	})
 }
 
 type sourceRescanRuntime struct {
@@ -52,4 +103,68 @@ func newSourceRescanRuntime(
 		bodyCache: bodyCache,
 		logger:    logger,
 	}
+}
+
+func newSourceRescanTaskRegistration(runtime *sourceRescanRuntime) sourceRescanTaskRegistration {
+	return sourceRescanTaskRegistration{newTaskRegistration(100, "source_rescan", func(ctx context.Context, scheduler gocron.Scheduler) (bool, error) {
+		return registerSourceRescanTask(ctx, scheduler, runtime)
+	})}
+}
+
+type artifactJanitorRuntime struct {
+	store     artifact.Store
+	catalog   catalog.Catalog
+	bodyCache *assetcache.Cache
+	logger    *slog.Logger
+}
+
+func newArtifactJanitorRuntime(
+	store artifact.Store,
+	cat catalog.Catalog,
+	bodyCache *assetcache.Cache,
+	logger *slog.Logger,
+) *artifactJanitorRuntime {
+	return &artifactJanitorRuntime{
+		store:     store,
+		catalog:   cat,
+		bodyCache: bodyCache,
+		logger:    logger,
+	}
+}
+
+func newArtifactJanitorTaskRegistration(runtime *artifactJanitorRuntime) artifactJanitorTaskRegistration {
+	return artifactJanitorTaskRegistration{newTaskRegistration(200, "artifact_janitor", func(ctx context.Context, scheduler gocron.Scheduler) (bool, error) {
+		return registerArtifactJanitorTask(ctx, scheduler, runtime)
+	})}
+}
+
+func startScheduledTasks(
+	ctx context.Context,
+	scheduler gocron.Scheduler,
+	registrations collectionx.List[taskRegistration],
+) error {
+	registered := lo.FilterMap(registrations.Values(), func(registration taskRegistration, _ int) (taskRegistration, bool) {
+		if registration.Register == nil {
+			return taskRegistration{}, false
+		}
+		return registration, true
+	})
+	if len(registered) == 0 {
+		return nil
+	}
+
+	started := false
+	for _, registration := range registered {
+		enabled, err := registration.Register(ctx, scheduler)
+		if err != nil {
+			return oops.In("task").Owner(registration.Name).Wrap(err)
+		}
+		if enabled {
+			started = true
+		}
+	}
+	if started {
+		scheduler.Start()
+	}
+	return nil
 }
