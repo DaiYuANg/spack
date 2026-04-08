@@ -2,8 +2,6 @@
 package pipeline
 
 import (
-	"bytes"
-	"compress/gzip"
 	"fmt"
 	"os"
 	"strconv"
@@ -11,18 +9,18 @@ import (
 	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/andybalholm/brotli"
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/contentcoding"
 	"github.com/samber/lo"
-	"github.com/samber/oops"
 )
 
 type compressionStage struct {
-	cfg     *config.Compression
-	store   artifact.Store
-	catalog catalog.Catalog
+	cfg        *config.Compression
+	store      artifact.Store
+	catalog    catalog.Catalog
+	strategies contentcoding.Registry
 }
 
 type compressionStageIn struct {
@@ -36,6 +34,11 @@ func newCompressionStage(in compressionStageIn) *compressionStage {
 		cfg:     in.Config,
 		store:   in.Store,
 		catalog: in.Catalog,
+		strategies: contentcoding.NewRegistry(contentcoding.Options{
+			BrotliQuality: in.Config.BrotliQuality,
+			GzipLevel:     in.Config.GzipLevel,
+			ZstdLevel:     in.Config.ZstdLevel,
+		}, in.Config.NormalizedEncodings()),
 	}
 }
 
@@ -52,9 +55,10 @@ func (s *compressionStage) Plan(asset *catalog.Asset, request Request) []Task {
 		return nil
 	}
 
-	encodings := normalizeEncodings(request.PreferredEncodings)
+	supportedEncodings := s.cfg.NormalizedEncodings()
+	encodings := filterConfiguredEncodings(normalizeEncodings(request.PreferredEncodings), supportedEncodings)
 	if encodings.IsEmpty() {
-		encodings = collectionx.NewList("br", "gzip")
+		encodings = supportedEncodings
 	}
 
 	existing := s.catalog.ListVariants(asset.Path)
@@ -112,41 +116,16 @@ func (s *compressionStage) Execute(task Task, asset *catalog.Asset) (*catalog.Va
 }
 
 func (s *compressionStage) compress(raw []byte, encoding string) ([]byte, string, error) {
-	switch encoding {
-	case "br":
-		return s.compressBrotli(raw)
-	case "gzip":
-		return s.compressGzip(raw)
-	default:
+	strategy, ok := s.strategies.Lookup(encoding)
+	if !ok {
 		return nil, "", fmt.Errorf("unsupported compression encoding: %s", encoding)
 	}
-}
 
-func (s *compressionStage) compressBrotli(raw []byte) ([]byte, string, error) {
-	var buf bytes.Buffer
-	writer := brotli.NewWriterLevel(&buf, clampBrotliQuality(s.cfg.BrotliQuality))
-	if _, err := writer.Write(raw); err != nil {
-		return nil, "", oops.In("compress").Wrap(fmt.Errorf("write brotli payload: %w", err))
-	}
-	if err := writer.Close(); err != nil {
-		return nil, "", oops.Owner("compress brotli writer").In("closer").Wrap(fmt.Errorf("close brotli writer: %w", err))
-	}
-	return buf.Bytes(), ".br", nil
-}
-
-func (s *compressionStage) compressGzip(raw []byte) ([]byte, string, error) {
-	var buf bytes.Buffer
-	writer, err := gzip.NewWriterLevel(&buf, clampGzipLevel(s.cfg.GzipLevel))
+	compressed, err := strategy.Compress(raw)
 	if err != nil {
-		return nil, "", fmt.Errorf("create gzip writer: %w", err)
+		return nil, "", err
 	}
-	if _, err := writer.Write(raw); err != nil {
-		return nil, "", fmt.Errorf("write gzip payload: %w", err)
-	}
-	if err := writer.Close(); err != nil {
-		return nil, "", fmt.Errorf("close gzip writer: %w", err)
-	}
-	return buf.Bytes(), ".gz", nil
+	return compressed, strategy.Suffix(), nil
 }
 
 func hasEncodingVariant(variants collectionx.List[*catalog.Variant], sourceHash, encoding string) bool {
@@ -208,34 +187,11 @@ func isKnownCompressibleType(mime string) bool {
 }
 
 func normalizeEncodings(encodings collectionx.List[string]) collectionx.List[string] {
-	if encodings.IsEmpty() {
-		return collectionx.NewList[string]()
-	}
+	return contentcoding.NormalizeNames(encodings)
+}
 
-	ordered := collectionx.NewOrderedSetWithCapacity[string](encodings.Len())
-	encodings.Each(func(_ int, raw string) {
-		encoding := strings.ToLower(strings.TrimSpace(raw))
-		switch encoding {
-		case "br", "gzip":
-			ordered.Add(encoding)
-		}
+func filterConfiguredEncodings(encodings, supported collectionx.List[string]) collectionx.List[string] {
+	return collectionx.FilterMapList(encodings, func(_ int, encoding string) (string, bool) {
+		return encoding, lo.Contains(supported.Values(), encoding)
 	})
-	return collectionx.NewList(ordered.Values()...)
-}
-
-func clampGzipLevel(level int) int {
-	if level < gzip.BestSpeed || level > gzip.BestCompression {
-		return gzip.DefaultCompression
-	}
-	return level
-}
-
-func clampBrotliQuality(q int) int {
-	if q < 0 {
-		return 0
-	}
-	if q > 11 {
-		return 11
-	}
-	return q
 }

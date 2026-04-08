@@ -10,24 +10,31 @@ import (
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/contentcoding"
 	"github.com/daiyuang/spack/internal/media"
 )
 
 var ErrNotFound = errors.New("asset not found")
 
 func newResolver(in resolverIn) *Resolver {
+	supportedEncodings := contentcoding.DefaultNames()
+	if in.Compression != nil {
+		supportedEncodings = in.Compression.NormalizedEncodings()
+	}
 	return &Resolver{
-		cfg:     in.Config,
-		catalog: in.Catalog,
-		logger:  in.Logger,
+		cfg:                in.Config,
+		supportedEncodings: supportedEncodings,
+		catalog:            in.Catalog,
+		logger:             in.Logger,
 	}
 }
 
-func newResolverFromDeps(cfg *config.Assets, cat catalog.Catalog, logger *slog.Logger) *Resolver {
+func newResolverFromDeps(cfg *config.Assets, compression *config.Compression, cat catalog.Catalog, logger *slog.Logger) *Resolver {
 	return newResolver(resolverIn{
-		Config:  cfg,
-		Catalog: cat,
-		Logger:  logger,
+		Config:      cfg,
+		Compression: compression,
+		Catalog:     cat,
+		Logger:      logger,
 	})
 }
 
@@ -37,7 +44,7 @@ func (r *Resolver) Resolve(request Request) (*Result, error) {
 		return nil, ErrNotFound
 	}
 
-	encodings := parseAcceptEncoding(request.AcceptEncoding)
+	encodings := parseAcceptEncoding(request.AcceptEncoding, r.supportedEncodings)
 	requestedFormat := media.NormalizeImageFormat(request.Format)
 	preferredImageFormats := preferredImageFormats(request.Accept, requestedFormat, asset.MediaType)
 	if request.Width > 0 || preferredImageFormats.Len() > 0 {

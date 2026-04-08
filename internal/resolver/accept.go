@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/daiyuang/spack/internal/contentcoding"
 	"github.com/daiyuang/spack/internal/media"
 	"github.com/samber/lo"
 )
@@ -29,12 +30,12 @@ type imagePreferences struct {
 	hasWildcardAny   bool
 }
 
-func parseAcceptEncoding(header string) collectionx.List[string] {
+func parseAcceptEncoding(header string, supported collectionx.List[string]) collectionx.List[string] {
 	if strings.TrimSpace(header) == "" {
 		return collectionx.NewList[string]()
 	}
 
-	return buildEncodingCandidates(collectEncodingPreferences(parseAcceptEntries(header)))
+	return buildEncodingCandidates(collectEncodingPreferences(parseAcceptEntries(header)), supported)
 }
 
 func parseAcceptImageFormats(header, sourceFormat string) collectionx.List[string] {
@@ -108,14 +109,17 @@ func collectEncodingPreferences(entries collectionx.List[acceptEntry]) encodingP
 	})
 }
 
-func buildEncodingCandidates(prefs encodingPreferences) collectionx.List[string] {
+func buildEncodingCandidates(prefs encodingPreferences, supported collectionx.List[string]) collectionx.List[string] {
 	type candidate struct {
 		encoding string
 		q        float64
 		priority int
 	}
 
-	supported := collectionx.NewList("br", "gzip")
+	supported = contentcoding.NormalizeNames(supported)
+	if supported.IsEmpty() {
+		supported = contentcoding.DefaultNames()
+	}
 	choices := collectionx.FilterMapList(supported, func(index int, encoding string) (candidate, bool) {
 		q, ok := encodingQuality(prefs, encoding)
 		if !ok {

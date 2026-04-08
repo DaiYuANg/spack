@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -70,5 +71,17 @@ func TestCompressionNamespaceMaxAges(t *testing.T) {
 	got = cfg.NamespaceMaxAges()
 	if got.Len() != 0 {
 		t.Fatalf("expected empty namespace max ages, got %#v", got)
+	}
+}
+
+func TestCompressionNormalizedEncodings(t *testing.T) {
+	cfg := config.Compression{Encodings: " gzip , zstd , bad , gzip "}
+	if got := cfg.NormalizedEncodings(); !slices.Equal(got.Values(), []string{"gzip", "zstd"}) {
+		t.Fatalf("expected normalized encodings [gzip zstd], got %#v", got.Values())
+	}
+
+	cfg = config.Compression{Encodings: "bad"}
+	if got := cfg.NormalizedEncodings(); !slices.Equal(got.Values(), []string{"br", "zstd", "gzip"}) {
+		t.Fatalf("expected default encodings [br zstd gzip], got %#v", got.Values())
 	}
 }

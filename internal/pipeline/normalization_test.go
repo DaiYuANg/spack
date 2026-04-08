@@ -9,8 +9,8 @@ import (
 )
 
 func TestNormalizeEncodingsPreservesFirstSeenOrder(t *testing.T) {
-	got := pipeline.NormalizeEncodingsForTest(collectionx.NewList(" gzip ", "br", "gzip", "bad", "br"))
-	want := []string{"gzip", "br"}
+	got := pipeline.NormalizeEncodingsForTest(collectionx.NewList(" gzip ", "br", "gzip", "zstd", "bad", "br"))
+	want := []string{"gzip", "br", "zstd"}
 	if !slices.Equal(got.Values(), want) {
 		t.Fatalf("expected encodings %#v, got %#v", want, got)
 	}
@@ -25,8 +25,8 @@ func TestNormalizeImageFormatsPreservesFirstSeenOrder(t *testing.T) {
 }
 
 func TestNormalizeRequestStringsSortsAndDeduplicates(t *testing.T) {
-	got := pipeline.NormalizeRequestStringsForTest(collectionx.NewList(" gzip ", "br", "gzip", "", " BR "))
-	want := []string{"br", "gzip"}
+	got := pipeline.NormalizeRequestStringsForTest(collectionx.NewList(" gzip ", "br", "gzip", "zstd", "", " BR "))
+	want := []string{"br", "gzip", "zstd"}
 	if !slices.Equal(got.Values(), want) {
 		t.Fatalf("expected request strings %#v, got %#v", want, got)
 	}

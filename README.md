@@ -14,7 +14,7 @@ Current scope:
 - SPA/static asset serving
 - `index.html` fallback for client-side routing
 - runtime asset catalog
-- `gzip` and `brotli` variant generation
+- `gzip`, `brotli`, and `zstd` variant generation
 - on-demand image width/format variants via query or `Accept` negotiation
 - in-memory hot asset cache for small files with optional startup warmup
 - `sendfile` delivery for disk-backed assets and range requests
@@ -164,6 +164,7 @@ CLI flags use config-path names directly, for example:
 - `--assets.backend=local`
 - `--assets.fallback.target=index.html`
 - `--compression.mode=warmup`
+- `--compression.encodings=br,zstd,gzip`
 - `--logger.level=info`
 
 You can pass `--config` multiple times. Later files override earlier ones.
@@ -204,12 +205,14 @@ Compression:
 - `SPACK_COMPRESSION_MIN_SIZE=1024`
 - `SPACK_COMPRESSION_WORKERS=2`
 - `SPACK_COMPRESSION_QUEUE_SIZE=128`
+- `SPACK_COMPRESSION_ENCODINGS=br,zstd,gzip`
 - `SPACK_COMPRESSION_CLEANUP_EVERY=5m`
 - `SPACK_COMPRESSION_MAX_AGE=168h`
 - `SPACK_COMPRESSION_IMAGE_MAX_AGE=336h`
 - `SPACK_COMPRESSION_ENCODING_MAX_AGE=168h`
 - `SPACK_COMPRESSION_MAX_CACHE_BYTES=1073741824`
 - `SPACK_COMPRESSION_BROTLI_QUALITY=5`
+- `SPACK_COMPRESSION_ZSTD_LEVEL=3`
 - `SPACK_COMPRESSION_GZIP_LEVEL=5`
 
 Images:

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/daiyuang/spack/internal/contentcoding"
 	"github.com/daiyuang/spack/internal/validation"
 )
 
@@ -21,12 +22,14 @@ type Compression struct {
 	MinSize        int64  `koanf:"min_size"         validate:"gte=0"`
 	Workers        int    `koanf:"workers"          validate:"gte=0"`
 	QueueSize      int    `koanf:"queue_size"       validate:"gte=0"`
+	Encodings      string `koanf:"encodings"`
 	CleanupEvery   string `koanf:"cleanup_every"    validate:"omitempty,spack_duration"`
 	MaxAge         string `koanf:"max_age"          validate:"omitempty,spack_flexible_duration"`
 	ImageMaxAge    string `koanf:"image_max_age"    validate:"omitempty,spack_flexible_duration"`
 	EncodingMaxAge string `koanf:"encoding_max_age" validate:"omitempty,spack_flexible_duration"`
 	MaxCacheBytes  int64  `koanf:"max_cache_bytes"  validate:"gte=0"`
 	BrotliQuality  int    `koanf:"brotli_quality"   validate:"gte=0,lte=11"`
+	ZstdLevel      int    `koanf:"zstd_level"       validate:"gte=0,lte=22"`
 	GzipLevel      int    `koanf:"gzip_level"       validate:"gte=-2,lte=9"`
 }
 
@@ -53,6 +56,10 @@ func (c Compression) QueueCapacity() int {
 	}
 	workers := max(c.Workers, 1)
 	return workers * 64
+}
+
+func (c Compression) NormalizedEncodings() collectionx.List[string] {
+	return contentcoding.ResolveNames(c.Encodings)
 }
 
 func (c Compression) ParsedCleanupInterval() time.Duration {

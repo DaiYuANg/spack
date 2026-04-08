@@ -31,13 +31,15 @@ type Result struct {
 }
 
 type Resolver struct {
-	cfg     *config.Assets
-	catalog catalog.Catalog
-	logger  *slog.Logger
+	cfg                *config.Assets
+	supportedEncodings collectionx.List[string]
+	catalog            catalog.Catalog
+	logger             *slog.Logger
 }
 
 type resolverIn struct {
-	Config  *config.Assets
-	Catalog catalog.Catalog
-	Logger  *slog.Logger
+	Config      *config.Assets
+	Compression *config.Compression
+	Catalog     catalog.Catalog
+	Logger      *slog.Logger
 }

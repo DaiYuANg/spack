@@ -100,11 +100,13 @@ func bindCompressionFlags(flags *pflag.FlagSet, defaults config.Compression) {
 	flags.Int64("compression.min_size", defaults.MinSize, "Minimum asset size in bytes eligible for compression.")
 	flags.Int("compression.workers", defaults.Workers, "Compression worker count.")
 	flags.Int("compression.queue_size", defaults.QueueSize, "Compression queue capacity.")
+	flags.String("compression.encodings", defaults.Encodings, "Comma-separated supported compression encodings in preference order.")
 	flags.String("compression.cleanup_every", defaults.CleanupEvery, "Compression cache cleanup interval.")
 	flags.String("compression.max_age", defaults.MaxAge, "Default cache max-age for compressed responses.")
 	flags.String("compression.image_max_age", defaults.ImageMaxAge, "Cache max-age for generated image variants.")
 	flags.String("compression.encoding_max_age", defaults.EncodingMaxAge, "Cache max-age for precompressed variants.")
 	flags.Int64("compression.max_cache_bytes", defaults.MaxCacheBytes, "Maximum bytes allowed in compression cache.")
 	flags.Int("compression.brotli_quality", defaults.BrotliQuality, "Brotli compression quality.")
+	flags.Int("compression.zstd_level", defaults.ZstdLevel, "Zstd compression level.")
 	flags.Int("compression.gzip_level", defaults.GzipLevel, "Gzip compression level.")
 }

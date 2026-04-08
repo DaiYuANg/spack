@@ -143,6 +143,8 @@ func configLogAttrs(cfg *config.Config) collectionx.List[slog.Attr] {
 		slog.Int64("compression_min_size", cfg.Compression.MinSize),
 		slog.Int("compression_workers", cfg.Compression.Workers),
 		slog.Int("compression_queue_size", cfg.Compression.QueueCapacity()),
+		slog.Any("compression_encodings", cfg.Compression.NormalizedEncodings().Values()),
+		slog.Int("compression_zstd_level", cfg.Compression.ZstdLevel),
 		slog.Bool("image_enable", cfg.Image.Enable),
 		slog.Any("image_widths", cfg.Image.ParsedWidths().Values()),
 		slog.Int("image_jpeg_quality", cfg.Image.JPEGQuality),

@@ -3,6 +3,7 @@ package pipeline_test
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -48,13 +49,14 @@ func TestCompressionStagePlanSkipsExistingVariant(t *testing.T) {
 
 	tasks := stage.Plan(asset, pipeline.Request{
 		AssetPath:          asset.Path,
-		PreferredEncodings: collectionx.NewList("br", "gzip"),
+		PreferredEncodings: collectionx.NewList("br", "gzip", "zstd"),
 	})
-	if len(tasks) != 1 {
-		t.Fatalf("expected one task, got %d", len(tasks))
+	if len(tasks) != 2 {
+		t.Fatalf("expected two tasks, got %d", len(tasks))
 	}
-	if tasks[0].Encoding != "gzip" {
-		t.Fatalf("expected gzip task, got %q", tasks[0].Encoding)
+	got := []string{tasks[0].Encoding, tasks[1].Encoding}
+	if !slices.Equal(got, []string{"gzip", "zstd"}) {
+		t.Fatalf("expected gzip and zstd tasks, got %#v", got)
 	}
 }
 
@@ -103,6 +105,111 @@ func TestCompressionStageExecuteCreatesVariant(t *testing.T) {
 	expectedPath := store.PathFor(asset.Path, asset.SourceHash, "encoding", ".gz")
 	if _, err := os.Stat(expectedPath); err != nil {
 		t.Fatalf("expected artifact to exist: %v", err)
+	}
+}
+
+func TestCompressionStageExecuteCreatesZstdVariant(t *testing.T) {
+	dir := t.TempDir()
+	sourcePath := filepath.Join(dir, "payload.json")
+	raw := []byte(`{"message":"` + strings.Repeat("zstd-payload-", 512) + `"}`)
+	if err := os.WriteFile(sourcePath, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cat := catalog.NewInMemoryCatalog()
+	asset := &catalog.Asset{
+		Path:       "payload.json",
+		FullPath:   sourcePath,
+		MediaType:  "application/json",
+		SourceHash: "hash-zstd",
+		ETag:       "\"hash-zstd\"",
+	}
+	if err := cat.UpsertAsset(asset); err != nil {
+		t.Fatal(err)
+	}
+
+	store := newTestStore(filepath.Join(dir, "cache"))
+	stage := pipeline.NewCompressionStageForTest(&config.Compression{
+		Enable:    true,
+		Mode:      config.CompressionModeLazy,
+		CacheDir:  filepath.Join(dir, "cache"),
+		MinSize:   1,
+		ZstdLevel: 3,
+	}, store, cat)
+
+	variant, err := stage.Execute(pipeline.Task{
+		AssetPath: asset.Path,
+		Encoding:  "zstd",
+	}, asset)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if variant == nil {
+		t.Fatal("expected zstd variant to be created")
+	}
+	if variant.Encoding != "zstd" {
+		t.Fatalf("expected zstd encoding, got %q", variant.Encoding)
+	}
+	expectedPath := store.PathFor(asset.Path, asset.SourceHash, "encoding", ".zst")
+	if _, err := os.Stat(expectedPath); err != nil {
+		t.Fatalf("expected zstd artifact to exist: %v", err)
+	}
+}
+
+func TestCompressionStagePlanUsesConfiguredEncodingOrder(t *testing.T) {
+	cat := catalog.NewInMemoryCatalog()
+	asset := &catalog.Asset{
+		Path:       "app.js",
+		FullPath:   "app.js",
+		MediaType:  "application/javascript",
+		SourceHash: "hash-1",
+		ETag:       "\"hash-1\"",
+	}
+	if err := cat.UpsertAsset(asset); err != nil {
+		t.Fatal(err)
+	}
+
+	stage := pipeline.NewCompressionStageForTest(&config.Compression{
+		Enable:    true,
+		Mode:      config.CompressionModeLazy,
+		Encodings: "gzip,zstd",
+	}, newTestStore(t.TempDir()), cat)
+
+	tasks := stage.Plan(asset, pipeline.Request{AssetPath: asset.Path})
+	if len(tasks) != 2 {
+		t.Fatalf("expected two tasks, got %d", len(tasks))
+	}
+	got := []string{tasks[0].Encoding, tasks[1].Encoding}
+	if !slices.Equal(got, []string{"gzip", "zstd"}) {
+		t.Fatalf("expected configured encoding order [gzip zstd], got %#v", got)
+	}
+}
+
+func TestCompressionStagePlanFiltersDisabledRequestEncodings(t *testing.T) {
+	cat := catalog.NewInMemoryCatalog()
+	asset := &catalog.Asset{
+		Path:       "app.js",
+		FullPath:   "app.js",
+		MediaType:  "application/javascript",
+		SourceHash: "hash-1",
+		ETag:       "\"hash-1\"",
+	}
+	if err := cat.UpsertAsset(asset); err != nil {
+		t.Fatal(err)
+	}
+
+	stage := pipeline.NewCompressionStageForTest(&config.Compression{
+		Enable:    true,
+		Mode:      config.CompressionModeLazy,
+		Encodings: "br,gzip",
+	}, newTestStore(t.TempDir()), cat)
+
+	tasks := stage.Plan(asset, pipeline.Request{
+		AssetPath:          asset.Path,
+		PreferredEncodings: collectionx.NewList("zstd", "gzip"),
+	})
+	if len(tasks) != 1 || tasks[0].Encoding != "gzip" {
+		t.Fatalf("expected only enabled gzip task, got %#v", tasks)
 	}
 }
 

@@ -80,8 +80,8 @@ func TestCatalogReadyAttrsIncludeCacheAndCompressionState(t *testing.T) {
 	if attrMap["variants"] != int64(1) {
 		t.Fatalf("expected variants attr to be 1, got %#v", attrMap["variants"])
 	}
-	if attrMap["memory_cache_enable"] != false {
-		t.Fatalf("expected memory_cache_enable false, got %#v", attrMap["memory_cache_enable"])
+	if attrMap["memory_cache_enable"] != true {
+		t.Fatalf("expected memory_cache_enable true, got %#v", attrMap["memory_cache_enable"])
 	}
 	if attrMap["compression_mode"] != cfg.Compression.NormalizedMode() {
 		t.Fatalf("expected compression_mode %q, got %#v", cfg.Compression.NormalizedMode(), attrMap["compression_mode"])
