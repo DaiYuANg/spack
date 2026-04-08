@@ -14,7 +14,6 @@ import (
 	"github.com/daiyuang/spack/internal/pipeline"
 	"github.com/daiyuang/spack/internal/resolver"
 	"github.com/gofiber/fiber/v3"
-	"github.com/samber/do/v2"
 )
 
 var Module = dix.NewModule("server",
@@ -23,15 +22,7 @@ var Module = dix.NewModule("server",
 		dix.Provider1(newHealthRoutesRegistration),
 		dix.Provider6(newAssetRouteRegistration),
 		dix.Provider3(newServerRegistrations),
-		dix.RawProviderWithMetadata(registerServerProvider, dix.ProviderMetadata{
-			Label:  "ServerProvider",
-			Output: dix.TypedService[*fiber.App](),
-			Dependencies: dix.ServiceRefs(
-				dix.TypedService[*config.Config](),
-				dix.TypedService[collectionx.List[appRegistration]](),
-			),
-			Raw: true,
-		}),
+		dix.ProviderErr2(newServerFromDeps),
 	),
 )
 
@@ -119,18 +110,4 @@ func newServerFromDeps(cfg *config.Config, registrations collectionx.List[appReg
 		return true
 	})
 	return app, nil
-}
-
-func registerServerProvider(c *dix.Container) {
-	do.ProvideNamed(c.Raw(), dix.TypedService[*fiber.App]().Name, func(i do.Injector) (*fiber.App, error) {
-		cfg, err := do.InvokeNamed[*config.Config](i, dix.TypedService[*config.Config]().Name)
-		if err != nil {
-			return nil, err
-		}
-		registrations, err := do.InvokeNamed[collectionx.List[appRegistration]](i, dix.TypedService[collectionx.List[appRegistration]]().Name)
-		if err != nil {
-			return nil, err
-		}
-		return newServerFromDeps(cfg, registrations)
-	})
 }

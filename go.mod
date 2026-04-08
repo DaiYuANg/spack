@@ -10,9 +10,9 @@ tool (
 )
 
 require (
-	github.com/DaiYuANg/arcgo/collectionx v0.1.2
+	github.com/DaiYuANg/arcgo/collectionx v0.1.3
 	github.com/DaiYuANg/arcgo/configx v0.2.1
-	github.com/DaiYuANg/arcgo/dix v0.2.2
+	github.com/DaiYuANg/arcgo/dix v0.3.0
 	github.com/DaiYuANg/arcgo/eventx v0.2.1
 	github.com/DaiYuANg/arcgo/logx v0.1.1
 	github.com/DaiYuANg/arcgo/observabilityx v0.1.1
@@ -29,6 +29,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/goyek/goyek/v2 v2.3.0
 	github.com/joho/godotenv v1.5.1
+	github.com/klauspost/compress v1.18.5
 	github.com/panjf2000/ants/v2 v2.12.0
 	github.com/pquerna/cachecontrol v0.2.0
 	github.com/prometheus/client_golang v1.23.2
@@ -69,7 +70,7 @@ require (
 	github.com/Antonboom/nilnil v1.1.1 // indirect
 	github.com/Antonboom/testifylint v1.6.4 // indirect
 	github.com/BurntSushi/toml v1.6.0 // indirect
-	github.com/DaiYuANg/arcgo/pkg/option v0.0.0-20260406093614-39f4f3dbfb3e // indirect
+	github.com/DaiYuANg/arcgo/pkg/option v0.0.0-20260408040114-1b83463ebd5d // indirect
 	github.com/Djarvur/go-err113 v0.1.1 // indirect
 	github.com/DmitriyVTitov/size v1.5.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.31.0 // indirect
@@ -235,7 +236,6 @@ require (
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/kisielk/errcheck v1.10.0 // indirect
 	github.com/kkHAIKE/contextcheck v1.1.6 // indirect
-	github.com/klauspost/compress v1.18.5 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/klauspost/pgzip v1.2.6 // indirect
 	github.com/knadh/koanf/maps v0.1.2 // indirect
@@ -309,7 +309,7 @@ require (
 	github.com/sajari/fuzzy v1.0.0 // indirect
 	github.com/samber/go-singleflightx v0.3.2 // indirect
 	github.com/samber/go-type-to-string v1.8.0 // indirect
-	github.com/samber/oops/loggers/zerolog v0.0.0-20260406154246-13cd300e3bcf // indirect
+	github.com/samber/oops/loggers/zerolog v0.0.0-20260407233437-b85b04a841c2 // indirect
 	github.com/samber/slog-common v0.22.0 // indirect
 	github.com/samber/slog-zerolog/v2 v2.9.2 // indirect
 	github.com/sanposhiho/wastedassign/v2 v2.1.0 // indirect
@@ -348,7 +348,7 @@ require (
 	github.com/uudashr/gocognit v1.2.1 // indirect
 	github.com/uudashr/iface v1.4.1 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasthttp v1.69.0 // indirect
+	github.com/valyala/fasthttp v1.70.0 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xen0n/gosmopolitan v1.3.0 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect

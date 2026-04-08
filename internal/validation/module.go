@@ -3,22 +3,10 @@ package validation
 
 import (
 	"github.com/DaiYuANg/arcgo/dix"
-	"github.com/go-playground/validator/v10"
-	"github.com/samber/do/v2"
 )
 
 var Module = dix.NewModule("validation",
 	dix.WithModuleProviders(
-		dix.RawProviderWithMetadata(registerValidatorProvider, dix.ProviderMetadata{
-			Label:  "ValidatorProvider",
-			Output: dix.TypedService[*validator.Validate](),
-			Raw:    true,
-		}),
+		dix.ProviderErr0(New),
 	),
 )
-
-func registerValidatorProvider(c *dix.Container) {
-	do.ProvideNamed(c.Raw(), dix.TypedService[*validator.Validate]().Name, func(do.Injector) (*validator.Validate, error) {
-		return New()
-	})
-}

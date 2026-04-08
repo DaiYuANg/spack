@@ -7,20 +7,12 @@ import (
 
 	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/panjf2000/ants/v2"
-	"github.com/samber/do/v2"
 )
 
 var Module = dix.NewModule("workerpool",
 	dix.WithModuleProviders(
 		dix.Provider1(newSettings),
-		dix.RawProviderWithMetadata(registerPoolProvider, dix.ProviderMetadata{
-			Label:  "WorkerPoolProvider",
-			Output: dix.TypedService[*ants.Pool](),
-			Dependencies: dix.ServiceRefs(
-				dix.TypedService[*Settings](),
-			),
-			Raw: true,
-		}),
+		dix.ProviderErr1(newPool),
 	),
 	dix.WithModuleHooks(
 		dix.OnStop(func(ctx context.Context, pool *ants.Pool) error {
@@ -34,13 +26,3 @@ var Module = dix.NewModule("workerpool",
 		}),
 	),
 )
-
-func registerPoolProvider(c *dix.Container) {
-	do.ProvideNamed(c.Raw(), dix.TypedService[*ants.Pool]().Name, func(i do.Injector) (*ants.Pool, error) {
-		settings, err := do.InvokeNamed[*Settings](i, dix.TypedService[*Settings]().Name)
-		if err != nil {
-			return nil, err
-		}
-		return newPool(settings)
-	})
-}

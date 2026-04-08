@@ -7,7 +7,6 @@ import (
 	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/daiyuang/spack/internal/validation"
 	"github.com/go-playground/validator/v10"
-	"github.com/samber/do/v2"
 	"github.com/samber/oops"
 )
 
@@ -16,13 +15,8 @@ var Module = NewModule(LoadOptions{})
 func NewModule(loadOptions LoadOptions) dix.Module {
 	return dix.NewModule("config",
 		dix.WithModuleProviders(
-			dix.RawProviderWithMetadata(registerConfigProvider(loadOptions), dix.ProviderMetadata{
-				Label:  "ConfigProvider",
-				Output: dix.TypedService[*Config](),
-				Dependencies: dix.ServiceRefs(
-					dix.TypedService[*validator.Validate](),
-				),
-				Raw: true,
+			dix.ProviderErr1(func(validate *validator.Validate) (*Config, error) {
+				return loadConfig(loadOptions, validate)
 			}),
 			dix.Provider1(func(cfg *Config) *Debug { return &cfg.Debug }),
 			dix.Provider1(func(cfg *Config) *Image { return &cfg.Image }),
@@ -34,18 +28,6 @@ func NewModule(loadOptions LoadOptions) dix.Module {
 			dix.Provider1(func(cfg *Config) *Compression { return &cfg.Compression }),
 		),
 	)
-}
-
-func registerConfigProvider(loadOptions LoadOptions) func(*dix.Container) {
-	return func(c *dix.Container) {
-		do.ProvideNamed(c.Raw(), dix.TypedService[*Config]().Name, func(i do.Injector) (*Config, error) {
-			validate, err := do.InvokeNamed[*validator.Validate](i, dix.TypedService[*validator.Validate]().Name)
-			if err != nil {
-				return nil, err
-			}
-			return loadConfig(loadOptions, validate)
-		})
-	}
 }
 
 func loadConfig(loadOptions LoadOptions, validate *validator.Validate) (*Config, error) {
