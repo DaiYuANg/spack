@@ -4,6 +4,7 @@ import (
 	"log/slog"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/DaiYuANg/arcgo/observabilityx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 )
@@ -35,4 +36,5 @@ type Resolver struct {
 	supportedEncodings collectionx.List[string]
 	catalog            catalog.Catalog
 	logger             *slog.Logger
+	obs                observabilityx.Observability
 }

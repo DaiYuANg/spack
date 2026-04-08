@@ -22,7 +22,12 @@ func ShouldVaryAcceptForTest(sourceMediaType, explicitFormat string) bool {
 
 // MetricsMiddlewareForTest exposes HTTP metrics middleware for external tests.
 func MetricsMiddlewareForTest(obs observabilityx.Observability) fiber.Handler {
-	return metricsMiddleware(obs)
+	return metricsMiddleware(obs, nil)
+}
+
+// MetricsMiddlewareWithRuntimeMetricsForTest exposes HTTP metrics middleware with runtime gauges for external tests.
+func MetricsMiddlewareWithRuntimeMetricsForTest(obs observabilityx.Observability, runtimeMetrics *RuntimeMetrics) fiber.Handler {
+	return metricsMiddleware(obs, runtimeMetrics)
 }
 
 // SetAssetDeliveryForTest exposes delivery tagging for external tests.
@@ -50,10 +55,25 @@ func NewAppForTest(
 	pipelineSvc *pipeline.Service,
 	bus eventx.BusRuntime,
 ) *fiber.App {
+	return NewObservedAppForTest(cfg, logger, nil, nil, cat, bodyCache, assetResolver, pipelineSvc, bus)
+}
+
+// NewObservedAppForTest exposes server construction with observability and runtime metrics for external tests.
+func NewObservedAppForTest(
+	cfg *config.Config,
+	logger *slog.Logger,
+	obs observabilityx.Observability,
+	runtimeMetrics *RuntimeMetrics,
+	cat catalog.Catalog,
+	bodyCache *assetcache.Cache,
+	assetResolver *resolver.Resolver,
+	pipelineSvc *pipeline.Service,
+	bus eventx.BusRuntime,
+) *fiber.App {
 	healthChecks := newHealthCheckDefinitions(cfg, cat)
 	app, err := newServerFromDeps(cfg, newServerRegistrations(
-		newMiddlewareRegistration(cfg, logger, nil),
-		newHealthRoutesRegistration(cat, healthChecks),
+		newMiddlewareRegistration(cfg, logger, obs, runtimeMetrics),
+		newHealthRoutesRegistration(cat, healthChecks, obs),
 		newRobotsRouteRegistration(cfg, logger, cat, bodyCache),
 		newAssetRouteRegistration(cfg, logger, assetResolver, pipelineSvc, bodyCache, bus),
 	))

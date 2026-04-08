@@ -13,6 +13,7 @@ var Module = dix.NewModule("workerpool",
 	dix.WithModuleProviders(
 		dix.Provider1(newSettings),
 		dix.ProviderErr1(newPool),
+		dix.Provider2(NewRuntimeMetrics),
 	),
 	dix.WithModuleHooks(
 		dix.OnStop(func(ctx context.Context, pool *ants.Pool) error {

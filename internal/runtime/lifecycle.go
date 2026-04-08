@@ -8,10 +8,8 @@ import (
 	"net/http"
 	"time"
 
-	obsprom "github.com/DaiYuANg/arcgo/observabilityx/prometheus"
 	"github.com/arl/statsviz"
 	"github.com/daiyuang/spack/internal/config"
-	"github.com/daiyuang/spack/internal/pipeline"
 	"github.com/gofiber/fiber/v3"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/samber/mo"
@@ -54,18 +52,22 @@ func stopHTTPRuntime(ctx context.Context, runtime httpRuntime) error {
 func buildDebugRuntime(
 	cfg *config.Config,
 	logger *slog.Logger,
-	pipelineMetrics *pipeline.Metrics,
-	metricsAdapter *obsprom.Adapter,
+	deps debugRuntimeDeps,
 ) *debugRuntime {
 	if !cfg.Debug.Enable {
 		return &debugRuntime{}
 	}
 
 	mux := http.NewServeMux()
-	if pipelineMetrics != nil {
-		prometheus.MustRegister(pipelineMetrics.Collectors()...)
+	registerDebugCollectors(deps.pipelineMetrics)
+	registerDebugCollectors(deps.catMetrics)
+	registerDebugCollectors(deps.serverMetrics)
+	registerDebugCollectors(deps.workerpoolMetrics)
+	if deps.metricsAdapter == nil {
+		logger.Error("Debug runtime registration failed", slog.String("err", "metrics adapter is not configured"))
+		return &debugRuntime{}
 	}
-	mux.Handle(cfg.Metrics.Prefix, metricsAdapter.Handler())
+	mux.Handle(cfg.Metrics.Prefix, deps.metricsAdapter.Handler())
 	if err := statsviz.Register(mux); err != nil {
 		logger.Error("Debug runtime registration failed", slog.String("err", err.Error()))
 		return &debugRuntime{}
@@ -83,6 +85,21 @@ func buildDebugRuntime(
 		metricsURL: fmt.Sprintf("http://127.0.0.1:%d%s", cfg.Debug.LivePort, cfg.Metrics.Prefix),
 		statsviz:   fmt.Sprintf("http://127.0.0.1:%d/debug/statsviz", cfg.Debug.LivePort),
 	}
+}
+
+type debugCollectorProvider interface {
+	Collectors() []prometheus.Collector
+}
+
+func registerDebugCollectors(provider debugCollectorProvider) {
+	if provider == nil {
+		return
+	}
+	collectors := provider.Collectors()
+	if len(collectors) == 0 {
+		return
+	}
+	prometheus.MustRegister(collectors...)
 }
 
 func startDebugRuntime(_ context.Context, logger *slog.Logger, runtime *debugRuntime) error {

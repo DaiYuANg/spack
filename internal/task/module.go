@@ -9,6 +9,7 @@ import (
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/dix"
+	"github.com/DaiYuANg/arcgo/observabilityx"
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"
@@ -21,9 +22,9 @@ import (
 var Module = dix.NewModule("task",
 	dix.WithModuleProviders(
 		dix.ProviderErr1(newScheduler),
-		dix.Provider4(newSourceRescanRuntime),
-		dix.Provider4(newArtifactJanitorRuntime),
-		dix.Provider4(newCacheWarmerRuntime),
+		dix.Provider6(newSourceRescanRuntime),
+		dix.Provider6(newArtifactJanitorRuntime),
+		dix.Provider5(newCacheWarmerRuntime),
 		dix.Provider1(newSourceRescanTaskRegistration),
 		dix.Provider1(newArtifactJanitorTaskRegistration),
 		dix.Provider1(newCacheWarmerTaskRegistration),
@@ -93,23 +94,29 @@ func newTaskRegistrations(
 }
 
 type sourceRescanRuntime struct {
-	scanner   sourcecatalog.Scanner
-	catalog   catalog.Catalog
-	bodyCache *assetcache.Cache
-	logger    *slog.Logger
+	scanner    sourcecatalog.Scanner
+	catalog    catalog.Catalog
+	catMetrics *catalog.RuntimeMetrics
+	bodyCache  *assetcache.Cache
+	logger     *slog.Logger
+	obs        observabilityx.Observability
 }
 
 func newSourceRescanRuntime(
 	scanner sourcecatalog.Scanner,
 	cat catalog.Catalog,
+	catMetrics *catalog.RuntimeMetrics,
 	bodyCache *assetcache.Cache,
 	logger *slog.Logger,
+	obs observabilityx.Observability,
 ) *sourceRescanRuntime {
 	return &sourceRescanRuntime{
-		scanner:   scanner,
-		catalog:   cat,
-		bodyCache: bodyCache,
-		logger:    logger,
+		scanner:    scanner,
+		catalog:    cat,
+		catMetrics: catMetrics,
+		bodyCache:  bodyCache,
+		logger:     logger,
+		obs:        observabilityx.Normalize(obs, logger),
 	}
 }
 
@@ -120,23 +127,29 @@ func newSourceRescanTaskRegistration(runtime *sourceRescanRuntime) sourceRescanT
 }
 
 type artifactJanitorRuntime struct {
-	store     artifact.Store
-	catalog   catalog.Catalog
-	bodyCache *assetcache.Cache
-	logger    *slog.Logger
+	store      artifact.Store
+	catalog    catalog.Catalog
+	catMetrics *catalog.RuntimeMetrics
+	bodyCache  *assetcache.Cache
+	logger     *slog.Logger
+	obs        observabilityx.Observability
 }
 
 func newArtifactJanitorRuntime(
 	store artifact.Store,
 	cat catalog.Catalog,
+	catMetrics *catalog.RuntimeMetrics,
 	bodyCache *assetcache.Cache,
 	logger *slog.Logger,
+	obs observabilityx.Observability,
 ) *artifactJanitorRuntime {
 	return &artifactJanitorRuntime{
-		store:     store,
-		catalog:   cat,
-		bodyCache: bodyCache,
-		logger:    logger,
+		store:      store,
+		catalog:    cat,
+		catMetrics: catMetrics,
+		bodyCache:  bodyCache,
+		logger:     logger,
+		obs:        observabilityx.Normalize(obs, logger),
 	}
 }
 
@@ -151,6 +164,7 @@ type cacheWarmerRuntime struct {
 	catalog   catalog.Catalog
 	bodyCache *assetcache.Cache
 	logger    *slog.Logger
+	obs       observabilityx.Observability
 }
 
 func newCacheWarmerRuntime(
@@ -158,12 +172,14 @@ func newCacheWarmerRuntime(
 	cat catalog.Catalog,
 	bodyCache *assetcache.Cache,
 	logger *slog.Logger,
+	obs observabilityx.Observability,
 ) *cacheWarmerRuntime {
 	return &cacheWarmerRuntime{
 		cfg:       cfg,
 		catalog:   cat,
 		bodyCache: bodyCache,
 		logger:    logger,
+		obs:       observabilityx.Normalize(obs, logger),
 	}
 }
 

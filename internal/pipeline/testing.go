@@ -7,6 +7,7 @@ import (
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/eventx"
+	"github.com/DaiYuANg/arcgo/observabilityx"
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
@@ -54,7 +55,7 @@ func NormalizeRequestIntsForTest(values collectionx.List[int]) collectionx.List[
 
 // NewServiceForTest exposes service construction for external tests.
 func NewServiceForTest(cfg *config.Compression, logger *slog.Logger, cat catalog.Catalog, queueSize int) *Service {
-	return newServiceState(cfg, logger, cat, nil, nil, nil, nil, queueSize)
+	return newServiceState(cfg, logger, cat, nil, nil, nil, nil, observabilityx.NopWithLogger(logger), nil, queueSize)
 }
 
 // NewServiceWithBusForTest exposes service construction with an event bus for external tests.
@@ -65,7 +66,18 @@ func NewServiceWithBusForTest(
 	bus eventx.BusRuntime,
 	queueSize int,
 ) *Service {
-	return newServiceState(cfg, logger, cat, nil, nil, bus, nil, queueSize)
+	return newServiceState(cfg, logger, cat, nil, nil, bus, nil, observabilityx.NopWithLogger(logger), nil, queueSize)
+}
+
+// NewServiceWithObservabilityForTest exposes service construction with an observability backend for external tests.
+func NewServiceWithObservabilityForTest(
+	cfg *config.Compression,
+	logger *slog.Logger,
+	cat catalog.Catalog,
+	obs observabilityx.Observability,
+	queueSize int,
+) *Service {
+	return newServiceState(cfg, logger, cat, nil, nil, nil, nil, obs, nil, queueSize)
 }
 
 type testStage struct {
@@ -107,4 +119,9 @@ func SubscribeVariantServedForTest(s *Service) error {
 // UpsertStageVariantForTest exposes catalog upsert and side effects for external tests.
 func UpsertStageVariantForTest(s *Service, stageName string, asset *catalog.Asset, variant *catalog.Variant) {
 	s.upsertStageVariant(context.Background(), testStage{name: stageName}, asset, variant)
+}
+
+// ExecuteStageTaskForTest exposes stage execution for external tests.
+func ExecuteStageTaskForTest(s *Service, stage Stage, asset *catalog.Asset, task Task) *catalog.Variant {
+	return s.executeStageTask(stage, asset, task)
 }

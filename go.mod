@@ -5,10 +5,11 @@ go 1.26.2
 require (
 	github.com/DaiYuANg/arcgo/collectionx v0.1.3
 	github.com/DaiYuANg/arcgo/configx v0.2.2
-	github.com/DaiYuANg/arcgo/dix v0.3.1
+	github.com/DaiYuANg/arcgo/dix v0.3.2
+	github.com/DaiYuANg/arcgo/dix/metrics v0.0.2
 	github.com/DaiYuANg/arcgo/eventx v0.2.2
 	github.com/DaiYuANg/arcgo/logx v0.1.1
-	github.com/DaiYuANg/arcgo/observabilityx v0.1.2
+	github.com/DaiYuANg/arcgo/observabilityx v0.1.3
 	github.com/andybalholm/brotli v1.2.1
 	github.com/anthonynsimon/bild v0.15.0
 	github.com/arl/statsviz v0.8.0
@@ -70,6 +71,7 @@ require (
 	github.com/knadh/koanf/providers/env/v2 v2.0.0 // indirect
 	github.com/knadh/koanf/providers/file v1.2.1 // indirect
 	github.com/knadh/koanf/v2 v2.3.4 // indirect
+	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.21 // indirect

@@ -11,6 +11,7 @@ import (
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/eventx"
+	"github.com/DaiYuANg/arcgo/observabilityx"
 	"github.com/daiyuang/spack/internal/cachepolicy"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
@@ -33,6 +34,8 @@ func newServiceState(
 	stages collectionx.List[Stage],
 	bus eventx.BusRuntime,
 	pool *ants.Pool,
+	obs observabilityx.Observability,
+	catMetrics *catalog.RuntimeMetrics,
 	queueSize int,
 ) *Service {
 	if stages == nil {
@@ -43,6 +46,8 @@ func newServiceState(
 		logger:         logger,
 		catalog:        cat,
 		metrics:        metrics,
+		obs:            observabilityx.Normalize(obs, logger),
+		catMetrics:     catMetrics,
 		stages:         stages,
 		bus:            bus,
 		tasks:          make(chan Request, queueSize),
@@ -164,22 +169,27 @@ func (s *Service) stopWorkers(ctx context.Context) error {
 }
 
 func (s *Service) executeStageTask(stage Stage, asset *catalog.Asset, task Task) *catalog.Variant {
+	startedAt := time.Now()
 	key := buildStageTaskKey(stage, asset, task)
 	variantValue, err, _ := s.sf.Do(key, func() (any, error) {
 		return stage.Execute(task, asset)
 	})
 	if err != nil {
 		if IsVariantSkipped(err) {
+			s.recordStageRunMetrics(stage.Name(), "skipped", startedAt)
 			return nil
 		}
+		s.recordStageRunMetrics(stage.Name(), "error", startedAt)
 		s.logStageFailure(stage, asset, err)
 		return nil
 	}
 
 	variant, ok := variantValue.(*catalog.Variant)
 	if !ok || variant == nil {
+		s.recordStageRunMetrics(stage.Name(), "empty", startedAt)
 		return nil
 	}
+	s.recordStageRunMetrics(stage.Name(), "ok", startedAt)
 	return variant
 }
 
@@ -211,5 +221,32 @@ func (s *Service) upsertStageVariant(ctx context.Context, stage Stage, asset *ca
 		)
 		return
 	}
+	s.recordGeneratedVariantMetrics(stage.Name(), variant)
+	s.catMetrics.SyncCatalog(s.catalog)
 	s.publishVariantGenerated(ctx, stage.Name(), variant)
+}
+
+func (s *Service) recordStageRunMetrics(stageName, result string, startedAt time.Time) {
+	if s == nil || s.obs == nil {
+		return
+	}
+	attrs := []observabilityx.Attribute{
+		observabilityx.String("stage", strings.TrimSpace(stageName)),
+		observabilityx.String("result", strings.TrimSpace(result)),
+	}
+	s.obs.AddCounter(context.Background(), "pipeline_stage_runs_total", 1, attrs...)
+	s.obs.RecordHistogram(context.Background(), "pipeline_stage_duration_seconds", time.Since(startedAt).Seconds(), attrs...)
+}
+
+func (s *Service) recordGeneratedVariantMetrics(stageName string, variant *catalog.Variant) {
+	if s == nil || s.obs == nil || variant == nil {
+		return
+	}
+	attrs := []observabilityx.Attribute{
+		observabilityx.String("stage", strings.TrimSpace(stageName)),
+	}
+	s.obs.AddCounter(context.Background(), "pipeline_variants_generated_total", 1, attrs...)
+	if variant.Size > 0 {
+		s.obs.AddCounter(context.Background(), "pipeline_variants_generated_bytes_total", variant.Size, attrs...)
+	}
 }

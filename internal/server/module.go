@@ -18,9 +18,10 @@ import (
 
 var Module = dix.NewModule("server",
 	dix.WithModuleProviders(
-		dix.Provider3(newMiddlewareRegistration),
+		dix.Provider0(NewRuntimeMetrics),
+		dix.Provider4(newMiddlewareRegistration),
 		dix.Provider2(newHealthCheckDefinitions),
-		dix.Provider2(newHealthRoutesRegistration),
+		dix.Provider3(newHealthRoutesRegistration),
 		dix.Provider4(newRobotsRouteRegistration),
 		dix.Provider6(newAssetRouteRegistration),
 		dix.Provider4(newServerRegistrations),
@@ -65,18 +66,20 @@ func newMiddlewareRegistration(
 	cfg *config.Config,
 	logger *slog.Logger,
 	obs observabilityx.Observability,
+	runtimeMetrics *RuntimeMetrics,
 ) middlewareRegistration {
 	return middlewareRegistration{newAppRegistration(100, "middleware", func(app *fiber.App) {
-		registerMiddleware(app, cfg, logger, obs)
+		registerMiddleware(app, cfg, logger, obs, runtimeMetrics)
 	})}
 }
 
 func newHealthRoutesRegistration(
 	cat catalog.Catalog,
 	checks collectionx.List[healthCheckDefinition],
+	obs observabilityx.Observability,
 ) healthRoutesRegistration {
 	return healthRoutesRegistration{newAppRegistration(200, "health_routes", func(app *fiber.App) {
-		registerHealthRoutes(app, cat, checks)
+		registerHealthRoutes(app, cat, checks, obs)
 	})}
 }
 

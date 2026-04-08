@@ -52,6 +52,7 @@ func registerMiddleware(
 	cfg *config.Config,
 	logger *slog.Logger,
 	obs observabilityx.Observability,
+	runtimeMetrics *RuntimeMetrics,
 ) {
 	requestIDConfig := requestid.ConfigDefault
 	requestIDConfig.Header = RequestIDHeader
@@ -60,7 +61,7 @@ func registerMiddleware(
 	app.Use(etag.New())
 	app.Use(helmet.New())
 	app.Use(requestLogMiddleware(logger))
-	app.Use(metricsMiddleware(obs))
+	app.Use(metricsMiddleware(obs, runtimeMetrics))
 
 	if cfg.Debug.Enable {
 		app.Use(expvarmw.New())
@@ -129,10 +130,13 @@ func enqueuePipelineResult(result *resolver.Result, pipelineSvc *pipeline.Servic
 	})
 }
 
-func metricsMiddleware(obs observabilityx.Observability) fiber.Handler {
+func metricsMiddleware(obs observabilityx.Observability, runtimeMetrics *RuntimeMetrics) fiber.Handler {
 	obs = lo.Ternary(obs != nil, obs, observabilityx.NopWithLogger(nil))
 
 	return func(c fiber.Ctx) error {
+		runtimeMetrics.IncRequestsInFlight()
+		defer runtimeMetrics.DecRequestsInFlight()
+
 		startedAt := time.Now()
 		err := c.Next()
 		duration := time.Since(startedAt).Seconds()

@@ -49,10 +49,12 @@ func registerCacheWarmerTask(ctx context.Context, scheduler gocron.Scheduler, ru
 func runCacheWarmer(ctx context.Context, runtime *cacheWarmerRuntime) {
 	startedAt := time.Now()
 	report, err := warmCacheHotset(ctx, runtime.cfg, runtime.catalog, runtime.bodyCache)
+	recordTaskRunMetrics(ctx, runtime.obs, "cache_warmer", startedAt, err)
 	if err != nil {
 		runtime.logger.Error("Task cache warmer failed", slog.String("err", err.Error()))
 		return
 	}
+	recordCacheWarmerMetrics(ctx, runtime.obs, report)
 	if report.LoadedEntries == 0 {
 		return
 	}

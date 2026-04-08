@@ -13,6 +13,7 @@ import (
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/resolver"
+	"github.com/daiyuang/spack/internal/server"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -62,6 +63,61 @@ func TestReadinessRouteReturnsUnavailableWhenAssetsRootIsMissing(t *testing.T) {
 	assertHealthResponse(t, app, "/readyz", http.StatusServiceUnavailable, "readiness", "assets_root", "stat assets root")
 }
 
+func TestHealthRoutesRecordRuntimeMetrics(t *testing.T) {
+	cfg := config.DefaultConfigForTest()
+	cfg.Debug.Enable = false
+	cfg.Assets.Root = t.TempDir() + "/missing"
+
+	cat := catalog.NewInMemoryCatalog()
+	obs := &recordingObservability{}
+	app := server.NewObservedAppForTest(
+		&cfg,
+		slog.New(slog.DiscardHandler),
+		obs,
+		nil,
+		cat,
+		assetcache.NewCacheForTest(cfg.HTTP.MemoryCache, slog.New(slog.DiscardHandler)),
+		resolver.NewResolverForTest(&cfg.Assets, cat, slog.New(slog.DiscardHandler)),
+		nil,
+		nil,
+	)
+	t.Cleanup(func() {
+		if err := app.Shutdown(); err != nil {
+			t.Fatalf("shutdown test app: %v", err)
+		}
+	})
+
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/readyz", http.NoBody)
+	response, err := app.Test(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeHTTPBody(t, response)
+
+	if response.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("expected readiness route to return 503, got %d", response.StatusCode)
+	}
+
+	assertMetricPresent(t, obs.counters, "health_check_runs_total", map[string]any{
+		"kind":   "readiness",
+		"check":  "assets_root",
+		"result": "error",
+	})
+	assertMetricPresent(t, obs.histograms, "health_check_duration_seconds", map[string]any{
+		"kind":   "readiness",
+		"check":  "assets_root",
+		"result": "error",
+	})
+	assertMetricPresent(t, obs.counters, "health_reports_total", map[string]any{
+		"kind":   "readiness",
+		"result": "error",
+	})
+	assertMetricPresent(t, obs.histograms, "health_report_duration_seconds", map[string]any{
+		"kind":   "readiness",
+		"result": "error",
+	})
+}
+
 func assertHealthResponse(
 	t *testing.T,
 	app *fiber.App,
@@ -105,4 +161,25 @@ func assertHealthResponse(
 	if checkMessage == nil || !strings.Contains(*checkMessage, checkContains) {
 		t.Fatalf("expected %s check %q to contain %q, got %v", path, checkName, checkContains, checkMessage)
 	}
+}
+
+func assertMetricPresent(t *testing.T, metrics []recordedMetric, name string, want map[string]any) {
+	t.Helper()
+
+	for _, metric := range metrics {
+		if metric.name != name {
+			continue
+		}
+		matched := true
+		for key, value := range want {
+			if metric.attrs[key] != value {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			return
+		}
+	}
+	t.Fatalf("metric %s with attrs %v not found", name, want)
 }

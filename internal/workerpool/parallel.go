@@ -2,10 +2,14 @@ package workerpool
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/DaiYuANg/arcgo/observabilityx"
 	"github.com/panjf2000/ants/v2"
 )
 
@@ -13,21 +17,40 @@ import (
 // It falls back to serial execution when pool is nil.
 func RunList[T any](
 	ctx context.Context,
+	obs observabilityx.Observability,
 	pool *ants.Pool,
+	workload string,
 	values collectionx.List[T],
 	run func(context.Context, T) error,
 ) error {
+	obs = observabilityx.Normalize(obs, nil)
+	workload = normalizeWorkload(workload)
+	mode := runMode(pool)
+	startedAt := time.Now()
+
 	if run == nil || values.IsEmpty() {
-		return contextErr(ctx)
+		err := contextErr(ctx)
+		recordBatchRunMetrics(ctx, obs, workload, mode, startedAt, err)
+		return err
 	}
+
+	recordBatchItems(ctx, obs, workload, mode, values.Len())
+
+	var err error
 	if pool == nil {
-		return runListSerial[T](ctx, values, run)
+		err = runListSerial[T](ctx, obs, workload, mode, values, run)
+	} else {
+		err = runListParallel[T](ctx, obs, workload, mode, pool, values, run)
 	}
-	return runListParallel[T](ctx, pool, values, run)
+	recordBatchRunMetrics(ctx, obs, workload, mode, startedAt, err)
+	return err
 }
 
 func runListParallel[T any](
 	ctx context.Context,
+	obs observabilityx.Observability,
+	workload string,
+	mode string,
 	pool *ants.Pool,
 	values collectionx.List[T],
 	run func(context.Context, T) error,
@@ -36,19 +59,24 @@ func runListParallel[T any](
 	defer cancel()
 
 	state := newRunState(cancel)
-	scheduleRunList[T](workerCtx, pool, values, run, state)
+	scheduleRunList[T](workerCtx, obs, workload, mode, pool, values, run, state)
 	state.Wait()
 	return pickRunErr(ctx, state.Err())
 }
 
 func runListSerial[T any](
 	ctx context.Context,
+	obs observabilityx.Observability,
+	workload string,
+	mode string,
 	values collectionx.List[T],
 	run func(context.Context, T) error,
 ) error {
 	var runErr error
 	values.Range(func(_ int, value T) bool {
+		startedAt := time.Now()
 		runErr = run(ctx, value)
+		recordTaskRunMetrics(ctx, obs, workload, mode, startedAt, runErr)
 		return runErr == nil
 	})
 	return pickRunErr(ctx, runErr)
@@ -97,6 +125,9 @@ func (s *runState) Err() error {
 
 func scheduleRunList[T any](
 	ctx context.Context,
+	obs observabilityx.Observability,
+	workload string,
+	mode string,
 	pool *ants.Pool,
 	values collectionx.List[T],
 	run func(context.Context, T) error,
@@ -107,12 +138,15 @@ func scheduleRunList[T any](
 			state.SetErr(err)
 			return false
 		}
-		return submitRunTask(ctx, pool, value, run, state)
+		return submitRunTask(ctx, obs, workload, mode, pool, value, run, state)
 	})
 }
 
 func submitRunTask[T any](
 	ctx context.Context,
+	obs observabilityx.Observability,
+	workload string,
+	mode string,
 	pool *ants.Pool,
 	value T,
 	run func(context.Context, T) error,
@@ -121,16 +155,97 @@ func submitRunTask[T any](
 	state.wg.Add(1)
 	if err := pool.Submit(func() {
 		defer state.wg.Done()
-		if contextErr(ctx) != nil {
-			return
+		startedAt := time.Now()
+		runErr := contextErr(ctx)
+		if runErr == nil {
+			runErr = run(ctx, value)
 		}
-		state.SetErr(run(ctx, value))
+		recordTaskRunMetrics(ctx, obs, workload, mode, startedAt, runErr)
+		state.SetErr(runErr)
 	}); err != nil {
 		state.wg.Done()
+		recordTaskSubmission(ctx, obs, workload, false)
 		state.SetErr(fmt.Errorf("submit worker pool task: %w", err))
 		return false
 	}
+	recordTaskSubmission(ctx, obs, workload, true)
 	return true
+}
+
+func normalizeWorkload(workload string) string {
+	workload = strings.TrimSpace(workload)
+	if workload == "" {
+		return "unknown"
+	}
+	return workload
+}
+
+func runMode(pool *ants.Pool) string {
+	if pool == nil {
+		return "serial"
+	}
+	return "parallel"
+}
+
+func workerpoolAttrs(workload, mode string) []observabilityx.Attribute {
+	return []observabilityx.Attribute{
+		observabilityx.String("workload", normalizeWorkload(workload)),
+		observabilityx.String("mode", strings.TrimSpace(mode)),
+	}
+}
+
+func recordBatchItems(ctx context.Context, obs observabilityx.Observability, workload, mode string, count int) {
+	if count <= 0 {
+		return
+	}
+	obs.AddCounter(ctx, "workerpool_batch_items_total", int64(count), workerpoolAttrs(workload, mode)...)
+}
+
+func recordBatchRunMetrics(
+	ctx context.Context,
+	obs observabilityx.Observability,
+	workload string,
+	mode string,
+	startedAt time.Time,
+	err error,
+) {
+	attrs := append(workerpoolAttrs(workload, mode), observabilityx.String("result", metricResult(err)))
+	obs.AddCounter(ctx, "workerpool_batch_runs_total", 1, attrs...)
+	obs.RecordHistogram(ctx, "workerpool_batch_duration_seconds", time.Since(startedAt).Seconds(), attrs...)
+}
+
+func recordTaskRunMetrics(
+	ctx context.Context,
+	obs observabilityx.Observability,
+	workload string,
+	mode string,
+	startedAt time.Time,
+	err error,
+) {
+	attrs := append(workerpoolAttrs(workload, mode), observabilityx.String("result", metricResult(err)))
+	obs.AddCounter(ctx, "workerpool_task_runs_total", 1, attrs...)
+	obs.RecordHistogram(ctx, "workerpool_task_duration_seconds", time.Since(startedAt).Seconds(), attrs...)
+}
+
+func recordTaskSubmission(ctx context.Context, obs observabilityx.Observability, workload string, submitted bool) {
+	result := "rejected"
+	if submitted {
+		result = "submitted"
+	}
+	obs.AddCounter(ctx, "workerpool_task_submissions_total", 1,
+		observabilityx.String("workload", normalizeWorkload(workload)),
+		observabilityx.String("result", result),
+	)
+}
+
+func metricResult(err error) string {
+	if err == nil {
+		return "ok"
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return "cancelled"
+	}
+	return "error"
 }
 
 func contextErr(ctx context.Context) error {

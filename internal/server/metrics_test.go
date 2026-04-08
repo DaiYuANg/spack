@@ -10,6 +10,7 @@ import (
 	"github.com/DaiYuANg/arcgo/observabilityx"
 	"github.com/daiyuang/spack/internal/server"
 	"github.com/gofiber/fiber/v3"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
 func TestMetricsMiddlewareRecordsAssetDeliveryMetrics(t *testing.T) {
@@ -60,6 +61,30 @@ func TestMetricsMiddlewareSkipsAssetDeliveryMetricsWithoutDelivery(t *testing.T)
 	assertMetricCount(t, obs.histograms, "http_request_duration_seconds", 1)
 	assertMetricCount(t, obs.counters, "http_asset_delivery_total", 0)
 	assertMetricCount(t, obs.histograms, "http_asset_delivery_duration_seconds", 0)
+}
+
+func TestMetricsMiddlewareTracksInFlightRequests(t *testing.T) {
+	obs := &recordingObservability{}
+	runtimeMetrics := server.NewRuntimeMetrics()
+	app := fiber.New()
+	app.Use(server.MetricsMiddlewareWithRuntimeMetricsForTest(obs, runtimeMetrics))
+	app.Get("/", func(c fiber.Ctx) error {
+		if got := testutil.ToFloat64(runtimeMetrics.RequestsInFlight); got != 1 {
+			t.Fatalf("expected in-flight gauge to be 1 during request, got %v", got)
+		}
+		return c.SendStatus(fiber.StatusNoContent)
+	})
+
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", http.NoBody)
+	response, err := app.Test(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeBody(t, response)
+
+	if got := testutil.ToFloat64(runtimeMetrics.RequestsInFlight); got != 0 {
+		t.Fatalf("expected in-flight gauge to return to 0, got %v", got)
+	}
 }
 
 type recordedMetric struct {

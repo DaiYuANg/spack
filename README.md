@@ -254,9 +254,20 @@ Debug and metrics:
 - `SPACK_METRICS_PREFIX=/prometheus`
 - request logs include `delivery=memory_cache_hit|memory_cache_fill|sendfile|sendfile_range` for static asset responses
 - `/prometheus` includes HTTP request metrics
+- `/prometheus` includes HTTP runtime gauges such as `spack_http_requests_in_flight`
 - `/prometheus` includes asset delivery metrics labeled by delivery mode
+- `/prometheus` includes health runtime metrics such as `spack_health_check_runs_total`, `spack_health_check_duration_seconds`, `spack_health_reports_total`, and `spack_health_report_duration_seconds`
 - `/prometheus` includes asset cache hit/miss/fill/warmup/eviction counters
 - `/prometheus` includes pipeline runtime metrics such as queue length, enqueue drop/dedupe, and cleanup activity
+- `/prometheus` includes pipeline stage execution metrics such as `spack_pipeline_stage_runs_total`, `spack_pipeline_stage_duration_seconds`, `spack_pipeline_variants_generated_total`, and `spack_pipeline_variants_generated_bytes_total`
+- `/prometheus` includes catalog gauges such as `spack_catalog_assets_current`, `spack_catalog_variants_current`, and `spack_catalog_source_bytes_current`
+- `/prometheus` includes resolver metrics such as `spack_resolver_resolutions_total`, `spack_resolver_resolution_duration_seconds`, and `spack_resolver_generation_requests_total`
+- `/prometheus` includes background task metrics such as `spack_task_runs_total`, `spack_task_run_duration_seconds`, `spack_source_rescan_*`, `spack_artifact_janitor_*`, and `spack_cache_warmer_*`
+- `/prometheus` includes worker pool gauges such as `spack_workerpool_capacity_current`, `spack_workerpool_running_current`, `spack_workerpool_waiting_current`, and `spack_workerpool_free_current`
+- `/prometheus` includes worker pool execution metrics such as `spack_workerpool_batch_runs_total`, `spack_workerpool_batch_duration_seconds`, `spack_workerpool_task_runs_total`, `spack_workerpool_task_duration_seconds`, and `spack_workerpool_task_submissions_total`
+- `/prometheus` includes `dix` runtime lifecycle metrics with the `spack_dix_*` prefix
+- `spack_dix_*` covers app build/start/stop, health checks, and state transitions
+- representative metrics include `spack_dix_build_total`, `spack_dix_start_total`, `spack_dix_health_check_total`, and `spack_dix_state_transition_total`
 
 Logger:
 

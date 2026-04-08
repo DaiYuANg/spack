@@ -107,7 +107,7 @@ func (c *Cache) Warm(ctx context.Context, cat catalog.Catalog) (WarmStats, error
 
 func (c *Cache) warmAssets(ctx context.Context, cat catalog.Catalog, stats *WarmStats) error {
 	var statsMu sync.Mutex
-	err := workerpool.RunList[*catalog.Asset](ctx, c.pool, cat.AllAssets(), func(ctx context.Context, asset *catalog.Asset) error {
+	err := workerpool.RunList[*catalog.Asset](ctx, c.obs, c.pool, "asset_cache_warm", cat.AllAssets(), func(ctx context.Context, asset *catalog.Asset) error {
 		assetStats := WarmStats{}
 		if err := c.warmAsset(ctx, cat, asset, &assetStats); err != nil {
 			return err

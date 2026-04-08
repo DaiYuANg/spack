@@ -8,7 +8,6 @@ import (
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/contentcoding"
 	"github.com/daiyuang/spack/internal/event"
-	"github.com/daiyuang/spack/internal/metrics"
 	"github.com/daiyuang/spack/internal/pipeline"
 	"github.com/daiyuang/spack/internal/resolver"
 	"github.com/daiyuang/spack/internal/server"
@@ -26,7 +25,6 @@ var rootCmd = &cobra.Command{
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		dixInstance, err := createContainer(
 			configLoadOptions(),
-			metrics.Module,
 			workerpool.Module,
 			event.Module,
 			source.Module,

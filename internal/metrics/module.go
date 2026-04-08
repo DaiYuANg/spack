@@ -9,16 +9,27 @@ import (
 	obsprom "github.com/DaiYuANg/arcgo/observabilityx/prometheus"
 )
 
-var Module = dix.NewModule("metrics",
-	dix.WithModuleProviders(
-		dix.Provider1(newAdapter),
-		dix.Provider1(func(adapter *obsprom.Adapter) observabilityx.Observability {
-			return adapter
-		}),
-	),
-)
+func NewModule(adapter *obsprom.Adapter) dix.Module {
+	if adapter != nil {
+		return dix.NewModule("metrics",
+			dix.WithModuleProviders(
+				dix.Provider0(func() *obsprom.Adapter { return adapter }),
+				dix.Provider0(func() observabilityx.Observability { return adapter }),
+			),
+		)
+	}
 
-func newAdapter(logger *slog.Logger) *obsprom.Adapter {
+	return dix.NewModule("metrics",
+		dix.WithModuleProviders(
+			dix.Provider1(NewAdapter),
+			dix.Provider1(func(adapter *obsprom.Adapter) observabilityx.Observability {
+				return adapter
+			}),
+		),
+	)
+}
+
+func NewAdapter(logger *slog.Logger) *obsprom.Adapter {
 	return obsprom.New(
 		obsprom.WithNamespace("spack"),
 		obsprom.WithLogger(logger),

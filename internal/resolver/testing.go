@@ -4,6 +4,7 @@ import (
 	"log/slog"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/DaiYuANg/arcgo/observabilityx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/contentcoding"
@@ -12,12 +13,22 @@ import (
 
 // NewResolverForTest exposes resolver construction for external tests.
 func NewResolverForTest(cfg *config.Assets, cat catalog.Catalog, logger *slog.Logger) *Resolver {
+	return NewResolverWithObservabilityForTest(cfg, cat, logger, observabilityx.NopWithLogger(logger))
+}
+
+// NewResolverWithObservabilityForTest exposes resolver construction with an observability backend for external tests.
+func NewResolverWithObservabilityForTest(
+	cfg *config.Assets,
+	cat catalog.Catalog,
+	logger *slog.Logger,
+	obs observabilityx.Observability,
+) *Resolver {
 	defaults := config.DefaultConfig().Compression
 	return newResolver(cfg, contentcoding.NewRegistry(contentcoding.Options{
 		BrotliQuality: defaults.BrotliQuality,
 		GzipLevel:     defaults.GzipLevel,
 		ZstdLevel:     defaults.ZstdLevel,
-	}, defaults.NormalizedEncodings()), cat, logger)
+	}, defaults.NormalizedEncodings()), cat, logger, obs)
 }
 
 // NewResolverWithCompressionForTest exposes resolver construction with compression config for external tests.
@@ -31,7 +42,7 @@ func NewResolverWithCompressionForTest(
 		BrotliQuality: compression.BrotliQuality,
 		GzipLevel:     compression.GzipLevel,
 		ZstdLevel:     compression.ZstdLevel,
-	}, compression.NormalizedEncodings()), cat, logger)
+	}, compression.NormalizedEncodings()), cat, logger, observabilityx.NopWithLogger(logger))
 }
 
 // ParseAcceptEncodingForTest exposes encoding preference parsing for external tests.

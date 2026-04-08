@@ -2,12 +2,15 @@ package resolver
 
 import (
 	"cmp"
+	"context"
 	"errors"
 	"log/slog"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/DaiYuANg/arcgo/observabilityx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/contentcoding"
@@ -21,18 +24,22 @@ func newResolver(
 	registry contentcoding.Registry,
 	cat catalog.Catalog,
 	logger *slog.Logger,
+	obs observabilityx.Observability,
 ) *Resolver {
 	return &Resolver{
 		cfg:                cfg,
 		supportedEncodings: registry.Names(),
 		catalog:            cat,
 		logger:             logger,
+		obs:                observabilityx.Normalize(obs, logger),
 	}
 }
 
 func (r *Resolver) Resolve(request Request) (*Result, error) {
+	startedAt := time.Now()
 	asset, fallbackUsed := r.findAsset(request.Path)
 	if asset == nil {
+		r.recordMetrics(startedAt, nil, ErrNotFound)
 		return nil, ErrNotFound
 	}
 
@@ -41,20 +48,22 @@ func (r *Resolver) Resolve(request Request) (*Result, error) {
 	preferredImageFormats := preferredImageFormats(request.Accept, requestedFormat, asset.MediaType)
 	if request.Width > 0 || preferredImageFormats.Len() > 0 {
 		if variant := r.pickImageVariant(asset, request.Width, preferredImageFormats); variant != nil {
-			return &Result{
+			result := &Result{
 				Asset:        asset,
 				Variant:      variant,
 				FilePath:     variant.ArtifactPath,
 				MediaType:    firstNonEmpty(variant.MediaType, asset.MediaType),
 				ETag:         firstNonEmpty(variant.ETag, asset.ETag),
 				FallbackUsed: fallbackUsed,
-			}, nil
+			}
+			r.recordMetrics(startedAt, result, nil)
+			return result, nil
 		}
 	}
 
 	if !request.RangeRequested && encodings.Len() > 0 {
 		if variant := r.pickVariant(asset, encodings); variant != nil {
-			return &Result{
+			result := &Result{
 				Asset:           asset,
 				Variant:         variant,
 				FilePath:        variant.ArtifactPath,
@@ -62,11 +71,13 @@ func (r *Resolver) Resolve(request Request) (*Result, error) {
 				ContentEncoding: variant.Encoding,
 				ETag:            firstNonEmpty(variant.ETag, asset.ETag),
 				FallbackUsed:    fallbackUsed,
-			}, nil
+			}
+			r.recordMetrics(startedAt, result, nil)
+			return result, nil
 		}
 	}
 
-	return &Result{
+	result := &Result{
 		Asset:              asset,
 		FilePath:           asset.FullPath,
 		MediaType:          asset.MediaType,
@@ -75,7 +86,64 @@ func (r *Resolver) Resolve(request Request) (*Result, error) {
 		PreferredWidths:    preferredWidths(request.Width),
 		PreferredFormats:   preferredImageFormats,
 		FallbackUsed:       fallbackUsed,
-	}, nil
+	}
+	r.recordMetrics(startedAt, result, nil)
+	return result, nil
+}
+
+func (r *Resolver) recordMetrics(startedAt time.Time, result *Result, err error) {
+	if r == nil || r.obs == nil {
+		return
+	}
+
+	resultKind := resolutionResultKind(result, err)
+	attrs := []observabilityx.Attribute{
+		observabilityx.String("result", resultKind),
+	}
+
+	r.obs.AddCounter(context.Background(), "resolver_resolutions_total", 1, attrs...)
+	r.obs.RecordHistogram(context.Background(), "resolver_resolution_duration_seconds", time.Since(startedAt).Seconds(), attrs...)
+
+	if result == nil {
+		return
+	}
+
+	if count := int64(result.PreferredEncodings.Len()); count > 0 {
+		r.obs.AddCounter(context.Background(), "resolver_generation_requests_total", count,
+			observabilityx.String("kind", "encoding"),
+		)
+	}
+	if count := int64(result.PreferredWidths.Len()); count > 0 {
+		r.obs.AddCounter(context.Background(), "resolver_generation_requests_total", count,
+			observabilityx.String("kind", "image_width"),
+		)
+	}
+	if count := int64(result.PreferredFormats.Len()); count > 0 {
+		r.obs.AddCounter(context.Background(), "resolver_generation_requests_total", count,
+			observabilityx.String("kind", "image_format"),
+		)
+	}
+}
+
+func resolutionResultKind(result *Result, err error) string {
+	switch {
+	case errors.Is(err, ErrNotFound):
+		return "not_found"
+	case err != nil:
+		return "error"
+	case result == nil:
+		return "empty"
+	case result.Variant != nil && (result.Variant.Width > 0 || strings.TrimSpace(result.Variant.Format) != ""):
+		return "image_variant"
+	case result.Variant != nil && strings.TrimSpace(result.Variant.Encoding) != "":
+		return "encoding_variant"
+	case result.Variant != nil:
+		return "variant"
+	case result.FallbackUsed:
+		return "fallback_asset"
+	default:
+		return "asset"
+	}
 }
 
 func (r *Resolver) findAsset(requestPath string) (*catalog.Asset, bool) {

@@ -10,15 +10,19 @@ import (
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/pipeline"
+	"github.com/daiyuang/spack/internal/server"
 	"github.com/daiyuang/spack/internal/sourcecatalog"
+	"github.com/daiyuang/spack/internal/workerpool"
 	"github.com/gofiber/fiber/v3"
 )
 
 var Module = dix.NewModule("runtime",
 	dix.WithModuleProviders(
-		dix.Provider6(newCatalogBootstrapRuntime),
+		dix.Provider5(newCatalogBootstrapDeps),
+		dix.Provider3(newCatalogBootstrapRuntime),
 		dix.Provider4(newHTTPRuntime),
-		dix.Provider4(newDebugRuntime),
+		dix.Provider5(newDebugRuntimeDeps),
+		dix.Provider3(newDebugRuntime),
 	),
 	dix.WithModuleHooks(
 		dix.OnStart(logConfigOnStart),
@@ -30,10 +34,35 @@ var Module = dix.NewModule("runtime",
 	),
 )
 
+type catalogBootstrapDeps struct {
+	scanner     sourcecatalog.Scanner
+	cat         catalog.Catalog
+	catMetrics  *catalog.RuntimeMetrics
+	bodyCache   *assetcache.Cache
+	pipelineSvc *pipeline.Service
+}
+
+func newCatalogBootstrapDeps(
+	scanner sourcecatalog.Scanner,
+	cat catalog.Catalog,
+	catMetrics *catalog.RuntimeMetrics,
+	bodyCache *assetcache.Cache,
+	pipelineSvc *pipeline.Service,
+) catalogBootstrapDeps {
+	return catalogBootstrapDeps{
+		scanner:     scanner,
+		cat:         cat,
+		catMetrics:  catMetrics,
+		bodyCache:   bodyCache,
+		pipelineSvc: pipelineSvc,
+	}
+}
+
 type catalogBootstrapRuntime struct {
 	cfg         *config.Config
 	scanner     sourcecatalog.Scanner
 	cat         catalog.Catalog
+	catMetrics  *catalog.RuntimeMetrics
 	bodyCache   *assetcache.Cache
 	pipelineSvc *pipeline.Service
 	logger      *slog.Logger
@@ -41,18 +70,16 @@ type catalogBootstrapRuntime struct {
 
 func newCatalogBootstrapRuntime(
 	cfg *config.Config,
-	scanner sourcecatalog.Scanner,
-	cat catalog.Catalog,
-	bodyCache *assetcache.Cache,
-	pipelineSvc *pipeline.Service,
+	deps catalogBootstrapDeps,
 	logger *slog.Logger,
 ) catalogBootstrapRuntime {
 	return catalogBootstrapRuntime{
 		cfg:         cfg,
-		scanner:     scanner,
-		cat:         cat,
-		bodyCache:   bodyCache,
-		pipelineSvc: pipelineSvc,
+		scanner:     deps.scanner,
+		cat:         deps.cat,
+		catMetrics:  deps.catMetrics,
+		bodyCache:   deps.bodyCache,
+		pipelineSvc: deps.pipelineSvc,
 		logger:      logger,
 	}
 }
@@ -73,11 +100,34 @@ func newHTTPRuntime(app *fiber.App, cfg *config.Config, cat catalog.Catalog, log
 	}
 }
 
+type debugRuntimeDeps struct {
+	pipelineMetrics   *pipeline.Metrics
+	catMetrics        *catalog.RuntimeMetrics
+	serverMetrics     *server.RuntimeMetrics
+	workerpoolMetrics *workerpool.RuntimeMetrics
+	metricsAdapter    *obsprom.Adapter
+}
+
+func newDebugRuntimeDeps(
+	pipelineMetrics *pipeline.Metrics,
+	catMetrics *catalog.RuntimeMetrics,
+	serverMetrics *server.RuntimeMetrics,
+	workerpoolMetrics *workerpool.RuntimeMetrics,
+	metricsAdapter *obsprom.Adapter,
+) debugRuntimeDeps {
+	return debugRuntimeDeps{
+		pipelineMetrics:   pipelineMetrics,
+		catMetrics:        catMetrics,
+		serverMetrics:     serverMetrics,
+		workerpoolMetrics: workerpoolMetrics,
+		metricsAdapter:    metricsAdapter,
+	}
+}
+
 func newDebugRuntime(
 	cfg *config.Config,
 	logger *slog.Logger,
-	pipelineMetrics *pipeline.Metrics,
-	metricsAdapter *obsprom.Adapter,
+	deps debugRuntimeDeps,
 ) *debugRuntime {
-	return buildDebugRuntime(cfg, logger, pipelineMetrics, metricsAdapter)
+	return buildDebugRuntime(cfg, logger, deps)
 }

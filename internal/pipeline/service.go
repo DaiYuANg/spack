@@ -10,6 +10,7 @@ import (
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/eventx"
+	"github.com/DaiYuANg/arcgo/observabilityx"
 	"github.com/daiyuang/spack/internal/cachepolicy"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
@@ -20,12 +21,14 @@ import (
 )
 
 type Service struct {
-	cfg     *config.Compression
-	logger  *slog.Logger
-	catalog catalog.Catalog
-	metrics *Metrics
-	stages  collectionx.List[Stage]
-	bus     eventx.BusRuntime
+	cfg        *config.Compression
+	logger     *slog.Logger
+	catalog    catalog.Catalog
+	metrics    *Metrics
+	obs        observabilityx.Observability
+	catMetrics *catalog.RuntimeMetrics
+	stages     collectionx.List[Stage]
+	bus        eventx.BusRuntime
 
 	tasks   chan Request
 	wg      sync.WaitGroup
@@ -93,7 +96,7 @@ func (s *Service) Warm(ctx context.Context) error {
 		return nil
 	}
 
-	err := workerpool.RunList[*catalog.Asset](ctx, s.warmPool, s.catalog.AllAssets(), func(ctx context.Context, asset *catalog.Asset) error {
+	err := workerpool.RunList[*catalog.Asset](ctx, s.obs, s.warmPool, "pipeline_warm", s.catalog.AllAssets(), func(ctx context.Context, asset *catalog.Asset) error {
 		s.process(ctx, Request{AssetPath: asset.Path})
 		return nil
 	})

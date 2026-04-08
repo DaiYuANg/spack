@@ -8,6 +8,7 @@ import (
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/DaiYuANg/arcgo/eventx"
+	"github.com/DaiYuANg/arcgo/observabilityx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/panjf2000/ants/v2"
@@ -20,7 +21,7 @@ var Module = dix.NewModule("pipeline",
 		dix.Provider4(newCompressionStage),
 		dix.Provider2(newStageRegistrations),
 		dix.Provider1(newStages),
-		dix.Provider4(newServiceDeps),
+		dix.Provider6(newServiceDeps),
 		dix.Provider4(newService),
 	),
 	dix.WithModuleHooks(
@@ -43,10 +44,12 @@ func newStages(registrations collectionx.List[stageRegistration]) collectionx.Li
 }
 
 type serviceDeps struct {
-	metrics *Metrics
-	stages  collectionx.List[Stage]
-	bus     eventx.BusRuntime
-	pool    *ants.Pool
+	metrics    *Metrics
+	stages     collectionx.List[Stage]
+	bus        eventx.BusRuntime
+	pool       *ants.Pool
+	obs        observabilityx.Observability
+	catMetrics *catalog.RuntimeMetrics
 }
 
 func newServiceDeps(
@@ -54,12 +57,16 @@ func newServiceDeps(
 	stages collectionx.List[Stage],
 	bus eventx.BusRuntime,
 	pool *ants.Pool,
+	obs observabilityx.Observability,
+	catMetrics *catalog.RuntimeMetrics,
 ) serviceDeps {
 	return serviceDeps{
-		metrics: metrics,
-		stages:  stages,
-		bus:     bus,
-		pool:    pool,
+		metrics:    metrics,
+		stages:     stages,
+		bus:        bus,
+		pool:       pool,
+		obs:        observabilityx.Normalize(obs, nil),
+		catMetrics: catMetrics,
 	}
 }
 
@@ -72,7 +79,7 @@ func newService(
 	workers := max(cfg.Workers, 1)
 	queueSize := resolveQueueSize(cfg, workers)
 
-	svc := newServiceState(cfg, logger, cat, deps.metrics, deps.stages, deps.bus, deps.pool, queueSize)
+	svc := newServiceState(cfg, logger, cat, deps.metrics, deps.stages, deps.bus, deps.pool, deps.obs, deps.catMetrics, queueSize)
 	svc.initializeMetrics(queueSize)
 	return svc
 }

@@ -112,6 +112,9 @@ func (s *Service) cleanupOnce(ctx context.Context) {
 		}
 	}
 	if result.removed > 0 {
+		s.catMetrics.SyncCatalog(s.catalog)
+	}
+	if result.removed > 0 {
 		s.logger.Info("Pipeline cache cleanup completed",
 			slog.Int("scanned", result.scanned),
 			slog.Int("removed", result.removed),

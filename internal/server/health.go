@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/dix"
+	"github.com/DaiYuANg/arcgo/observabilityx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/gofiber/fiber/v3"
@@ -78,28 +80,38 @@ func registerHealthRoutes(
 	app *fiber.App,
 	cat catalog.Catalog,
 	checks collectionx.List[healthCheckDefinition],
+	obs observabilityx.Observability,
 ) {
-	app.Get(healthEndpoint, healthHandler(dix.HealthKindGeneral, checks))
-	app.Get(livenessEndpoint, healthHandler(dix.HealthKindLiveness, checks))
-	app.Get(readinessEndpoint, healthHandler(dix.HealthKindReadiness, checks))
+	app.Get(healthEndpoint, healthHandler(dix.HealthKindGeneral, checks, obs))
+	app.Get(livenessEndpoint, healthHandler(dix.HealthKindLiveness, checks, obs))
+	app.Get(readinessEndpoint, healthHandler(dix.HealthKindReadiness, checks, obs))
 	app.Get("/catalog", func(c fiber.Ctx) error {
 		return c.JSON(cat.Snapshot())
 	})
 }
 
-func healthHandler(kind dix.HealthKind, checks collectionx.List[healthCheckDefinition]) fiber.Handler {
+func healthHandler(kind dix.HealthKind, checks collectionx.List[healthCheckDefinition], obs observabilityx.Observability) fiber.Handler {
+	obs = observabilityx.Normalize(obs, nil)
+
 	return func(c fiber.Ctx) error {
-		report := runHealthChecks(c.Context(), kind, checks)
+		startedAt := time.Now()
+		report := runHealthChecks(c.Context(), kind, checks, obs)
 		status := fiber.StatusOK
 		if !report.Healthy() {
 			status = fiber.StatusServiceUnavailable
 		}
+		recordHealthReportMetrics(c.Context(), obs, kind, report.Healthy(), startedAt)
 		c.Status(status)
 		return c.JSON(report)
 	}
 }
 
-func runHealthChecks(ctx context.Context, kind dix.HealthKind, checks collectionx.List[healthCheckDefinition]) dix.HealthReport {
+func runHealthChecks(
+	ctx context.Context,
+	kind dix.HealthKind,
+	checks collectionx.List[healthCheckDefinition],
+	obs observabilityx.Observability,
+) dix.HealthReport {
 	matched := checks.Where(func(_ int, check healthCheckDefinition) bool {
 		return check.Kind == kind && check.Name != "" && check.Check != nil
 	})
@@ -108,10 +120,54 @@ func runHealthChecks(ctx context.Context, kind dix.HealthKind, checks collection
 		Checks: collectionx.NewMapWithCapacity[string, error](matched.Len()),
 	}
 	matched.Range(func(_ int, check healthCheckDefinition) bool {
-		report.Checks.Set(check.Name, check.Check(ctx))
+		startedAt := time.Now()
+		err := check.Check(ctx)
+		recordHealthCheckMetrics(ctx, obs, kind, check.Name, err == nil, startedAt)
+		report.Checks.Set(check.Name, err)
 		return true
 	})
 	return report
+}
+
+func recordHealthCheckMetrics(
+	ctx context.Context,
+	obs observabilityx.Observability,
+	kind dix.HealthKind,
+	checkName string,
+	healthy bool,
+	startedAt time.Time,
+) {
+	obs = observabilityx.Normalize(obs, nil)
+	attrs := []observabilityx.Attribute{
+		observabilityx.String("kind", string(kind)),
+		observabilityx.String("check", strings.TrimSpace(checkName)),
+		observabilityx.String("result", healthMetricResult(healthy)),
+	}
+	obs.AddCounter(ctx, "health_check_runs_total", 1, attrs...)
+	obs.RecordHistogram(ctx, "health_check_duration_seconds", time.Since(startedAt).Seconds(), attrs...)
+}
+
+func recordHealthReportMetrics(
+	ctx context.Context,
+	obs observabilityx.Observability,
+	kind dix.HealthKind,
+	healthy bool,
+	startedAt time.Time,
+) {
+	obs = observabilityx.Normalize(obs, nil)
+	attrs := []observabilityx.Attribute{
+		observabilityx.String("kind", string(kind)),
+		observabilityx.String("result", healthMetricResult(healthy)),
+	}
+	obs.AddCounter(ctx, "health_reports_total", 1, attrs...)
+	obs.RecordHistogram(ctx, "health_report_duration_seconds", time.Since(startedAt).Seconds(), attrs...)
+}
+
+func healthMetricResult(healthy bool) string {
+	if healthy {
+		return "ok"
+	}
+	return "error"
 }
 
 func checkCatalog(cat catalog.Catalog) error {

@@ -24,6 +24,8 @@ func bootstrapCatalogOnStart(
 	if scanErr != nil {
 		return scanErr
 	}
+	runtime.catMetrics.SyncCatalog(runtime.cat)
+	runtime.catMetrics.SetSourceBytes(totalBytes)
 
 	warmErr := runtime.pipelineSvc.Warm(ctx)
 	if warmErr != nil {

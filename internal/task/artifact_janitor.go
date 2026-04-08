@@ -53,10 +53,13 @@ func registerArtifactJanitorTask(ctx context.Context, scheduler gocron.Scheduler
 func runArtifactJanitor(ctx context.Context, runtime *artifactJanitorRuntime) {
 	startedAt := time.Now()
 	report, err := syncArtifactCatalog(ctx, runtime.store, runtime.catalog, runtime.bodyCache)
+	recordTaskRunMetrics(ctx, runtime.obs, "artifact_janitor", startedAt, err)
 	if err != nil {
 		runtime.logger.Error("Task artifact janitor failed", slog.String("err", err.Error()))
 		return
 	}
+	recordArtifactJanitorMetrics(ctx, runtime.obs, report)
+	runtime.catMetrics.SyncCatalog(runtime.catalog)
 	if report.ScannedArtifacts == 0 && report.RemovedOrphans == 0 && report.MissingVariants == 0 && report.RemovedDirectories == 0 {
 		return
 	}

@@ -18,6 +18,7 @@ import (
 const sourceRescanInterval = 5 * time.Minute
 
 type SourceRescanReport struct {
+	TotalBytes         int64
 	Scanned            int
 	Added              int
 	Updated            int
@@ -52,10 +53,14 @@ func registerSourceRescanTask(ctx context.Context, scheduler gocron.Scheduler, r
 func runSourceRescan(ctx context.Context, runtime *sourceRescanRuntime) {
 	startedAt := time.Now()
 	report, err := syncSourceCatalog(ctx, runtime.scanner, runtime.catalog, runtime.bodyCache)
+	recordTaskRunMetrics(ctx, runtime.obs, "source_rescan", startedAt, err)
 	if err != nil {
 		runtime.logger.Error("Task source rescan failed", slog.String("err", err.Error()))
 		return
 	}
+	recordSourceRescanMetrics(ctx, runtime.obs, report)
+	runtime.catMetrics.SyncCatalog(runtime.catalog)
+	runtime.catMetrics.SetSourceBytes(report.TotalBytes)
 
 	runtime.logger.Info("Task source rescan completed",
 		slog.Int("scanned", report.Scanned),
@@ -97,7 +102,10 @@ func collectScannedSnapshot(ctx context.Context, scanner sourcecatalog.Scanner) 
 	if err != nil {
 		return sourcecatalog.Snapshot{}, SourceRescanReport{}, scanErr.Wrap(err)
 	}
-	return snapshot, SourceRescanReport{Scanned: snapshot.Assets.Len()}, nil
+	return snapshot, SourceRescanReport{
+		TotalBytes: snapshot.TotalBytes,
+		Scanned:    snapshot.Assets.Len(),
+	}, nil
 }
 
 func indexAssetsByPath(assets collectionx.List[*catalog.Asset]) collectionx.Map[string, *catalog.Asset] {

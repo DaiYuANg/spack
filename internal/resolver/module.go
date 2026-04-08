@@ -5,6 +5,6 @@ import "github.com/DaiYuANg/arcgo/dix"
 
 var Module = dix.NewModule("resolver",
 	dix.WithModuleProviders(
-		dix.Provider4(newResolver),
+		dix.Provider5(newResolver),
 	),
 )
