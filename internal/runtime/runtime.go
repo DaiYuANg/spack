@@ -132,6 +132,7 @@ func configLogAttrs(cfg *config.Config) collectionx.List[slog.Attr] {
 		slog.Int("compression_zstd_level", cfg.Compression.ZstdLevel),
 		slog.Bool("image_enable", cfg.Image.Enable),
 		slog.Any("image_widths", cfg.Image.ParsedWidths().Values()),
+		slog.Any("image_formats", cfg.Image.ParsedFormats().Values()),
 		slog.Int("image_jpeg_quality", cfg.Image.JPEGQuality),
 		slog.Bool("debug_enable", cfg.Debug.Enable),
 		slog.Int("debug_live_port", cfg.Debug.LivePort),

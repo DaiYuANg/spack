@@ -240,11 +240,15 @@ Images:
 
 - `SPACK_IMAGE_ENABLE=true`
 - `SPACK_IMAGE_WIDTHS=640,1280,1920`
+- `SPACK_IMAGE_FORMATS=jpeg,png`
 - `SPACK_IMAGE_JPEG_QUALITY=78`
 - request width variants with `?w=<width>`
+- image processing uses the builtin Go image pipeline and supports `jpeg` and `png`
 - request format variants with `?format=jpeg|png`
 - format can also be negotiated from `Accept: image/jpeg,image/png`
 - combine both as `?w=640&format=jpeg`
+- when `SPACK_IMAGE_FORMATS` is set, warmup/default image planning can pre-generate those formats
+- when `SPACK_IMAGE_FORMATS` is empty, request-time `Accept` negotiation can still ask for any supported output format
 
 Debug and metrics:
 
@@ -326,7 +330,6 @@ go run . --assets.root=./test/build/dist --assets.path=/ --assets.entry=index.ht
 
 The current architecture leaves room for:
 
-- additional image formats beyond `jpeg` and `png`
 - alternate source backends beyond the local asset tree
 - richer cache policy strategies beyond TTL and max-size eviction
 - more pipeline stages built on the same artifact/catalog/runtime model

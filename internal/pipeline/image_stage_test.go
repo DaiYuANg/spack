@@ -70,6 +70,32 @@ func TestImageStagePlanSchedulesFormatVariant(t *testing.T) {
 	}
 }
 
+func TestImageStagePlanIgnoresUnsupportedModernFormatVariant(t *testing.T) {
+	cat := catalog.NewInMemoryCatalog()
+	asset := &catalog.Asset{
+		Path:       "hero.png",
+		FullPath:   "hero.png",
+		MediaType:  "image/png",
+		SourceHash: "hash-1",
+		ETag:       "\"hash-1\"",
+	}
+	if err := cat.UpsertAsset(asset); err != nil {
+		t.Fatal(err)
+	}
+
+	stage := pipeline.NewImageStageForTest(&config.Image{
+		Enable: true,
+	}, newTestStore(t.TempDir()), cat)
+
+	tasks := stage.Plan(asset, pipeline.Request{
+		AssetPath:        asset.Path,
+		PreferredFormats: collectionx.NewList("webp"),
+	})
+	if tasks.Len() != 0 {
+		t.Fatalf("expected unsupported webp format to be ignored, got %#v", tasks.Values())
+	}
+}
+
 func TestImageStageExecuteCreatesResizedVariant(t *testing.T) {
 	dir := t.TempDir()
 	sourcePath := filepath.Join(dir, "hero.jpg")

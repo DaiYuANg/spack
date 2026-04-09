@@ -47,12 +47,16 @@ func preferredWidths(width int) collectionx.List[int] {
 	return collectionx.NewList(width)
 }
 
-func preferredImageFormats(acceptHeader, explicitFormat, sourceMediaType string) collectionx.List[string] {
+func preferredImageFormats(
+	acceptHeader,
+	explicitFormat,
+	sourceMediaType string,
+) collectionx.List[string] {
 	if explicitFormat != "" {
 		return collectionx.NewList(explicitFormat)
 	}
 	if !media.IsImageMediaType(sourceMediaType) {
 		return collectionx.NewList[string]()
 	}
-	return parseAcceptImageFormats(acceptHeader, media.ImageFormat(sourceMediaType))
+	return parseAcceptImageFormats(acceptHeader, media.ImageFormat(sourceMediaType), media.SupportedImageFormats())
 }

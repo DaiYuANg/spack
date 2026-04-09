@@ -9,6 +9,7 @@ import (
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/contentcoding"
 	contentcodingspec "github.com/daiyuang/spack/internal/contentcoding/spec"
+	"github.com/daiyuang/spack/internal/media"
 )
 
 // NewResolverForTest exposes resolver construction for external tests.
@@ -23,12 +24,12 @@ func NewResolverWithObservabilityForTest(
 	logger *slog.Logger,
 	obs observabilityx.Observability,
 ) *Resolver {
-	defaults := config.DefaultConfig().Compression
+	defaults := config.DefaultConfig()
 	return newResolver(cfg, contentcoding.NewRegistry(contentcoding.Options{
-		BrotliQuality: defaults.BrotliQuality,
-		GzipLevel:     defaults.GzipLevel,
-		ZstdLevel:     defaults.ZstdLevel,
-	}, defaults.NormalizedEncodings()), cat, logger, obs)
+		BrotliQuality: defaults.Compression.BrotliQuality,
+		GzipLevel:     defaults.Compression.GzipLevel,
+		ZstdLevel:     defaults.Compression.ZstdLevel,
+	}, defaults.Compression.NormalizedEncodings()), cat, logger, obs)
 }
 
 // NewResolverWithCompressionForTest exposes resolver construction with compression config for external tests.
@@ -57,5 +58,5 @@ func ParseAcceptEncodingWithSupportedForTest(header string, supported collection
 
 // ParseAcceptImageFormatsForTest exposes image format preference parsing for external tests.
 func ParseAcceptImageFormatsForTest(header, sourceFormat string) collectionx.List[string] {
-	return parseAcceptImageFormats(header, sourceFormat)
+	return parseAcceptImageFormats(header, sourceFormat, media.SupportedImageFormats())
 }

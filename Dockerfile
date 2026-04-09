@@ -1,7 +1,7 @@
 FROM golang:bookworm AS builder
 
 ENV GO111MODULE=on \
-    CGO_ENABLED=1
+    CGO_ENABLED=0
 
 USER root
 

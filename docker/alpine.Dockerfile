@@ -1,5 +1,5 @@
 FROM frolvlad/alpine-glibc AS alpine
-RUN adduser -D -g ' appuser
+RUN adduser -D -g '' appuser
 
 WORKDIR /opt
 COPY --from=builder /app/spack /opt/spack

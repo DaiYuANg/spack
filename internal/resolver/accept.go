@@ -30,6 +30,15 @@ type imagePreferences struct {
 	hasWildcardAny   bool
 }
 
+type imagePreferenceMatch int
+
+const (
+	imagePreferenceNone imagePreferenceMatch = iota
+	imagePreferenceAnyWildcard
+	imagePreferenceImageWildcard
+	imagePreferenceExplicit
+)
+
 func parseAcceptEncoding(header string, supported collectionx.List[string]) collectionx.List[string] {
 	if strings.TrimSpace(header) == "" {
 		return collectionx.NewList[string]()
@@ -38,12 +47,12 @@ func parseAcceptEncoding(header string, supported collectionx.List[string]) coll
 	return buildEncodingCandidates(collectEncodingPreferences(parseAcceptEntries(header)), supported)
 }
 
-func parseAcceptImageFormats(header, sourceFormat string) collectionx.List[string] {
+func parseAcceptImageFormats(header, sourceFormat string, supported collectionx.List[string]) collectionx.List[string] {
 	if strings.TrimSpace(header) == "" {
 		return collectionx.NewList[string]()
 	}
 
-	return buildImageCandidates(collectImagePreferences(parseAcceptEntries(header)), sourceFormat)
+	return buildImageCandidates(collectImagePreferences(parseAcceptEntries(header)), sourceFormat, supported)
 }
 
 func parseAcceptEntries(header string) collectionx.List[acceptEntry] {
@@ -175,8 +184,8 @@ func applyImagePreference(prefs *imagePreferences, entry acceptEntry) {
 		prefs.hasWildcardAny = true
 		prefs.wildcardAnyQ = entry.q
 	default:
-		if capability, ok := media.LookupImageCapabilityByAcceptToken(entry.token); ok {
-			setMaxQuality(prefs.explicit, capability.Name, entry.q)
+		if descriptor, ok := media.LookupImageDescriptorByAcceptToken(entry.token); ok {
+			setMaxQuality(prefs.explicit, descriptor.Name, entry.q)
 		}
 	}
 }
@@ -188,27 +197,32 @@ func setMaxQuality(values collectionx.Map[string, float64], key string, q float6
 	values.Set(key, q)
 }
 
-func buildImageCandidates(prefs imagePreferences, sourceFormat string) collectionx.List[string] {
+func buildImageCandidates(prefs imagePreferences, sourceFormat string, supported collectionx.List[string]) collectionx.List[string] {
 	type candidate struct {
 		format   string
 		q        float64
+		match    imagePreferenceMatch
 		priority int
 	}
 
-	supported := media.SupportedImageFormats()
+	supported = imageFormatCandidates(supported, sourceFormat)
 	candidates := collectionx.FilterMapList(supported, func(index int, format string) (candidate, bool) {
-		q := imageQualityForFormat(prefs, format)
-		if q <= 0 {
+		q, match := imageQualityForFormat(prefs, format)
+		if q <= 0 || match == imagePreferenceNone {
 			return candidate{}, false
 		}
 		return candidate{
 			format:   format,
 			q:        q,
+			match:    match,
 			priority: imagePriority(index, format, sourceFormat),
 		}, true
 	})
 
 	candidates.Sort(func(left, right candidate) int {
+		if left.match != right.match {
+			return cmp.Compare(int(right.match), int(left.match))
+		}
 		if left.q == right.q {
 			return cmp.Compare(left.priority, right.priority)
 		}
@@ -223,17 +237,31 @@ func buildImageCandidates(prefs imagePreferences, sourceFormat string) collectio
 	})
 }
 
-func imageQualityForFormat(prefs imagePreferences, format string) float64 {
+func imageFormatCandidates(supported collectionx.List[string], sourceFormat string) collectionx.List[string] {
+	candidates := collectionx.NewList[string]()
+	if supported != nil && !supported.IsEmpty() {
+		candidates.Add(supported.Values()...)
+	}
+	if sourceFormat != "" {
+		candidates.Add(sourceFormat)
+	}
+	if candidates.IsEmpty() {
+		candidates.Add(media.SupportedImageFormats().Values()...)
+	}
+	return media.NormalizeImageFormats(candidates)
+}
+
+func imageQualityForFormat(prefs imagePreferences, format string) (float64, imagePreferenceMatch) {
 	if q, ok := prefs.explicit.Get(format); ok {
-		return q
+		return q, imagePreferenceExplicit
 	}
 	if prefs.hasWildcardImage {
-		return prefs.wildcardImageQ
+		return prefs.wildcardImageQ, imagePreferenceImageWildcard
 	}
 	if prefs.hasWildcardAny {
-		return prefs.wildcardAnyQ
+		return prefs.wildcardAnyQ, imagePreferenceAnyWildcard
 	}
-	return 0
+	return 0, imagePreferenceNone
 }
 
 func imagePriority(index int, format, sourceFormat string) int {

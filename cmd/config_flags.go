@@ -77,6 +77,7 @@ func bindDebugFlags(flags *pflag.FlagSet, defaults config.Debug) {
 func bindImageFlags(flags *pflag.FlagSet, defaults config.Image) {
 	flags.Bool("image.enable", defaults.Enable, "Enable image variant pipeline.")
 	flags.String("image.widths", defaults.Widths, "Comma-separated responsive image widths.")
+	flags.String("image.formats", defaults.Formats, "Comma-separated additional image output formats for warmup and default generation.")
 	flags.Int("image.jpeg_quality", defaults.JPEGQuality, "JPEG encoding quality for generated variants.")
 }
 

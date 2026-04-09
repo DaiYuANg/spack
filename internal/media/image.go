@@ -6,61 +6,55 @@ import (
 	"strings"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/anthonynsimon/bild/imgio"
 	"github.com/samber/lo"
 )
 
-type ImageFormatCapability struct {
+type ImageFormatDescriptor struct {
 	Name         string
 	MediaType    string
 	Extension    string
 	AcceptTokens collectionx.List[string]
-	Encoder      func(quality int) imgio.Encoder
 }
 
-var imageFormatCapabilities = []ImageFormatCapability{
+var imageFormatDescriptors = []ImageFormatDescriptor{
 	{
 		Name:         "jpeg",
 		MediaType:    "image/jpeg",
 		Extension:    ".jpg",
 		AcceptTokens: collectionx.NewList("image/jpeg", "image/jpg"),
-		Encoder:      imgio.JPEGEncoder,
 	},
 	{
 		Name:         "png",
 		MediaType:    "image/png",
 		Extension:    ".png",
 		AcceptTokens: collectionx.NewList("image/png"),
-		Encoder: func(_ int) imgio.Encoder {
-			return imgio.PNGEncoder()
-		},
 	},
 }
 
 func SupportedImageFormats() collectionx.List[string] {
-	return collectionx.NewList(lo.Map(imageFormatCapabilities, func(capability ImageFormatCapability, _ int) string {
-		return capability.Name
+	return collectionx.NewList(lo.Map(imageFormatDescriptors, func(descriptor ImageFormatDescriptor, _ int) string {
+		return descriptor.Name
 	})...)
 }
 
-func LookupImageCapability(format string) (ImageFormatCapability, bool) {
+func LookupImageDescriptor(format string) (ImageFormatDescriptor, bool) {
 	normalized := strings.ToLower(strings.TrimSpace(format))
-	return findImageCapability(func(capability ImageFormatCapability) bool {
-		return capability.Name == normalized
+	return findImageDescriptor(func(descriptor ImageFormatDescriptor) bool {
+		return descriptor.Name == normalized
 	})
 }
 
-func LookupImageCapabilityByMediaType(mediaType string) (ImageFormatCapability, bool) {
+func LookupImageDescriptorByMediaType(mediaType string) (ImageFormatDescriptor, bool) {
 	normalized := strings.ToLower(strings.TrimSpace(mediaType))
-	return findImageCapability(func(capability ImageFormatCapability) bool {
-		return capability.MediaType == normalized
+	return findImageDescriptor(func(descriptor ImageFormatDescriptor) bool {
+		return descriptor.MediaType == normalized
 	})
 }
 
-func LookupImageCapabilityByAcceptToken(token string) (ImageFormatCapability, bool) {
+func LookupImageDescriptorByAcceptToken(token string) (ImageFormatDescriptor, bool) {
 	normalized := strings.ToLower(strings.TrimSpace(token))
-	return findImageCapability(func(capability ImageFormatCapability) bool {
-		return slices.Contains(capability.AcceptTokens.Values(), normalized)
+	return findImageDescriptor(func(descriptor ImageFormatDescriptor) bool {
+		return slices.Contains(descriptor.AcceptTokens.Values(), normalized)
 	})
 }
 
@@ -70,16 +64,16 @@ func NormalizeImageFormat(format string) string {
 	case "jpg":
 		return "jpeg"
 	default:
-		if capability, ok := LookupImageCapability(normalized); ok {
-			return capability.Name
+		if descriptor, ok := LookupImageDescriptor(normalized); ok {
+			return descriptor.Name
 		}
 		return ""
 	}
 }
 
 func ImageFormat(mediaType string) string {
-	if capability, ok := LookupImageCapabilityByMediaType(mediaType); ok {
-		return capability.Name
+	if descriptor, ok := LookupImageDescriptorByMediaType(mediaType); ok {
+		return descriptor.Name
 	}
 	return ""
 }
@@ -100,6 +94,6 @@ func NormalizeImageFormats(formats collectionx.List[string]) collectionx.List[st
 	return collectionx.NewList(collectionx.NewOrderedSet(normalized.Values()...).Values()...)
 }
 
-func findImageCapability(match func(ImageFormatCapability) bool) (ImageFormatCapability, bool) {
-	return lo.Find(imageFormatCapabilities, match)
+func findImageDescriptor(match func(ImageFormatDescriptor) bool) (ImageFormatDescriptor, bool) {
+	return lo.Find(imageFormatDescriptors, match)
 }

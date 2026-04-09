@@ -51,6 +51,7 @@ func defaultConfig() Config {
 		Image: Image{
 			Enable:      true,
 			Widths:      "640,1280,1920",
+			Formats:     "",
 			JPEGQuality: 78,
 		},
 		Compression: Compression{

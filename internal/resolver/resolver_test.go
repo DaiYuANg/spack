@@ -23,6 +23,13 @@ func TestParseAcceptImageFormatsPriority(t *testing.T) {
 	}
 }
 
+func TestParseAcceptImageFormatsPrefersExplicitOverWildcard(t *testing.T) {
+	got := resolver.ParseAcceptImageFormatsForTest("image/jpeg;q=0.7,image/*;q=0.9", "png")
+	if !slices.Equal(got.Values(), []string{"jpeg", "png"}) {
+		t.Fatalf("unexpected image formats: %#v", got)
+	}
+}
+
 func TestResolverFallsBackForSPAPath(t *testing.T) {
 	sourcePath, _, assetResolver := newResolverFixture(t, "index.html", "text/html; charset=utf-8", []byte("<html>origin</html>"), spaAssetsConfig())
 	result, err := assetResolver.Resolve(resolver.Request{Path: "docs"})
@@ -144,6 +151,20 @@ func TestResolverRequestsFormatGenerationFromAcceptWhenMissing(t *testing.T) {
 	first, ok := result.PreferredFormats.GetFirst()
 	if !ok || first != "jpeg" {
 		t.Fatalf("expected format generation request from accept, got %#v", result.PreferredFormats)
+	}
+}
+
+func TestResolverIgnoresUnsupportedModernFormatsFromAccept(t *testing.T) {
+	_, _, assetResolver := newResolverFixture(t, "hero.png", "image/png", []byte("origin"), baseAssetsConfig())
+	result, err := assetResolver.Resolve(resolver.Request{
+		Path:   "hero.png",
+		Accept: "image/webp,image/avif,image/png;q=0.5",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(result.PreferredFormats.Values(), []string{"png"}) {
+		t.Fatalf("expected unsupported modern formats to be ignored, got %#v", result.PreferredFormats)
 	}
 }
 
