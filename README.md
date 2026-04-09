@@ -15,6 +15,7 @@ Current scope:
 - `index.html` fallback for client-side routing
 - built-in `robots.txt` fallback generation with static-file precedence
 - runtime asset catalog
+- request-path normalization for mounted, encoded, and SPA-style routes
 - `gzip`, `brotli`, and `zstd` variant generation
 - on-demand image width/format variants via query or `Accept` negotiation
 - in-memory hot asset cache for small files with optional startup warmup
@@ -36,24 +37,28 @@ Out of scope:
 
 The current runtime is composed of:
 
-1. `source`
+1. `config + dix bootstrap`
+   Loads configuration from dotenv, files, env, and CLI, then wires the runtime through `dix`.
+2. `source`
    Reads files from the configured asset backend, currently local filesystem.
-2. `catalog`
-   Stores scanned assets and generated variants as runtime metadata.
-3. `pipeline`
+3. `catalog`
+   Stores scanned source assets and generated variants as runtime metadata.
+4. `requestpath`
+   Normalizes mounted paths, percent-encoded asset paths, and SPA route-like requests before resolution.
+5. `resolver`
+   Maps an HTTP request to the best asset or variant, including `Accept` and `Accept-Encoding` negotiation.
+6. `pipeline`
    Generates compressed and image variants in lazy or warmup mode.
-4. `resolver`
-   Maps an HTTP request to the best asset or variant.
-5. `assetcache`
+7. `assetcache`
    Keeps small hot responses in memory and supports warmup/invalidation.
-6. `server`
-   Handles HTTP, fallback, delivery, generated `robots.txt`, and observability.
-7. `event`
+8. `server`
+   Handles HTTP, fallback, delivery, generated `robots.txt`, cache headers, and request metrics.
+9. `event`
    Decouples variant lifecycle notifications between server, pipeline, and cache.
-8. `task`
-   Runs internal scheduled maintenance such as periodic source rescans.
-9. `runtime`
-   Boots scanning, warmup, HTTP serving, and debug endpoints through `dix` lifecycle hooks.
+10. `task + scheduler`
+    Runs internal source rescans, artifact cleanup, and cache warmup through `gocron`.
+11. `runtime + observability`
+    Boots HTTP/debug runtimes and exports Prometheus metrics, build/config info, and Grafana-ready signals.
 
 ```mermaid
 flowchart TB
@@ -68,29 +73,59 @@ flowchart TB
     Config --> Loader["configx loader"]
     Loader --> CLI["Cobra + dix container"]
 
-    CLI --> Runtime["runtime lifecycle"]
-    Runtime --> Source["source"]
-    Source --> Catalog["catalog"]
-    Runtime --> Pipeline["pipeline"]
-    Runtime --> AssetCache["assetcache"]
-    Runtime --> HTTP["Fiber HTTP server"]
-    Runtime --> Debug["debug runtime"]
+    subgraph Runtime["Runtime and Data Plane"]
+        CLI --> Lifecycle["runtime lifecycle"]
+        Lifecycle --> Source["source"]
+        Source --> Catalog["catalog"]
+        Lifecycle --> Pipeline["pipeline"]
+        Lifecycle --> WorkerPool["shared worker pool"]
+        Lifecycle --> AssetCache["assetcache"]
+        Lifecycle --> Scheduler["gocron scheduler"]
+        Lifecycle --> HTTP["Fiber HTTP server"]
+        Lifecycle --> Debug["debug runtime"]
 
-    Pipeline --> ArtifactStore["artifact store"]
-    ArtifactStore --> Catalog
+        Pipeline --> WorkerPool
+        Pipeline --> ArtifactStore["artifact store"]
+        ArtifactStore --> Catalog
 
-    HTTP --> Resolver["resolver"]
-    Resolver --> Catalog
-    HTTP --> Delivery["delivery: memory cache or sendfile"]
-    AssetCache --> Delivery
+        Scheduler --> SourceRescan["source rescan"]
+        Scheduler --> ArtifactJanitor["artifact janitor"]
+        Scheduler --> CacheWarmer["cache warmer"]
+        SourceRescan --> Source
+        ArtifactJanitor --> ArtifactStore
+        CacheWarmer --> AssetCache
+    end
 
-    HTTP -->|VariantServed| EventBus["event bus"]
-    Pipeline -->|VariantGenerated / VariantRemoved| EventBus
-    EventBus --> Pipeline
-    EventBus --> AssetCache
+    subgraph RequestFlow["Request Flow"]
+        Client["client"] --> HTTP
+        HTTP --> PathCleaner["requestpath cleaner"]
+        PathCleaner --> Resolver["resolver"]
+        Resolver --> Catalog
+        Resolver --> Fallback["entry fallback"]
+        Resolver --> Delivery["delivery"]
+        Delivery --> MemoryCache["memory cache hit/fill"]
+        Delivery --> Sendfile["sendfile / range"]
+        Delivery --> Headers["ETag / Last-Modified / Cache-Control / Expires"]
+    end
 
-    Debug --> Metrics["/prometheus"]
-    Debug --> Statsviz["/debug/statsviz"]
+    subgraph Events["Event Flow"]
+        HTTP -->|VariantServed| EventBus["event bus"]
+        Pipeline -->|VariantGenerated / VariantRemoved| EventBus
+        EventBus --> Pipeline
+        EventBus --> AssetCache
+    end
+
+    subgraph Observability["Observability"]
+        HTTP --> Metrics["observabilityx"]
+        Resolver --> Metrics
+        Pipeline --> Metrics
+        Scheduler --> Metrics
+        WorkerPool --> Metrics
+        Debug --> Prometheus["/prometheus"]
+        Debug --> Statsviz["/debug/statsviz"]
+        Metrics --> Prometheus
+        Prometheus --> Dashboard["Grafana overview dashboard"]
+    end
 ```
 
 Request flow at a high level:
@@ -99,9 +134,18 @@ Request flow at a high level:
 2. An internal scheduler periodically rescans the source tree and removes stale generated artifacts.
 3. The pipeline optionally warms compressed/image variants.
 4. The memory cache can optionally preload small hot assets and generated variants.
-5. For each request, the resolver chooses the best asset or variant.
-6. Delivery uses memory cache for eligible small files, otherwise Fiber `SendFile`.
-7. Served/generated/removed variants are propagated through the event bus for decoupled cache and pipeline updates.
+5. Each request path is normalized by `requestpath` before route resolution so mounted, encoded, and SPA-style paths follow the same matching rules.
+6. The resolver chooses the best asset or variant, including content-coding and image-format negotiation.
+7. Delivery uses memory cache for eligible small files, otherwise Fiber `SendFile`.
+8. Cache and validator headers are applied from resolved metadata and response policy rules.
+9. Served/generated/removed variants are propagated through the event bus for decoupled cache and pipeline updates.
+
+Hot paths that are intentionally optimized:
+
+- request-path cleaning for already-canonical asset paths
+- resolver negotiation for direct assets, encoding variants, and image variants
+- HTTP middleware short-circuiting when request logging or metrics are disabled
+- response-header calculation for `Vary`, `Content-Length`, `Last-Modified`, and cache-policy emission
 
 ## Quick Start
 
@@ -131,6 +175,89 @@ Or override configuration at startup:
 go run . --config .\spack.yaml --http.port=8080 --assets.root=.\dist
 ```
 
+## Container Examples
+
+Use SPACK directly as the runtime base image for frontend build outputs:
+
+```dockerfile
+FROM node:22-alpine AS build
+WORKDIR /workspace
+
+COPY package.json pnpm-lock.yaml ./
+RUN corepack enable && pnpm install --frozen-lockfile
+
+COPY . .
+RUN pnpm build
+
+FROM daiyuang/spack:latest
+
+COPY --from=build /workspace/dist /app
+
+ENV SPACK_ASSETS_ROOT=/app
+ENV SPACK_ASSETS_PATH=/
+ENV SPACK_ASSETS_ENTRY=index.html
+ENV SPACK_ASSETS_FALLBACK_TARGET=index.html
+ENV SPACK_HTTP_PORT=80
+ENV SPACK_COMPRESSION_ENABLE=true
+ENV SPACK_COMPRESSION_MODE=lazy
+ENV SPACK_IMAGE_ENABLE=true
+
+EXPOSE 80 8080
+```
+
+Use SPACK as a reusable runtime base in your own image family:
+
+```dockerfile
+FROM daiyuang/spack:latest AS spack-runtime
+
+ENV SPACK_ASSETS_ROOT=/srv/www
+ENV SPACK_ASSETS_PATH=/
+ENV SPACK_ASSETS_ENTRY=index.html
+ENV SPACK_ASSETS_FALLBACK_TARGET=index.html
+ENV SPACK_HTTP_PORT=80
+ENV SPACK_DEBUG_ENABLE=true
+ENV SPACK_DEBUG_LIVE_PORT=8080
+
+FROM spack-runtime
+COPY ./dist /srv/www
+
+EXPOSE 80 8080
+```
+
+Use a custom config file instead of many environment variables:
+
+```dockerfile
+FROM daiyuang/spack:latest
+
+COPY ./dist /app
+COPY ./deploy/spack.yaml /etc/spack/spack.yaml
+
+ENV SPACK_ASSETS_ROOT=/app
+
+CMD ["spack", "--config", "/etc/spack/spack.yaml"]
+```
+
+Use SPACK only as the runtime layer while keeping your own build pipeline:
+
+```dockerfile
+FROM daiyuang/spack:latest
+
+COPY ./packages/web/dist /opt/assets
+
+ENV SPACK_ASSETS_ROOT=/opt/assets
+ENV SPACK_ASSETS_PATH=/assets
+ENV SPACK_ASSETS_ENTRY=index.html
+ENV SPACK_ASSETS_FALLBACK_TARGET=index.html
+ENV SPACK_ROBOTS_ENABLE=true
+```
+
+Container deployment notes:
+
+- keep hashed build assets cacheable and let SPACK serve `index.html` fallback separately
+- expose the debug runtime port only inside trusted networks when `/prometheus` and profiling endpoints are enabled
+- prefer baking assets into the image for immutable deploys instead of mounting mutable runtime volumes
+- use `spack_build_info` and `spack_runtime_start_time_seconds` to correlate image versions and container restarts
+
 Important endpoints:
 
 - `/healthz`
@@ -150,6 +277,30 @@ Response behavior:
 - responses include `ETag`, `Last-Modified`, `Cache-Control`, and `Expires`
 - conditional requests support `304 Not Modified`
 - `HEAD` requests reuse the same header selection logic without sending a response body
+
+## Observability
+
+SPACK is designed to be operated as an application runtime, not just a static file drop. The default observability surface combines:
+
+- Prometheus runtime metrics from SPACK modules
+- default Go runtime metrics such as `go_goroutines`, `go_threads`, `go_memstats_*`, `go_gc_*`, and `go_info`
+- default process metrics such as `process_cpu_seconds_total`, `process_resident_memory_bytes`, `process_open_fds`, and `process_start_time_seconds`
+- static runtime metadata via `spack_build_info`, `spack_config_info`, and `spack_runtime_start_time_seconds`
+- scheduler telemetry through `gocron`'s `SchedulerMonitor`
+- `dix` lifecycle telemetry through the `spack_dix_*` metric family
+
+The bundled Grafana dashboard lives at [`deploy/grafana/spack-overview-dashboard.json`](C:/Users/12783/Projects/GitHub/spack/deploy/grafana/spack-overview-dashboard.json). It includes:
+
+- application request, resolver, pipeline, cache, worker-pool, and scheduler panels
+- Go runtime and process overview panels for startup time, uptime, RSS, heap, goroutines, OS threads, GOMAXPROCS, open FDs, and GC behavior
+- build and runtime config tables derived from `spack_build_info` and `spack_config_info`
+
+Recommended operational flow:
+
+1. Import the bundled dashboard into Grafana.
+2. Point it at the SPACK Prometheus target.
+3. Use `spack_build_info` and `spack_runtime_start_time_seconds` to correlate deploys, restarts, and regressions.
+4. Use the benchmark/profile entrypoints below before and after performance changes.
 
 ## Configuration
 
@@ -339,6 +490,12 @@ The current baseline focuses on four hot paths:
 - `assetcache.GetOrLoad` for cache hit and miss behavior
 - `pipeline.Service.Enqueue` for unique and deduplicated lazy-generation requests
 - HTTP asset delivery through memory-cache-hit and sendfile paths
+
+Recent optimization work has primarily targeted:
+
+- request-path normalization
+- resolver variant negotiation and per-request reuse
+- HTTP middleware short-circuiting and response-header emission
 
 Profile artifacts are written to `tmp/perf/` so later optimization passes can compare against the same entrypoints.
 
