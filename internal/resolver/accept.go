@@ -8,7 +8,6 @@ import (
 	"github.com/DaiYuANg/arcgo/collectionx"
 	contentcodingspec "github.com/daiyuang/spack/internal/contentcoding/spec"
 	"github.com/daiyuang/spack/internal/media"
-	"github.com/samber/lo"
 )
 
 type acceptEntry struct {
@@ -56,9 +55,18 @@ func parseAcceptImageFormats(header, sourceFormat string, supported collectionx.
 }
 
 func parseAcceptEntries(header string) collectionx.List[acceptEntry] {
-	return collectionx.FilterMapList(collectionx.NewList(strings.Split(header, ",")...), func(_ int, rawPart string) (acceptEntry, bool) {
-		return parseAcceptEntry(rawPart)
-	})
+	entries := collectionx.NewList[acceptEntry]()
+	remaining := header
+	for {
+		part, rest, found := strings.Cut(remaining, ",")
+		if entry, ok := parseAcceptEntry(part); ok {
+			entries.Add(entry)
+		}
+		if !found {
+			return entries
+		}
+		remaining = rest
+	}
 }
 
 func parseAcceptEntry(rawPart string) (acceptEntry, bool) {
@@ -67,25 +75,35 @@ func parseAcceptEntry(rawPart string) (acceptEntry, bool) {
 		return acceptEntry{}, false
 	}
 
-	pieces := strings.Split(part, ";")
-	token := strings.ToLower(strings.TrimSpace(pieces[0]))
+	tokenRaw, paramsRaw, _ := strings.Cut(part, ";")
+	token := strings.ToLower(strings.TrimSpace(tokenRaw))
 	if token == "" {
 		return acceptEntry{}, false
 	}
 	return acceptEntry{
 		token: token,
-		q:     parseAcceptQuality(pieces[1:]),
+		q:     parseAcceptQuality(paramsRaw),
 	}, true
 }
 
-func parseAcceptQuality(params []string) float64 {
-	return lo.Reduce(params, func(q float64, rawParam string, _ int) float64 {
-		param := strings.TrimSpace(rawParam)
-		if !strings.HasPrefix(strings.ToLower(param), "q=") {
-			return q
+func parseAcceptQuality(params string) float64 {
+	if strings.TrimSpace(params) == "" {
+		return 1.0
+	}
+
+	quality := 1.0
+	remaining := params
+	for {
+		paramRaw, rest, found := strings.Cut(remaining, ";")
+		param := strings.TrimSpace(paramRaw)
+		if len(param) >= 2 && (param[0] == 'q' || param[0] == 'Q') && param[1] == '=' {
+			quality = clampAcceptQuality(strings.TrimSpace(param[2:]))
 		}
-		return clampAcceptQuality(strings.TrimSpace(strings.TrimPrefix(strings.ToLower(param), "q=")))
-	}, 1.0)
+		if !found {
+			return quality
+		}
+		remaining = rest
+	}
 }
 
 func clampAcceptQuality(raw string) float64 {
@@ -103,19 +121,21 @@ func clampAcceptQuality(raw string) float64 {
 }
 
 func collectEncodingPreferences(entries collectionx.List[acceptEntry]) encodingPreferences {
-	return lo.Reduce(entries.Values(), func(prefs encodingPreferences, entry acceptEntry, _ int) encodingPreferences {
+	prefs := encodingPreferences{
+		explicit: collectionx.NewMapWithCapacity[string, float64](4),
+	}
+	entries.Range(func(_ int, entry acceptEntry) bool {
 		if entry.token == "*" {
 			prefs.hasWildcard = true
 			prefs.wildcardQ = entry.q
-			return prefs
+			return true
 		}
 		if entry.q > prefs.explicit.GetOrDefault(entry.token, -1) {
 			prefs.explicit.Set(entry.token, entry.q)
 		}
-		return prefs
-	}, encodingPreferences{
-		explicit: collectionx.NewMapWithCapacity[string, float64](4),
+		return true
 	})
+	return prefs
 }
 
 func buildEncodingCandidates(prefs encodingPreferences, supported collectionx.List[string]) collectionx.List[string] {
@@ -167,12 +187,14 @@ func encodingQuality(prefs encodingPreferences, encoding string) (float64, bool)
 }
 
 func collectImagePreferences(entries collectionx.List[acceptEntry]) imagePreferences {
-	return lo.Reduce(entries.Values(), func(prefs imagePreferences, entry acceptEntry, _ int) imagePreferences {
-		applyImagePreference(&prefs, entry)
-		return prefs
-	}, imagePreferences{
+	prefs := imagePreferences{
 		explicit: collectionx.NewMapWithCapacity[string, float64](4),
+	}
+	entries.Range(func(_ int, entry acceptEntry) bool {
+		applyImagePreference(&prefs, entry)
+		return true
 	})
+	return prefs
 }
 
 func applyImagePreference(prefs *imagePreferences, entry acceptEntry) {

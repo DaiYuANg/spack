@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -21,7 +20,7 @@ func requestKey(request Request) string {
 	encodings := normalizeRequestStrings(request.PreferredEncodings)
 	formats := normalizeRequestStrings(request.PreferredFormats)
 	widths := normalizeRequestInts(request.PreferredWidths)
-	return assetPath + "|e=" + encodings.Join(",") + "|f=" + formats.Join(",") + "|w=" + joinInts(widths)
+	return buildRequestKey(assetPath, encodings, formats, widths)
 }
 
 func normalizeRequestStrings(values collectionx.List[string]) collectionx.List[string] {
@@ -29,16 +28,24 @@ func normalizeRequestStrings(values collectionx.List[string]) collectionx.List[s
 		return collectionx.NewList[string]()
 	}
 
-	normalized := lo.FilterMap(values.Values(), func(value string, _ int) (string, bool) {
-		normalized := strings.ToLower(strings.TrimSpace(value))
-		return normalized, normalized != ""
+	normalized := collectionx.NewList[string]()
+	seen := make(map[string]struct{})
+	values.Range(func(_ int, value string) bool {
+		normalizedValue := strings.ToLower(strings.TrimSpace(value))
+		if normalizedValue == "" {
+			return true
+		}
+		if _, ok := seen[normalizedValue]; ok {
+			return true
+		}
+		seen[normalizedValue] = struct{}{}
+		normalized.Add(normalizedValue)
+		return true
 	})
-	if len(normalized) == 0 {
+	if normalized.IsEmpty() {
 		return collectionx.NewList[string]()
 	}
-
-	sorted := collectionx.NewList(normalized...).Sort(strings.Compare)
-	return collectionx.NewList(collectionx.NewOrderedSet(sorted.Values()...).Values()...)
+	return normalized.Sort(strings.Compare)
 }
 
 func normalizeRequestInts(values collectionx.List[int]) collectionx.List[int] {
@@ -46,21 +53,23 @@ func normalizeRequestInts(values collectionx.List[int]) collectionx.List[int] {
 		return collectionx.NewList[int]()
 	}
 
-	normalized := lo.FilterMap(values.Values(), func(value int, _ int) (int, bool) {
-		return value, value > 0
+	normalized := collectionx.NewList[int]()
+	seen := make(map[int]struct{})
+	values.Range(func(_ int, value int) bool {
+		if value <= 0 {
+			return true
+		}
+		if _, ok := seen[value]; ok {
+			return true
+		}
+		seen[value] = struct{}{}
+		normalized.Add(value)
+		return true
 	})
-	if len(normalized) == 0 {
+	if normalized.IsEmpty() {
 		return collectionx.NewList[int]()
 	}
-
-	sorted := collectionx.NewList(normalized...).Sort(cmp.Compare[int])
-	return collectionx.NewList(collectionx.NewOrderedSet(sorted.Values()...).Values()...)
-}
-
-func joinInts(values collectionx.List[int]) string {
-	return collectionx.MapList(values, func(_ int, value int) string {
-		return strconv.Itoa(value)
-	}).Join(",")
+	return normalized.Sort(cmp.Compare[int])
 }
 
 type cleanupFile struct {

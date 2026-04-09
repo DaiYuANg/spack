@@ -120,6 +120,35 @@ tasks:
     cmds:
       - go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4 run ./...
 
+  perf:bench:
+    desc: 运行关键路径性能基线 benchmark
+    cmds:
+      - go test -run=TestDoesNotExist -bench='.' -benchmem -count=3 ./internal/resolver ./internal/assetcache ./internal/pipeline ./internal/server
+
+  perf:profile:resolver:
+    desc: 生成 resolver 基线 CPU/内存 profile
+    cmds:
+      - mkdir -p tmp/perf
+      - go test -run=TestDoesNotExist -bench='BenchmarkResolverResolve' -benchmem -count=1 -cpuprofile tmp/perf/resolver.cpu.pprof -memprofile tmp/perf/resolver.mem.pprof ./internal/resolver
+
+  perf:profile:cache:
+    desc: 生成 asset cache 基线 CPU/内存 profile
+    cmds:
+      - mkdir -p tmp/perf
+      - go test -run=TestDoesNotExist -bench='BenchmarkCacheGetOrLoad' -benchmem -count=1 -cpuprofile tmp/perf/cache.cpu.pprof -memprofile tmp/perf/cache.mem.pprof ./internal/assetcache
+
+  perf:profile:pipeline:
+    desc: 生成 pipeline enqueue 基线 CPU/内存 profile
+    cmds:
+      - mkdir -p tmp/perf
+      - go test -run=TestDoesNotExist -bench='BenchmarkServiceEnqueue' -benchmem -count=1 -cpuprofile tmp/perf/pipeline.cpu.pprof -memprofile tmp/perf/pipeline.mem.pprof ./internal/pipeline
+
+  perf:profile:http:
+    desc: 生成 HTTP 资产路由基线 CPU/内存 profile
+    cmds:
+      - mkdir -p tmp/perf
+      - go test -run=TestDoesNotExist -bench='BenchmarkHTTPAssetRoute' -benchmem -count=1 -cpuprofile tmp/perf/http.cpu.pprof -memprofile tmp/perf/http.mem.pprof ./internal/server
+
   release:tag:
     desc: "创建注释标签（用法: task release:tag VERSION=0.1.0）"
     requires:

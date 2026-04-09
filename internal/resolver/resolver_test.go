@@ -1,6 +1,7 @@
 package resolver_test
 
 import (
+	"errors"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -41,6 +42,18 @@ func TestResolverFallsBackForSPAPath(t *testing.T) {
 	}
 	if result.FilePath != sourcePath {
 		t.Fatalf("expected fallback path %q, got %q", sourcePath, result.FilePath)
+	}
+}
+
+func TestResolverDoesNotFallbackForMissingAssetPath(t *testing.T) {
+	_, _, assetResolver := newResolverFixture(t, "index.html", "text/html; charset=utf-8", []byte("<html>origin</html>"), spaAssetsConfig())
+
+	_, err := assetResolver.Resolve(resolver.Request{Path: "assets/index-missing.js"})
+	if err == nil {
+		t.Fatal("expected missing asset path not to use SPA fallback")
+	}
+	if !errors.Is(err, resolver.ErrNotFound) {
+		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
 }
 

@@ -10,12 +10,7 @@ import (
 	"github.com/samber/lo"
 )
 
-func uniqueStrings(values collectionx.List[string]) collectionx.List[string] {
-	filtered := collectionx.FilterMapList(values, func(_ int, value string) (string, bool) {
-		return value, value != ""
-	})
-	return collectionx.NewList(collectionx.NewOrderedSet(filtered.Values()...).Values()...)
-}
+var supportedImageFormats = media.SupportedImageFormats()
 
 func isUsableVariant(variant *catalog.Variant, assetSourceHash string) bool {
 	if variant == nil || strings.TrimSpace(variant.ArtifactPath) == "" {
@@ -58,5 +53,5 @@ func preferredImageFormats(
 	if !media.IsImageMediaType(sourceMediaType) {
 		return collectionx.NewList[string]()
 	}
-	return parseAcceptImageFormats(acceptHeader, media.ImageFormat(sourceMediaType), media.SupportedImageFormats())
+	return parseAcceptImageFormats(acceptHeader, media.ImageFormat(sourceMediaType), supportedImageFormats)
 }

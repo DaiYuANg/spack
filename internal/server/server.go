@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -15,8 +14,8 @@ import (
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/media"
 	"github.com/daiyuang/spack/internal/pipeline"
+	"github.com/daiyuang/spack/internal/requestpath"
 	"github.com/daiyuang/spack/internal/resolver"
-	"github.com/daiyuang/spack/view"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/etag"
 	expvarmw "github.com/gofiber/fiber/v3/middleware/expvar"
@@ -24,7 +23,6 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/pprof"
 	recoverer "github.com/gofiber/fiber/v3/middleware/recover"
 	"github.com/gofiber/fiber/v3/middleware/requestid"
-	"github.com/gofiber/template/html/v2"
 	"github.com/samber/lo"
 	"github.com/samber/oops"
 )
@@ -61,10 +59,9 @@ func newServerApp(cfg *config.Config) (*fiber.App, error) {
 	}
 	return fiber.New(fiber.Config{
 		AppName:           "Spack",
-		Views:             html.NewFileSystem(http.FS(view.View), ".html"),
-		PassLocalsToViews: true,
 		Immutable:         true,
 		StreamRequestBody: true,
+		UnescapePath:      true,
 		ErrorHandler:      errorHandler,
 		ServerHeader:      header,
 		StrictRouting:     true,
@@ -84,7 +81,7 @@ func registerMiddleware(
 	requestIDConfig.Generator = requestIDGenerator
 	app.Use(requestid.New(requestIDConfig))
 	app.Use(etag.New())
-	app.Use(helmet.New())
+	app.Use(helmet.New(newHelmetConfig()))
 	app.Use(requestLogMiddleware(logger))
 	app.Use(metricsMiddleware(obs, runtimeMetrics))
 
@@ -129,8 +126,9 @@ func registerAssetRoute(
 }
 
 func buildResolverRequest(c fiber.Ctx, mountPath, requestedFormat string) resolver.Request {
+	cleanedPath := requestpath.CleanMounted(c.Path(), mountPath)
 	return resolver.Request{
-		Path:           trimMountPath(c.Path(), mountPath),
+		Path:           cleanedPath.Value,
 		Accept:         c.Get(fiber.HeaderAccept),
 		AcceptEncoding: c.Get(fiber.HeaderAcceptEncoding),
 		Width:          parsePositiveInt(c.Query("w")),
@@ -218,16 +216,6 @@ func routePattern(mountPath string) string {
 		return "/*"
 	}
 	return strings.TrimRight(mountPath, "/") + "*"
-}
-
-func trimMountPath(requestPath, mountPath string) string {
-	mountPath = strings.TrimSpace(mountPath)
-	if lo.Contains([]string{"", "/"}, mountPath) {
-		return strings.TrimPrefix(requestPath, "/")
-	}
-
-	trimmed := strings.TrimPrefix(requestPath, strings.TrimRight(mountPath, "/"))
-	return strings.TrimPrefix(trimmed, "/")
 }
 
 func parsePositiveInt(raw string) int {

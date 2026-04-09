@@ -317,6 +317,31 @@ Run tests:
 go test ./...
 ```
 
+Run repeatable performance baselines:
+
+```powershell
+task perf:bench
+```
+
+Capture CPU and memory profiles for a single subsystem:
+
+```powershell
+task perf:profile:resolver
+task perf:profile:cache
+task perf:profile:pipeline
+task perf:profile:http
+go tool pprof .\tmp\perf\resolver.cpu.pprof
+```
+
+The current baseline focuses on four hot paths:
+
+- `resolver.Resolve` for direct asset, encoding variant, and image variant selection
+- `assetcache.GetOrLoad` for cache hit and miss behavior
+- `pipeline.Service.Enqueue` for unique and deduplicated lazy-generation requests
+- HTTP asset delivery through memory-cache-hit and sendfile paths
+
+Profile artifacts are written to `tmp/perf/` so later optimization passes can compare against the same entrypoints.
+
 Use the SPA fixture:
 
 ```powershell

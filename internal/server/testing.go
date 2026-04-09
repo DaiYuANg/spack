@@ -13,6 +13,7 @@ import (
 	"github.com/daiyuang/spack/internal/pipeline"
 	"github.com/daiyuang/spack/internal/resolver"
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/helmet"
 )
 
 // ShouldVaryAcceptForTest exposes vary-header behavior for external tests.
@@ -81,6 +82,11 @@ func NewObservedAppForTest(
 		panic(err)
 	}
 	return app
+}
+
+// NewHelmetConfigForTest exposes the helmet configuration for external tests.
+func NewHelmetConfigForTest() helmet.Config {
+	return newHelmetConfig()
 }
 
 // NewHealthModuleForTest exposes the dix health-check setup for external tests.

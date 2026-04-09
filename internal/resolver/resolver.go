@@ -15,6 +15,7 @@ import (
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/contentcoding"
 	"github.com/daiyuang/spack/internal/media"
+	"github.com/daiyuang/spack/internal/requestpath"
 )
 
 var (
@@ -175,20 +176,13 @@ func resolutionVariantKind(variant *catalog.Variant) (string, bool) {
 }
 
 func (r *Resolver) findAsset(requestPath string) (*catalog.Asset, bool) {
-	var asset *catalog.Asset
-	candidates(requestPath, r.cfg.Entry).Range(func(_ int, candidate string) bool {
-		if found, ok := r.catalog.FindAsset(candidate); ok {
-			asset = found
-			return false
-		}
-		return true
-	})
-	if asset != nil {
+	resolvedPath := requestpath.Clean(requestPath)
+	if asset, ok := r.findPrimaryAsset(resolvedPath); ok {
 		return asset, false
 	}
 
-	if r.cfg.Fallback.On == config.FallbackOnNotFound {
-		target := normalizeAssetPath(r.cfg.Fallback.Target)
+	if r.cfg.Fallback.On == config.FallbackOnNotFound && resolvedPath.AllowsEntryFallback {
+		target := requestpath.Clean(r.cfg.Fallback.Target).Value
 		if target != "" {
 			if asset, ok := r.catalog.FindAsset(target); ok {
 				return asset, true
@@ -196,6 +190,25 @@ func (r *Resolver) findAsset(requestPath string) (*catalog.Asset, bool) {
 		}
 	}
 	return nil, false
+}
+
+func (r *Resolver) findPrimaryAsset(requestPath requestpath.Cleaned) (*catalog.Asset, bool) {
+	if requestPath.Value == "" {
+		return r.catalog.FindAsset(r.cfg.Entry)
+	}
+
+	if asset, ok := r.catalog.FindAsset(requestPath.Value); ok {
+		return asset, true
+	}
+	if !requestPath.AllowsEntryFallback {
+		return nil, false
+	}
+
+	candidate := path.Join(requestPath.Value, r.cfg.Entry)
+	if candidate == requestPath.Value {
+		return nil, false
+	}
+	return r.catalog.FindAsset(candidate)
 }
 
 func (r *Resolver) pickVariant(asset *catalog.Asset, encodings collectionx.List[string]) *catalog.Variant {
@@ -269,31 +282,4 @@ func pickImageVariantForFormat(
 
 	variant, _ := byFormat.GetLast()
 	return variant
-}
-
-func candidates(requestPath, entry string) collectionx.List[string] {
-	normalized := normalizeAssetPath(requestPath)
-	if normalized == "" {
-		return collectionx.NewList(entry)
-	}
-
-	result := collectionx.NewList(normalized)
-	if strings.HasSuffix(strings.TrimSpace(requestPath), "/") || path.Ext(normalized) == "" {
-		result.Add(path.Join(normalized, entry))
-	}
-	return uniqueStrings(result)
-}
-
-func normalizeAssetPath(raw string) string {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return ""
-	}
-
-	clean := path.Clean("/" + strings.TrimPrefix(trimmed, "/"))
-	if clean == "/" || clean == "." {
-		return ""
-	}
-
-	return strings.TrimPrefix(clean, "/")
 }

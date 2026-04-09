@@ -17,19 +17,16 @@ func errorHandler(ctx fiber.Ctx, err error) error {
 
 	switch code {
 	case fiber.StatusNotFound:
-		if renderErr := ctx.Status(fiber.StatusNotFound).Render("404", fiber.Map{
-			"Path":    ctx.OriginalURL(),
-			"Message": "Not found",
-		}); renderErr != nil {
-			return fmt.Errorf("render 404 page: %w", renderErr)
-		}
-		return nil
+		return sendErrorResponse(ctx, fiber.StatusNotFound, "Not found")
 	default:
-		if renderErr := ctx.Status(code).Render("500", fiber.Map{
-			"Message": err.Error(),
-		}); renderErr != nil {
-			return fmt.Errorf("render error page: %w", renderErr)
-		}
-		return nil
+		return sendErrorResponse(ctx, code, err.Error())
 	}
+}
+
+func sendErrorResponse(ctx fiber.Ctx, code int, body string) error {
+	ctx.Set(fiber.HeaderContentType, fiber.MIMETextPlainCharsetUTF8)
+	if err := ctx.Status(code).SendString(body); err != nil {
+		return fmt.Errorf("send %d response body: %w", code, err)
+	}
+	return nil
 }

@@ -106,6 +106,16 @@ func QueuedCountForTest(s *Service) int {
 	return len(s.tasks)
 }
 
+// DequeueRequestForTest exposes draining the queued request channel for external tests.
+func DequeueRequestForTest(s *Service) Request {
+	return <-s.tasks
+}
+
+// FinishRequestForTest exposes pending-set cleanup for a queued request in external tests.
+func FinishRequestForTest(s *Service, request Request) {
+	s.finishRequest(requestKey(request))
+}
+
 // CleanupRemovedForTest exposes cleanup execution for external tests.
 func CleanupRemovedForTest(s *Service, now time.Time) int {
 	return s.cleanupArtifacts(context.Background(), now).removed
