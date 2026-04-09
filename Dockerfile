@@ -13,8 +13,8 @@ ARG TARGETOS
 ARG TARGETARCH
 
 RUN apt-get update \
-    && apt-get upgrade -y \
-    && apt-get install -y --no-install-recommends curl xz-utils ca-certificates \
+    && apt-get upgrade -y -fix-missing \
+    && apt-get install -y -fix-missing --no-install-recommends curl xz-utils ca-certificates \
     && ARCH="${BUILDARCH}" && \
     case "$ARCH" in \
         amd64)   UPX_ARCH=amd64 ;; \
