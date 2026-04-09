@@ -12,6 +12,41 @@ import (
 
 var supportedImageFormats = media.SupportedImageFormats()
 
+type variantViewCatalog interface {
+	ListVariantsView(assetPath string) collectionx.List[*catalog.Variant]
+}
+
+func listVariantsForRead(cat catalog.Catalog, assetPath string) collectionx.List[*catalog.Variant] {
+	if fastCat, ok := cat.(variantViewCatalog); ok {
+		return fastCat.ListVariantsView(assetPath)
+	}
+	return cat.ListVariants(assetPath)
+}
+
+type variantUsabilityCache map[string]bool
+
+func newVariantUsabilityCache() variantUsabilityCache {
+	return make(variantUsabilityCache, 4)
+}
+
+func (cache variantUsabilityCache) IsUsable(variant *catalog.Variant, assetSourceHash string) bool {
+	if variant == nil {
+		return false
+	}
+
+	key := variant.ID
+	if key == "" {
+		key = variant.ArtifactPath
+	}
+	if usable, ok := cache[key]; ok {
+		return usable
+	}
+
+	usable := isUsableVariant(variant, assetSourceHash)
+	cache[key] = usable
+	return usable
+}
+
 func isUsableVariant(variant *catalog.Variant, assetSourceHash string) bool {
 	if variant == nil || strings.TrimSpace(variant.ArtifactPath) == "" {
 		return false

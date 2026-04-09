@@ -90,18 +90,14 @@ func (c *InMemoryCatalog) ListVariants(assetPath string) collectionx.List[*Varia
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	byAsset := c.variants.Row(assetPath)
-	if len(byAsset) == 0 {
-		return collectionx.NewList[*Variant]()
-	}
+	return cloneVariantList(c.variants.Row(assetPath))
+}
 
-	out := collectionx.MapList(collectionx.NewList(lo.Values(byAsset)...), func(_ int, variant *Variant) *Variant {
-		return cloneVariant(variant)
-	})
-	out.Sort(func(left, right *Variant) int {
-		return cmp.Compare(left.ID, right.ID)
-	})
-	return out
+func (c *InMemoryCatalog) ListVariantsView(assetPath string) collectionx.List[*Variant] {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return sortedVariantList(c.variants.Row(assetPath))
 }
 
 func (c *InMemoryCatalog) AllAssets() collectionx.List[*Asset] {
@@ -198,18 +194,32 @@ func (c *InMemoryCatalog) deleteVariantsLocked(assetPath string) collectionx.Lis
 		return collectionx.NewList[*Variant]()
 	}
 
-	out := collectionx.MapList(collectionx.NewList(lo.Values(byAsset)...), func(_ int, variant *Variant) *Variant {
-		return cloneVariant(variant)
-	})
-	out.Sort(func(left, right *Variant) int {
-		return cmp.Compare(left.ID, right.ID)
-	})
+	out := cloneVariantList(byAsset)
 
 	out.Range(func(_ int, variant *Variant) bool {
 		c.artifactIndex.Delete(variant.ArtifactPath)
 		return true
 	})
 	c.variants.DeleteRow(assetPath)
+	return out
+}
+
+func cloneVariantList(byAsset map[string]*Variant) collectionx.List[*Variant] {
+	out := sortedVariantList(byAsset)
+	return collectionx.MapList(out, func(_ int, variant *Variant) *Variant {
+		return cloneVariant(variant)
+	})
+}
+
+func sortedVariantList(byAsset map[string]*Variant) collectionx.List[*Variant] {
+	if len(byAsset) == 0 {
+		return collectionx.NewList[*Variant]()
+	}
+
+	out := collectionx.NewList(lo.Values(byAsset)...)
+	out.Sort(func(left, right *Variant) int {
+		return cmp.Compare(left.ID, right.ID)
+	})
 	return out
 }
 

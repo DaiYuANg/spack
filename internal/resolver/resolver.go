@@ -1,7 +1,6 @@
 package resolver
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"log/slog"
@@ -14,6 +13,7 @@ import (
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/contentcoding"
+	contentcodingspec "github.com/daiyuang/spack/internal/contentcoding/spec"
 	"github.com/daiyuang/spack/internal/media"
 	"github.com/daiyuang/spack/internal/requestpath"
 )
@@ -48,7 +48,7 @@ func newResolver(
 ) *Resolver {
 	return &Resolver{
 		cfg:                cfg,
-		supportedEncodings: registry.Names(),
+		supportedEncodings: contentcodingspec.NormalizeNames(registry.Names()),
 		catalog:            cat,
 		logger:             logger,
 		obs:                observabilityx.Normalize(obs, logger),
@@ -212,13 +212,18 @@ func (r *Resolver) findPrimaryAsset(requestPath requestpath.Cleaned) (*catalog.A
 }
 
 func (r *Resolver) pickVariant(asset *catalog.Asset, encodings collectionx.List[string]) *catalog.Variant {
-	variants := r.catalog.ListVariants(asset.Path)
+	variants := listVariantsForRead(r.catalog, asset.Path)
+	usable := newVariantUsabilityCache()
 
 	var picked *catalog.Variant
 	encodings.Range(func(_ int, encoding string) bool {
-		picked, _ = variants.FirstWhere(func(_ int, variant *catalog.Variant) bool {
-			return variant.Encoding == encoding && isUsableVariant(variant, asset.SourceHash)
-		}).Get()
+		variants.Range(func(_ int, variant *catalog.Variant) bool {
+			if variant.Encoding != encoding || !usable.IsUsable(variant, asset.SourceHash) {
+				return true
+			}
+			picked = variant
+			return false
+		})
 		return picked == nil
 	})
 	return picked
@@ -226,8 +231,8 @@ func (r *Resolver) pickVariant(asset *catalog.Asset, encodings collectionx.List[
 
 func (r *Resolver) pickImageVariant(asset *catalog.Asset, width int, formats collectionx.List[string]) *catalog.Variant {
 	sourceFormat := media.ImageFormat(asset.MediaType)
-	candidates := imageCandidates(r.catalog.ListVariants(asset.Path), asset.SourceHash)
-	if candidates.IsEmpty() {
+	variants := listVariantsForRead(r.catalog, asset.Path)
+	if variants.IsEmpty() {
 		return nil
 	}
 
@@ -235,51 +240,11 @@ func (r *Resolver) pickImageVariant(asset *catalog.Asset, width int, formats col
 		formats = collectionx.NewList(sourceFormat)
 	}
 
+	usable := newVariantUsabilityCache()
 	var picked *catalog.Variant
 	formats.Range(func(_ int, format string) bool {
-		picked = pickImageVariantForFormat(candidates, format, sourceFormat, width)
+		picked = pickImageVariantForFormat(variants, usable, asset.SourceHash, format, sourceFormat, width)
 		return picked == nil
 	})
 	return picked
-}
-
-func imageCandidates(variants collectionx.List[*catalog.Variant], sourceHash string) collectionx.List[*catalog.Variant] {
-	return variants.Where(func(_ int, variant *catalog.Variant) bool {
-		if variant.Width <= 0 && variant.Format == "" {
-			return false
-		}
-		return isUsableVariant(variant, sourceHash)
-	})
-}
-
-func pickImageVariantForFormat(
-	candidates collectionx.List[*catalog.Variant],
-	format string,
-	sourceFormat string,
-	width int,
-) *catalog.Variant {
-	byFormat := candidates.Where(func(_ int, candidate *catalog.Variant) bool {
-		return format == "" || variantFormat(candidate, sourceFormat) == format
-	})
-	if byFormat.IsEmpty() {
-		return nil
-	}
-	if width <= 0 {
-		variant, _ := byFormat.FirstWhere(func(_ int, candidate *catalog.Variant) bool {
-			return candidate.Width == 0
-		}).Get()
-		return variant
-	}
-
-	byFormat.Sort(func(left, right *catalog.Variant) int {
-		return cmp.Compare(left.Width, right.Width)
-	})
-	if variant, ok := byFormat.FirstWhere(func(_ int, candidate *catalog.Variant) bool {
-		return candidate.Width >= width
-	}).Get(); ok {
-		return variant
-	}
-
-	variant, _ := byFormat.GetLast()
-	return variant
 }

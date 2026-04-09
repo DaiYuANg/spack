@@ -11,6 +11,7 @@ import (
 	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/DaiYuANg/arcgo/observabilityx"
 	"github.com/daiyuang/spack/internal/assetcache"
+	"github.com/daiyuang/spack/internal/cachepolicy"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/media"
 	"github.com/daiyuang/spack/internal/pipeline"
@@ -104,6 +105,7 @@ func registerAssetRoute(
 	bodyCache *assetcache.Cache,
 	bus eventx.BusRuntime,
 ) {
+	responsePolicy := cachepolicy.NewResponsePolicy(&cfg.Compression)
 	app.Use(routePattern(cfg.Assets.Path), func(c fiber.Ctx) error {
 		requestedFormat := media.NormalizeImageFormat(c.Query("format"))
 		request := buildResolverRequest(c, cfg.Assets.Path, requestedFormat)
@@ -113,7 +115,7 @@ func registerAssetRoute(
 		}
 
 		enqueuePipelineResult(result, pipelineSvc)
-		delivery, err := sendResolvedAsset(c, cfg, request, result, requestedFormat, logger, bodyCache)
+		delivery, err := sendResolvedAsset(c, responsePolicy, request, result, requestedFormat, logger, bodyCache)
 		if err != nil {
 			return err
 		}
@@ -154,7 +156,26 @@ func enqueuePipelineResult(result *resolver.Result, pipelineSvc *pipeline.Servic
 }
 
 func metricsMiddleware(obs observabilityx.Observability, runtimeMetrics *RuntimeMetrics) fiber.Handler {
-	obs = lo.Ternary(obs != nil, obs, observabilityx.NopWithLogger(nil))
+	if obs == nil && runtimeMetrics == nil {
+		return passthroughMiddleware("metrics middleware chain")
+	}
+
+	if obs == nil {
+		return func(c fiber.Ctx) error {
+			runtimeMetrics.IncRequestsInFlight()
+			defer runtimeMetrics.DecRequestsInFlight()
+
+			if err := c.Next(); err != nil {
+				return oops.In("server").Wrap(fmt.Errorf("run metrics middleware chain: %w", err))
+			}
+			return nil
+		}
+	}
+
+	requestCounter := obs.Counter(httpRequestsTotalSpec)
+	requestDuration := obs.Histogram(httpRequestDurationSpec)
+	assetDeliveryCounter := obs.Counter(httpAssetDeliveryTotalSpec)
+	assetDeliveryDuration := obs.Histogram(httpAssetDeliveryDurationSpec)
 
 	return func(c fiber.Ctx) error {
 		runtimeMetrics.IncRequestsInFlight()
@@ -165,13 +186,13 @@ func metricsMiddleware(obs observabilityx.Observability, runtimeMetrics *Runtime
 		duration := time.Since(startedAt).Seconds()
 
 		requestAttrs := requestMetricsAttrs(c)
-		obs.Counter(httpRequestsTotalSpec).Add(context.Background(), 1, requestAttrs...)
-		obs.Histogram(httpRequestDurationSpec).Record(context.Background(), duration, requestAttrs...)
+		requestCounter.Add(context.Background(), 1, requestAttrs...)
+		requestDuration.Record(context.Background(), duration, requestAttrs...)
 
 		deliveryAttrs := assetDeliveryMetricsAttrs(c)
 		if len(deliveryAttrs) > 0 {
-			obs.Counter(httpAssetDeliveryTotalSpec).Add(context.Background(), 1, deliveryAttrs...)
-			obs.Histogram(httpAssetDeliveryDurationSpec).Record(context.Background(), duration, deliveryAttrs...)
+			assetDeliveryCounter.Add(context.Background(), 1, deliveryAttrs...)
+			assetDeliveryDuration.Record(context.Background(), duration, deliveryAttrs...)
 		}
 		if err != nil {
 			return oops.In("server").Wrap(fmt.Errorf("run metrics middleware chain: %w", err))
@@ -199,12 +220,25 @@ func assetDeliveryMetricsAttrs(c fiber.Ctx) []observabilityx.Attribute {
 }
 
 func requestLogMiddleware(logger *slog.Logger) fiber.Handler {
+	if logger == nil || !logger.Enabled(context.Background(), slog.LevelInfo) {
+		return passthroughMiddleware("request log middleware")
+	}
+
 	return func(c fiber.Ctx) error {
 		startedAt := time.Now()
 		err := c.Next()
 		logRequest(logger, c, startedAt)
 		if err != nil {
 			return oops.In("server").Owner("request log middleware").Wrap(err)
+		}
+		return nil
+	}
+}
+
+func passthroughMiddleware(owner string) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		if err := c.Next(); err != nil {
+			return oops.In("server").Owner(owner).Wrap(err)
 		}
 		return nil
 	}

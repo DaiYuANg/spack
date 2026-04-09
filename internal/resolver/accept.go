@@ -43,7 +43,7 @@ func parseAcceptEncoding(header string, supported collectionx.List[string]) coll
 		return collectionx.NewList[string]()
 	}
 
-	return buildEncodingCandidates(collectEncodingPreferences(parseAcceptEntries(header)), supported)
+	return buildEncodingCandidates(collectEncodingPreferences(header), supported)
 }
 
 func parseAcceptImageFormats(header, sourceFormat string, supported collectionx.List[string]) collectionx.List[string] {
@@ -51,19 +51,20 @@ func parseAcceptImageFormats(header, sourceFormat string, supported collectionx.
 		return collectionx.NewList[string]()
 	}
 
-	return buildImageCandidates(collectImagePreferences(parseAcceptEntries(header)), sourceFormat, supported)
+	return buildImageCandidates(collectImagePreferences(header), sourceFormat, supported)
 }
 
-func parseAcceptEntries(header string) collectionx.List[acceptEntry] {
-	entries := collectionx.NewList[acceptEntry]()
+func forEachAcceptEntry(header string, yield func(entry acceptEntry) bool) {
 	remaining := header
 	for {
 		part, rest, found := strings.Cut(remaining, ",")
 		if entry, ok := parseAcceptEntry(part); ok {
-			entries.Add(entry)
+			if !yield(entry) {
+				return
+			}
 		}
 		if !found {
-			return entries
+			return
 		}
 		remaining = rest
 	}
@@ -120,11 +121,11 @@ func clampAcceptQuality(raw string) float64 {
 	return parsed
 }
 
-func collectEncodingPreferences(entries collectionx.List[acceptEntry]) encodingPreferences {
+func collectEncodingPreferences(header string) encodingPreferences {
 	prefs := encodingPreferences{
 		explicit: collectionx.NewMapWithCapacity[string, float64](4),
 	}
-	entries.Range(func(_ int, entry acceptEntry) bool {
+	forEachAcceptEntry(header, func(entry acceptEntry) bool {
 		if entry.token == "*" {
 			prefs.hasWildcard = true
 			prefs.wildcardQ = entry.q
@@ -186,11 +187,11 @@ func encodingQuality(prefs encodingPreferences, encoding string) (float64, bool)
 	return prefs.wildcardQ, true
 }
 
-func collectImagePreferences(entries collectionx.List[acceptEntry]) imagePreferences {
+func collectImagePreferences(header string) imagePreferences {
 	prefs := imagePreferences{
 		explicit: collectionx.NewMapWithCapacity[string, float64](4),
 	}
-	entries.Range(func(_ int, entry acceptEntry) bool {
+	forEachAcceptEntry(header, func(entry acceptEntry) bool {
 		applyImagePreference(&prefs, entry)
 		return true
 	})

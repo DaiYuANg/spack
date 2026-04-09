@@ -7,6 +7,7 @@ import (
 	"text/template"
 
 	"github.com/daiyuang/spack/internal/assetcache"
+	"github.com/daiyuang/spack/internal/cachepolicy"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/resolver"
@@ -40,11 +41,12 @@ func registerRobotsRoute(
 		return
 	}
 
+	responsePolicy := cachepolicy.NewResponsePolicy(&cfg.Compression)
 	handler := func(c fiber.Ctx) error {
 		if asset, ok := staticRobotsAsset(cfg.Robots, cat); ok {
 			_, err := sendResolvedAsset(
 				c,
-				cfg,
+				responsePolicy,
 				resolver.Request{RangeRequested: strings.TrimSpace(c.Get(fiber.HeaderRange)) != ""},
 				&resolver.Result{
 					Asset:     asset,
