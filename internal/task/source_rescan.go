@@ -38,6 +38,7 @@ func registerSourceRescanTask(ctx context.Context, scheduler gocron.Scheduler, r
 		gocron.NewTask(func() {
 			runSourceRescan(ctx, runtime)
 		}),
+		gocron.WithName("source_rescan"),
 	)
 	if err != nil {
 		return false, oops.In("task").Owner("source rescan").Wrap(err)

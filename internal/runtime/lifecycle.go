@@ -10,6 +10,7 @@ import (
 
 	"github.com/arl/statsviz"
 	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/metrics"
 	"github.com/gofiber/fiber/v3"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/samber/mo"
@@ -62,7 +63,10 @@ func buildDebugRuntime(
 	registerDebugCollectors(deps.pipelineMetrics)
 	registerDebugCollectors(deps.catMetrics)
 	registerDebugCollectors(deps.serverMetrics)
+	registerDebugCollectors(deps.taskMetrics)
 	registerDebugCollectors(deps.workerpoolMetrics)
+	registerDebugCollectors(metrics.NewBuildInfoMetrics("spack"))
+	registerDebugCollectors(metrics.NewRuntimeInfoMetrics("spack", cfg, time.Now().UTC()))
 	if deps.metricsAdapter == nil {
 		logger.Error("Debug runtime registration failed", slog.String("err", "metrics adapter is not configured"))
 		return &debugRuntime{}
@@ -99,7 +103,15 @@ func registerDebugCollectors(provider debugCollectorProvider) {
 	if len(collectors) == 0 {
 		return
 	}
-	prometheus.MustRegister(collectors...)
+	for _, collector := range collectors {
+		if err := prometheus.Register(collector); err != nil {
+			var alreadyRegisteredErr prometheus.AlreadyRegisteredError
+			if errors.As(err, &alreadyRegisteredErr) {
+				continue
+			}
+			panic(err)
+		}
+	}
 }
 
 func startDebugRuntime(_ context.Context, logger *slog.Logger, runtime *debugRuntime) error {

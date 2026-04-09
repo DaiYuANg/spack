@@ -37,6 +37,7 @@ func registerArtifactJanitorTask(ctx context.Context, scheduler gocron.Scheduler
 		gocron.NewTask(func() {
 			runArtifactJanitor(ctx, runtime)
 		}),
+		gocron.WithName("artifact_janitor"),
 	)
 	if err != nil {
 		return false, oops.In("task").Owner("artifact janitor").Wrap(err)

@@ -1,6 +1,7 @@
-package cmd
+package cmd_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/DaiYuANg/arcgo/dix"
 	obsprom "github.com/DaiYuANg/arcgo/observabilityx/prometheus"
+	"github.com/daiyuang/spack/cmd"
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/config"
@@ -25,7 +27,7 @@ func TestCreateContainerBuildPublishesDixMetrics(t *testing.T) {
 	t.Setenv("SPACK_ASSETS_ROOT", t.TempDir())
 	t.Setenv("SPACK_LOGGER_CONSOLE_ENABLED", "false")
 
-	app, err := createContainer(
+	app, err := cmd.CreateContainerForTest(
 		config.LoadOptions{},
 		workerpool.Module,
 		event.Module,
@@ -52,7 +54,7 @@ func TestCreateContainerBuildPublishesDixMetrics(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	request := httptest.NewRequest(http.MethodGet, "/prometheus", http.NoBody)
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/prometheus", http.NoBody)
 	response := httptest.NewRecorder()
 	adapter.Handler().ServeHTTP(response, request)
 

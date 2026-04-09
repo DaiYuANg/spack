@@ -55,7 +55,7 @@ func (builtinImageEngine) SupportedTargetFormats() collectionx.List[string] {
 	return collectionx.NewList("jpeg", "png")
 }
 
-func (builtinImageEngine) Generate(sourcePath string, sourceMediaType string, targetFormat string, targetWidth int, opts imageEncodeOptions) (imageGenerateResult, error) {
+func (builtinImageEngine) Generate(sourcePath, sourceMediaType, targetFormat string, targetWidth int, opts imageEncodeOptions) (imageGenerateResult, error) {
 	srcImage, sourceWidth, sourceHeight, err := loadBuiltinSourceImage(sourcePath)
 	if err != nil {
 		return imageGenerateResult{}, err
@@ -78,13 +78,16 @@ func (builtinImageEngine) Generate(sourcePath string, sourceMediaType string, ta
 	}, nil
 }
 
-func loadBuiltinSourceImage(path string) (image.Image, int, int, error) {
+func loadBuiltinSourceImage(path string) (_ image.Image, _, _ int, err error) {
+	// #nosec G304 -- path comes from scanned assets rooted under configured sources.
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, 0, 0, fmt.Errorf("open source image: %w", err)
 	}
 	defer func() {
-		_ = file.Close()
+		if closeErr := file.Close(); err == nil && closeErr != nil {
+			err = fmt.Errorf("close source image: %w", closeErr)
+		}
 	}()
 
 	img, _, err := image.Decode(file)

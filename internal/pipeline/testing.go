@@ -123,5 +123,5 @@ func UpsertStageVariantForTest(s *Service, stageName string, asset *catalog.Asse
 
 // ExecuteStageTaskForTest exposes stage execution for external tests.
 func ExecuteStageTaskForTest(s *Service, stage Stage, asset *catalog.Asset, task Task) *catalog.Variant {
-	return s.executeStageTask(stage, asset, task)
+	return s.executeStageTask(context.Background(), stage, asset, task)
 }

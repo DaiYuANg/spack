@@ -21,7 +21,8 @@ import (
 
 var Module = dix.NewModule("task",
 	dix.WithModuleProviders(
-		dix.ProviderErr1(newScheduler),
+		dix.Provider0(NewRuntimeMetrics),
+		dix.ProviderErr2(newScheduler),
 		dix.Provider6(newSourceRescanRuntime),
 		dix.Provider6(newArtifactJanitorRuntime),
 		dix.Provider5(newCacheWarmerRuntime),
@@ -36,9 +37,10 @@ var Module = dix.NewModule("task",
 	),
 )
 
-func newScheduler(logger *slog.Logger) (gocron.Scheduler, error) {
+func newScheduler(logger *slog.Logger, runtimeMetrics *RuntimeMetrics) (gocron.Scheduler, error) {
 	scheduler, err := gocron.NewScheduler(
 		gocron.WithLogger(logger),
+		gocron.WithSchedulerMonitor(runtimeMetrics),
 	)
 	if err != nil {
 		return nil, oops.In("task").Owner("scheduler").Wrap(err)

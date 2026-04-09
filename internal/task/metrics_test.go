@@ -1,4 +1,4 @@
-package task
+package task_test
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/DaiYuANg/arcgo/observabilityx"
+	"github.com/daiyuang/spack/internal/task"
 )
 
 type recordedMetric struct {
@@ -93,7 +94,7 @@ func (recordingSpan) SetAttributes(...observabilityx.Attribute) {}
 func TestRecordTaskRunMetrics(t *testing.T) {
 	obs := &recordingObservability{}
 
-	recordTaskRunMetrics(context.Background(), obs, "source_rescan", time.Now().Add(-time.Second), nil)
+	task.RecordTaskRunMetricsForTest(context.Background(), obs, "source_rescan", time.Now().Add(-time.Second), nil)
 
 	assertCounterMetric(t, obs.counters, "task_runs_total", 1, "task", "source_rescan")
 	assertCounterMetric(t, obs.counters, "task_runs_total", 1, "result", "ok")
@@ -103,7 +104,7 @@ func TestRecordTaskRunMetrics(t *testing.T) {
 func TestRecordSourceRescanMetrics(t *testing.T) {
 	obs := &recordingObservability{}
 
-	recordSourceRescanMetrics(context.Background(), obs, SourceRescanReport{
+	task.RecordSourceRescanMetricsForTest(context.Background(), obs, task.SourceRescanReport{
 		TotalBytes:         4096,
 		Scanned:            10,
 		Added:              2,
@@ -127,14 +128,14 @@ func TestRecordSourceRescanMetrics(t *testing.T) {
 func TestRecordArtifactJanitorAndCacheWarmerMetrics(t *testing.T) {
 	obs := &recordingObservability{}
 
-	recordArtifactJanitorMetrics(context.Background(), obs, ArtifactJanitorReport{
+	task.RecordArtifactJanitorMetricsForTest(context.Background(), obs, task.ArtifactJanitorReport{
 		ScannedArtifacts:   12,
 		RemovedOrphans:     2,
 		RemovedDirectories: 1,
 		MissingVariants:    3,
 		CacheInvalidations: 4,
 	})
-	recordCacheWarmerMetrics(context.Background(), obs, CacheWarmerReport{
+	task.RecordCacheWarmerMetricsForTest(context.Background(), obs, task.CacheWarmerReport{
 		Assets:        3,
 		Variants:      5,
 		LoadedEntries: 7,
@@ -174,7 +175,7 @@ func assertCounterMetric(t *testing.T, metrics []recordedMetric, name string, wa
 	t.Fatalf("expected counter %s with value %v", name, wantValue)
 }
 
-func assertHistogramMetric(t *testing.T, metrics []recordedMetric, name string, key string, want any) {
+func assertHistogramMetric(t *testing.T, metrics []recordedMetric, name, key string, want any) {
 	t.Helper()
 
 	for _, metric := range metrics {

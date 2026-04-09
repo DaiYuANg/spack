@@ -2,7 +2,9 @@ package task
 
 import (
 	"context"
+	"time"
 
+	"github.com/DaiYuANg/arcgo/observabilityx"
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"
@@ -46,4 +48,30 @@ func WarmCacheHotsetForTest(
 	bodyCache *assetcache.Cache,
 ) (CacheWarmerReport, error) {
 	return warmCacheHotset(ctx, cfg, cat, bodyCache)
+}
+
+// RecordTaskRunMetricsForTest exposes task run metric recording for external tests.
+func RecordTaskRunMetricsForTest(
+	ctx context.Context,
+	obs observabilityx.Observability,
+	taskName string,
+	startedAt time.Time,
+	err error,
+) {
+	recordTaskRunMetrics(ctx, obs, taskName, startedAt, err)
+}
+
+// RecordSourceRescanMetricsForTest exposes source-rescan metric recording for external tests.
+func RecordSourceRescanMetricsForTest(ctx context.Context, obs observabilityx.Observability, report SourceRescanReport) {
+	recordSourceRescanMetrics(ctx, obs, report)
+}
+
+// RecordArtifactJanitorMetricsForTest exposes janitor metric recording for external tests.
+func RecordArtifactJanitorMetricsForTest(ctx context.Context, obs observabilityx.Observability, report ArtifactJanitorReport) {
+	recordArtifactJanitorMetrics(ctx, obs, report)
+}
+
+// RecordCacheWarmerMetricsForTest exposes cache-warmer metric recording for external tests.
+func RecordCacheWarmerMetricsForTest(ctx context.Context, obs observabilityx.Observability, report CacheWarmerReport) {
+	recordCacheWarmerMetrics(ctx, obs, report)
 }

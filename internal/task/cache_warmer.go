@@ -34,6 +34,7 @@ func registerCacheWarmerTask(ctx context.Context, scheduler gocron.Scheduler, ru
 		gocron.NewTask(func() {
 			runCacheWarmer(ctx, runtime)
 		}),
+		gocron.WithName("cache_warmer"),
 	)
 	if err != nil {
 		return false, oops.In("task").Owner("cache warmer").Wrap(err)

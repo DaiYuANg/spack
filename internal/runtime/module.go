@@ -12,6 +12,7 @@ import (
 	"github.com/daiyuang/spack/internal/pipeline"
 	"github.com/daiyuang/spack/internal/server"
 	"github.com/daiyuang/spack/internal/sourcecatalog"
+	"github.com/daiyuang/spack/internal/task"
 	"github.com/daiyuang/spack/internal/workerpool"
 	"github.com/gofiber/fiber/v3"
 )
@@ -21,7 +22,7 @@ var Module = dix.NewModule("runtime",
 		dix.Provider5(newCatalogBootstrapDeps),
 		dix.Provider3(newCatalogBootstrapRuntime),
 		dix.Provider4(newHTTPRuntime),
-		dix.Provider5(newDebugRuntimeDeps),
+		dix.Provider6(newDebugRuntimeDeps),
 		dix.Provider3(newDebugRuntime),
 	),
 	dix.WithModuleHooks(
@@ -104,6 +105,7 @@ type debugRuntimeDeps struct {
 	pipelineMetrics   *pipeline.Metrics
 	catMetrics        *catalog.RuntimeMetrics
 	serverMetrics     *server.RuntimeMetrics
+	taskMetrics       *task.RuntimeMetrics
 	workerpoolMetrics *workerpool.RuntimeMetrics
 	metricsAdapter    *obsprom.Adapter
 }
@@ -112,6 +114,7 @@ func newDebugRuntimeDeps(
 	pipelineMetrics *pipeline.Metrics,
 	catMetrics *catalog.RuntimeMetrics,
 	serverMetrics *server.RuntimeMetrics,
+	taskMetrics *task.RuntimeMetrics,
 	workerpoolMetrics *workerpool.RuntimeMetrics,
 	metricsAdapter *obsprom.Adapter,
 ) debugRuntimeDeps {
@@ -119,6 +122,7 @@ func newDebugRuntimeDeps(
 		pipelineMetrics:   pipelineMetrics,
 		catMetrics:        catMetrics,
 		serverMetrics:     serverMetrics,
+		taskMetrics:       taskMetrics,
 		workerpoolMetrics: workerpoolMetrics,
 		metricsAdapter:    metricsAdapter,
 	}

@@ -138,7 +138,7 @@ func isMatchingImageVariant(variant *catalog.Variant, sourceHash string, width i
 	return err == nil
 }
 
-func filterSupportedImageFormats(formats collectionx.List[string], supported collectionx.List[string]) collectionx.List[string] {
+func filterSupportedImageFormats(formats, supported collectionx.List[string]) collectionx.List[string] {
 	normalized := normalizeImageFormats(formats)
 	if normalized.IsEmpty() || supported.IsEmpty() {
 		return normalized

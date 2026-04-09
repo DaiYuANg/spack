@@ -278,7 +278,7 @@ func metricResult(err error) string {
 		return "ok"
 	}
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		return "cancelled"
+		return "canceled"
 	}
 	return "error"
 }

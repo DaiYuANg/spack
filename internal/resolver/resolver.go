@@ -143,24 +143,35 @@ func (r *Resolver) recordMetrics(startedAt time.Time, result *Result, err error)
 }
 
 func resolutionResultKind(result *Result, err error) string {
-	switch {
-	case errors.Is(err, ErrNotFound):
+	if errors.Is(err, ErrNotFound) {
 		return "not_found"
-	case err != nil:
-		return "error"
-	case result == nil:
-		return "empty"
-	case result.Variant != nil && (result.Variant.Width > 0 || strings.TrimSpace(result.Variant.Format) != ""):
-		return "image_variant"
-	case result.Variant != nil && strings.TrimSpace(result.Variant.Encoding) != "":
-		return "encoding_variant"
-	case result.Variant != nil:
-		return "variant"
-	case result.FallbackUsed:
-		return "fallback_asset"
-	default:
-		return "asset"
 	}
+	if err != nil {
+		return "error"
+	}
+	if result == nil {
+		return "empty"
+	}
+	if kind, ok := resolutionVariantKind(result.Variant); ok {
+		return kind
+	}
+	if result.FallbackUsed {
+		return "fallback_asset"
+	}
+	return "asset"
+}
+
+func resolutionVariantKind(variant *catalog.Variant) (string, bool) {
+	if variant == nil {
+		return "", false
+	}
+	if variant.Width > 0 || strings.TrimSpace(variant.Format) != "" {
+		return "image_variant", true
+	}
+	if strings.TrimSpace(variant.Encoding) != "" {
+		return "encoding_variant", true
+	}
+	return "variant", true
 }
 
 func (r *Resolver) findAsset(requestPath string) (*catalog.Asset, bool) {

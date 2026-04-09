@@ -1,4 +1,4 @@
-package metrics
+package metrics_test
 
 import (
 	"context"
@@ -9,11 +9,12 @@ import (
 
 	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/DaiYuANg/arcgo/observabilityx"
+	"github.com/daiyuang/spack/internal/metrics"
 )
 
 func TestObserverCachesInstruments(t *testing.T) {
 	obs := &countingObservability{}
-	observer := NewObserver(obs)
+	observer := metrics.NewObserver(obs)
 
 	buildEvent := dix.BuildEvent{
 		Meta:     dix.AppMeta{Name: "spack", Version: "test"},

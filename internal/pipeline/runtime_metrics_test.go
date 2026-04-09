@@ -196,7 +196,7 @@ func assertPipelineCounterMetric(t *testing.T, metrics []pipelineMetric, name st
 	t.Fatalf("expected counter %s with %s=%v", name, key, want)
 }
 
-func assertPipelineHistogramMetric(t *testing.T, metrics []pipelineMetric, name string, key string, want any) {
+func assertPipelineHistogramMetric(t *testing.T, metrics []pipelineMetric, name, key string, want any) {
 	t.Helper()
 
 	for _, metric := range metrics {

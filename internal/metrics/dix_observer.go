@@ -70,6 +70,29 @@ type observer struct {
 	histograms sync.Map
 }
 
+var metricDescriptions = map[string]string{
+	"build_total":              "Total number of dix application build attempts.",
+	"build_duration_ms":        "dix application build duration in milliseconds.",
+	"build_modules":            "Number of modules included in a dix application build.",
+	"build_providers":          "Number of providers included in a dix application build.",
+	"build_hooks":              "Number of hooks included in a dix application build.",
+	"build_setups":             "Number of setups included in a dix application build.",
+	"build_invokes":            "Number of invokes included in a dix application build.",
+	"start_total":              "Total number of dix runtime start attempts.",
+	"start_duration_ms":        "dix runtime start duration in milliseconds.",
+	"start_registered_hooks":   "Number of registered start hooks in a dix runtime.",
+	"start_completed_hooks":    "Number of completed start hooks in a dix runtime.",
+	"start_rollback_total":     "Total number of dix runtime starts that triggered rollback.",
+	"stop_total":               "Total number of dix runtime stop attempts.",
+	"stop_duration_ms":         "dix runtime stop duration in milliseconds.",
+	"stop_registered_hooks":    "Number of registered stop hooks in a dix runtime.",
+	"stop_shutdown_errors":     "Number of shutdown errors observed during a dix runtime stop.",
+	"stop_hook_error_total":    "Total number of dix runtime stops that encountered stop hook errors.",
+	"health_check_total":       "Total number of dix health check executions.",
+	"health_check_duration_ms": "dix health check execution duration in milliseconds.",
+	"state_transition_total":   "Total number of dix runtime state transitions.",
+}
+
 func (o *observer) OnBuild(ctx context.Context, event dix.BuildEvent) {
 	attrs := o.withResultAttrs(event.Meta, event.Profile, event.Err)
 	o.counter("build_total", "app", "profile", "result", "version").
@@ -149,22 +172,34 @@ func (o *observer) counter(suffix string, labelKeys ...string) observabilityx.Co
 	spec := o.counterSpec(suffix, labelKeys...)
 	key := fmt.Sprintf("%s|%s|%v", spec.Name, spec.Description, spec.LabelKeys)
 	if cached, ok := o.counters.Load(key); ok {
-		return cached.(observabilityx.Counter)
+		if counter, castOK := cached.(observabilityx.Counter); castOK {
+			return counter
+		}
 	}
 	instrument := o.obs.Counter(spec)
 	actual, _ := o.counters.LoadOrStore(key, instrument)
-	return actual.(observabilityx.Counter)
+	counter, castOK := actual.(observabilityx.Counter)
+	if !castOK {
+		return instrument
+	}
+	return counter
 }
 
-func (o *observer) histogram(suffix string, unit string, labelKeys ...string) observabilityx.Histogram {
+func (o *observer) histogram(suffix, unit string, labelKeys ...string) observabilityx.Histogram {
 	spec := o.histogramSpec(suffix, unit, labelKeys...)
 	key := fmt.Sprintf("%s|%s|%s|%v", spec.Name, spec.Description, spec.Unit, spec.LabelKeys)
 	if cached, ok := o.histograms.Load(key); ok {
-		return cached.(observabilityx.Histogram)
+		if histogram, castOK := cached.(observabilityx.Histogram); castOK {
+			return histogram
+		}
 	}
 	instrument := o.obs.Histogram(spec)
 	actual, _ := o.histograms.LoadOrStore(key, instrument)
-	return actual.(observabilityx.Histogram)
+	histogram, castOK := actual.(observabilityx.Histogram)
+	if !castOK {
+		return instrument
+	}
+	return histogram
 }
 
 func (o *observer) commonAttrs(meta dix.AppMeta, profile dix.Profile) []observabilityx.Attribute {
@@ -195,7 +230,7 @@ func (o *observer) counterSpec(suffix string, labelKeys ...string) observability
 	)
 }
 
-func (o *observer) histogramSpec(suffix string, unit string, labelKeys ...string) observabilityx.HistogramSpec {
+func (o *observer) histogramSpec(suffix, unit string, labelKeys ...string) observabilityx.HistogramSpec {
 	spec := observabilityx.NewHistogramSpec(
 		o.metricName(suffix),
 		observabilityx.WithDescription(o.metricDescription(suffix)),
@@ -213,50 +248,7 @@ func (o *observer) histogramSpec(suffix string, unit string, labelKeys ...string
 }
 
 func (o *observer) metricDescription(suffix string) string {
-	switch suffix {
-	case "build_total":
-		return "Total number of dix application build attempts."
-	case "build_duration_ms":
-		return "dix application build duration in milliseconds."
-	case "build_modules":
-		return "Number of modules included in a dix application build."
-	case "build_providers":
-		return "Number of providers included in a dix application build."
-	case "build_hooks":
-		return "Number of hooks included in a dix application build."
-	case "build_setups":
-		return "Number of setups included in a dix application build."
-	case "build_invokes":
-		return "Number of invokes included in a dix application build."
-	case "start_total":
-		return "Total number of dix runtime start attempts."
-	case "start_duration_ms":
-		return "dix runtime start duration in milliseconds."
-	case "start_registered_hooks":
-		return "Number of registered start hooks in a dix runtime."
-	case "start_completed_hooks":
-		return "Number of completed start hooks in a dix runtime."
-	case "start_rollback_total":
-		return "Total number of dix runtime starts that triggered rollback."
-	case "stop_total":
-		return "Total number of dix runtime stop attempts."
-	case "stop_duration_ms":
-		return "dix runtime stop duration in milliseconds."
-	case "stop_registered_hooks":
-		return "Number of registered stop hooks in a dix runtime."
-	case "stop_shutdown_errors":
-		return "Number of shutdown errors observed during a dix runtime stop."
-	case "stop_hook_error_total":
-		return "Total number of dix runtime stops that encountered stop hook errors."
-	case "health_check_total":
-		return "Total number of dix health check executions."
-	case "health_check_duration_ms":
-		return "dix health check execution duration in milliseconds."
-	case "state_transition_total":
-		return "Total number of dix runtime state transitions."
-	default:
-		return ""
-	}
+	return metricDescriptions[suffix]
 }
 
 func resultOf(err error) string {

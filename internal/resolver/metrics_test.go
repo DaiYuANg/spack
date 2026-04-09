@@ -105,13 +105,13 @@ func TestResolverMetricsRecordFallbackResolution(t *testing.T) {
 		t.Fatalf("expected fallback path %q, got %q", sourcePath, result.FilePath)
 	}
 
-	assertCounterMetric(t, obs.counters, "resolver_resolutions_total", 1, "result", "fallback_asset")
+	assertCounterMetric(t, obs.counters, "resolver_resolutions_total", "result", "fallback_asset")
 	assertHistogramMetric(t, obs.histograms, "resolver_resolution_duration_seconds", "result", "fallback_asset")
 }
 
 func TestResolverMetricsRecordGenerationRequests(t *testing.T) {
 	obs := &recordingObservability{}
-	sourcePath := writeAssetForMetricTest(t, "hero.png", "image/png")
+	sourcePath := writeAssetForMetricTest(t, "hero.png")
 	cat := catalog.NewInMemoryCatalog()
 	upsertTestAsset(t, cat, "hero.png", sourcePath, "image/png")
 
@@ -124,9 +124,9 @@ func TestResolverMetricsRecordGenerationRequests(t *testing.T) {
 		t.Fatalf("expected original asset result, got variant %#v", result.Variant)
 	}
 
-	assertCounterMetric(t, obs.counters, "resolver_resolutions_total", 1, "result", "asset")
-	assertCounterMetric(t, obs.counters, "resolver_generation_requests_total", 1, "kind", "image_width")
-	assertCounterMetric(t, obs.counters, "resolver_generation_requests_total", 1, "kind", "image_format")
+	assertCounterMetric(t, obs.counters, "resolver_resolutions_total", "result", "asset")
+	assertCounterMetric(t, obs.counters, "resolver_generation_requests_total", "kind", "image_width")
+	assertCounterMetric(t, obs.counters, "resolver_generation_requests_total", "kind", "image_format")
 }
 
 func TestResolverMetricsRecordNotFound(t *testing.T) {
@@ -138,11 +138,11 @@ func TestResolverMetricsRecordNotFound(t *testing.T) {
 		t.Fatal("expected not found error")
 	}
 
-	assertCounterMetric(t, obs.counters, "resolver_resolutions_total", 1, "result", "not_found")
+	assertCounterMetric(t, obs.counters, "resolver_resolutions_total", "result", "not_found")
 	assertHistogramMetric(t, obs.histograms, "resolver_resolution_duration_seconds", "result", "not_found")
 }
 
-func writeAssetForMetricTest(t *testing.T, assetPath, mediaType string) string {
+func writeAssetForMetricTest(t *testing.T, assetPath string) string {
 	t.Helper()
 
 	sourcePath := testFilePath(t, assetPath)
@@ -163,11 +163,11 @@ func attrsToMap(attrs []observabilityx.Attribute) map[string]any {
 	return values
 }
 
-func assertCounterMetric(t *testing.T, metrics []recordedMetric, name string, wantValue float64, key string, want any) {
+func assertCounterMetric(t *testing.T, metrics []recordedMetric, name, key string, want any) {
 	t.Helper()
 
 	for _, metric := range metrics {
-		if metric.name != name || metric.value != wantValue {
+		if metric.name != name || metric.value != 1 {
 			continue
 		}
 		if got := metric.attrs[key]; got == want {
@@ -177,7 +177,7 @@ func assertCounterMetric(t *testing.T, metrics []recordedMetric, name string, wa
 	t.Fatalf("expected counter %s with %s=%v", name, key, want)
 }
 
-func assertHistogramMetric(t *testing.T, metrics []recordedMetric, name string, key string, want any) {
+func assertHistogramMetric(t *testing.T, metrics []recordedMetric, name, key string, want any) {
 	t.Helper()
 
 	for _, metric := range metrics {
