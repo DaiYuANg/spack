@@ -89,3 +89,21 @@ func TestCatalogReadyAttrsIncludeCacheAndCompressionState(t *testing.T) {
 		t.Fatalf("expected compression_mode %q, got %#v", cfg.Compression.NormalizedMode(), got)
 	}
 }
+
+func TestHTTPListenConfigUsesPreforkSetting(t *testing.T) {
+	cfg := config.DefaultConfigForTest()
+
+	listenCfg := runtime.HTTPListenConfigForTest(&cfg)
+	if listenCfg.EnablePrefork {
+		t.Fatal("expected prefork to be disabled by default")
+	}
+	if !listenCfg.DisableStartupMessage {
+		t.Fatal("expected startup message to stay disabled")
+	}
+
+	cfg.HTTP.Prefork = true
+	listenCfg = runtime.HTTPListenConfigForTest(&cfg)
+	if !listenCfg.EnablePrefork {
+		t.Fatal("expected prefork to be enabled when configured")
+	}
+}

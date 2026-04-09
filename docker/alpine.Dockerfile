@@ -1,12 +1,11 @@
-FROM frolvlad/alpine-glibc AS alpine
-RUN adduser -D -g '' appuser
+FROM alpine:latest AS alpine
+
+RUN apk upgrade --no-cache \
+    && apk add --no-cache ca-certificates curl dumb-init \
+    && adduser -D -g '' appuser
 
 WORKDIR /opt
 COPY --from=builder /app/spack /opt/spack
-
-USER root
-
-RUN apk add --no-cache dumb-init curl
 
 RUN chmod +x /opt/spack
 

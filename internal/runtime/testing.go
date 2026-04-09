@@ -10,6 +10,7 @@ import (
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/source"
 	"github.com/daiyuang/spack/internal/sourcecatalog"
+	"github.com/gofiber/fiber/v3"
 	"github.com/samber/oops"
 )
 
@@ -30,4 +31,8 @@ func CatalogReadyAttrsForTest(
 	duration time.Duration,
 ) collectionx.List[slog.Attr] {
 	return catalogReadyAttrs(cfg, cat, bodyCache, cacheStats, totalBytes, duration)
+}
+
+func HTTPListenConfigForTest(cfg *config.Config) fiber.ListenConfig {
+	return newHTTPListenConfig(cfg)
 }

@@ -2,11 +2,12 @@ FROM debian:stable-slim AS debian
 
 WORKDIR /opt
 
-COPY --from=builder /usr/bin/dumb-init /usr/bin/dumb-init
-
 COPY --from=builder /app/spack /opt/spack
 
-RUN apt-get update && apt-get install -y ca-certificates curl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends ca-certificates curl dumb-init \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN chmod +x /opt/spack
 

@@ -126,6 +126,7 @@ func TestLoadWithOptions_PrioritizesFlagsOverEnvOverFiles(t *testing.T) {
 
 	unsetEnvForTest(t, "SPACK_HTTP_PORT")
 	unsetEnvForTest(t, "SPACK_HTTP_LOW_MEMORY")
+	unsetEnvForTest(t, "SPACK_HTTP_PREFORK")
 	unsetEnvForTest(t, "SPACK_ASSETS_PATH")
 	unsetEnvForTest(t, "SPACK_ASSETS_BACKEND")
 	unsetEnvForTest(t, "SPACK_LOGGER_LEVEL")
@@ -135,6 +136,7 @@ func TestLoadWithOptions_PrioritizesFlagsOverEnvOverFiles(t *testing.T) {
 	configBody := "" +
 		"http:\n" +
 		"  port: 7001\n" +
+		"  prefork: false\n" +
 		"assets:\n" +
 		"  path: /from-file\n" +
 		"  root: /file-root\n" +
@@ -145,13 +147,15 @@ func TestLoadWithOptions_PrioritizesFlagsOverEnvOverFiles(t *testing.T) {
 	}
 
 	t.Setenv("SPACK_ASSETS_ROOT", "/env-root")
+	t.Setenv("SPACK_HTTP_PREFORK", "true")
 
 	flags := pflag.NewFlagSet("spack-test", pflag.ContinueOnError)
 	flags.Int("http.port", 0, "")
 	flags.Bool("http.low_memory", true, "")
+	flags.Bool("http.prefork", false, "")
 	flags.String("assets.backend", "", "")
 	flags.String("logger.level", "", "")
-	if err := flags.Parse([]string{"--http.port=8088", "--http.low_memory=false", "--assets.backend=local", "--logger.level=debug"}); err != nil {
+	if err := flags.Parse([]string{"--http.port=8088", "--http.low_memory=false", "--http.prefork=false", "--assets.backend=local", "--logger.level=debug"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -168,6 +172,9 @@ func TestLoadWithOptions_PrioritizesFlagsOverEnvOverFiles(t *testing.T) {
 	}
 	if cfg.HTTP.LowMemory {
 		t.Fatal("expected flag to override http.low_memory to false")
+	}
+	if cfg.HTTP.Prefork {
+		t.Fatal("expected flag to override http.prefork to false")
 	}
 	if cfg.Assets.Path != "/from-file" {
 		t.Fatalf("expected config file to set assets.path, got %q", cfg.Assets.Path)

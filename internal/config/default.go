@@ -11,6 +11,7 @@ func defaultConfig() Config {
 		HTTP: HTTP{
 			Port:      80,
 			LowMemory: true,
+			Prefork:   false,
 			MemoryCache: MemoryCache{
 				Enable:      true,
 				Warmup:      true,

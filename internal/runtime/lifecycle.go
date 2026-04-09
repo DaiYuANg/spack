@@ -28,19 +28,26 @@ type debugRuntime struct {
 func startHTTPRuntime(_ context.Context, runtime httpRuntime) error {
 	go func() {
 		address := "127.0.0.1:" + runtime.cfg.HTTP.GetPort()
+		listenConfig := newHTTPListenConfig(runtime.cfg)
 		runtime.logger.Info("HTTP runtime listening",
 			slog.String("address", "http://"+address),
 			slog.String("mount_path", runtime.cfg.Assets.Path),
 			slog.Int("assets", runtime.cat.AssetCount()),
 			slog.Int("variants", runtime.cat.VariantCount()),
+			slog.Bool("prefork", listenConfig.EnablePrefork),
 		)
-		if err := runtime.app.Listen(":"+runtime.cfg.HTTP.GetPort(), fiber.ListenConfig{
-			DisableStartupMessage: true,
-		}); err != nil {
+		if err := runtime.app.Listen(":"+runtime.cfg.HTTP.GetPort(), listenConfig); err != nil {
 			runtime.logger.Error("HTTP runtime stopped", slog.String("err", err.Error()))
 		}
 	}()
 	return nil
+}
+
+func newHTTPListenConfig(cfg *config.Config) fiber.ListenConfig {
+	return fiber.ListenConfig{
+		DisableStartupMessage: true,
+		EnablePrefork:         cfg.HTTP.Prefork,
+	}
 }
 
 func stopHTTPRuntime(ctx context.Context, runtime httpRuntime) error {

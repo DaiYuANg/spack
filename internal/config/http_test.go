@@ -54,3 +54,10 @@ func TestMemoryCacheWarmupEnabled(t *testing.T) {
 		t.Fatal("expected memory cache warmup to be disabled")
 	}
 }
+
+func TestDefaultHTTPPreforkDisabled(t *testing.T) {
+	cfg := config.DefaultConfigForTest()
+	if cfg.HTTP.Prefork {
+		t.Fatal("expected HTTP prefork to be disabled by default")
+	}
+}
