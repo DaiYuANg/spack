@@ -17,7 +17,26 @@ import (
 	"github.com/daiyuang/spack/internal/media"
 )
 
-var ErrNotFound = errors.New("asset not found")
+var (
+	ErrNotFound = errors.New("asset not found")
+
+	resolverResolutionsTotalSpec = observabilityx.NewCounterSpec(
+		"resolver_resolutions_total",
+		observabilityx.WithDescription("Total number of asset resolution attempts."),
+		observabilityx.WithLabelKeys("result"),
+	)
+	resolverResolutionDurationSpec = observabilityx.NewHistogramSpec(
+		"resolver_resolution_duration_seconds",
+		observabilityx.WithDescription("Asset resolution duration in seconds."),
+		observabilityx.WithUnit("s"),
+		observabilityx.WithLabelKeys("result"),
+	)
+	resolverGenerationRequestsTotalSpec = observabilityx.NewCounterSpec(
+		"resolver_generation_requests_total",
+		observabilityx.WithDescription("Total number of requested generated artifact dimensions by kind."),
+		observabilityx.WithLabelKeys("kind"),
+	)
+)
 
 func newResolver(
 	cfg *config.Assets,
@@ -96,30 +115,28 @@ func (r *Resolver) recordMetrics(startedAt time.Time, result *Result, err error)
 		return
 	}
 
-	resultKind := resolutionResultKind(result, err)
 	attrs := []observabilityx.Attribute{
-		observabilityx.String("result", resultKind),
+		observabilityx.String("result", resolutionResultKind(result, err)),
 	}
-
-	r.obs.AddCounter(context.Background(), "resolver_resolutions_total", 1, attrs...)
-	r.obs.RecordHistogram(context.Background(), "resolver_resolution_duration_seconds", time.Since(startedAt).Seconds(), attrs...)
+	r.obs.Counter(resolverResolutionsTotalSpec).Add(context.Background(), 1, attrs...)
+	r.obs.Histogram(resolverResolutionDurationSpec).Record(context.Background(), time.Since(startedAt).Seconds(), attrs...)
 
 	if result == nil {
 		return
 	}
 
 	if count := int64(result.PreferredEncodings.Len()); count > 0 {
-		r.obs.AddCounter(context.Background(), "resolver_generation_requests_total", count,
+		r.obs.Counter(resolverGenerationRequestsTotalSpec).Add(context.Background(), count,
 			observabilityx.String("kind", "encoding"),
 		)
 	}
 	if count := int64(result.PreferredWidths.Len()); count > 0 {
-		r.obs.AddCounter(context.Background(), "resolver_generation_requests_total", count,
+		r.obs.Counter(resolverGenerationRequestsTotalSpec).Add(context.Background(), count,
 			observabilityx.String("kind", "image_width"),
 		)
 	}
 	if count := int64(result.PreferredFormats.Len()); count > 0 {
-		r.obs.AddCounter(context.Background(), "resolver_generation_requests_total", count,
+		r.obs.Counter(resolverGenerationRequestsTotalSpec).Add(context.Background(), count,
 			observabilityx.String("kind", "image_format"),
 		)
 	}

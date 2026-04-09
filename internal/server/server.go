@@ -29,6 +29,31 @@ import (
 	"github.com/samber/oops"
 )
 
+var (
+	httpRequestsTotalSpec = observabilityx.NewCounterSpec(
+		"http_requests_total",
+		observabilityx.WithDescription("Total number of HTTP requests handled by the Fiber server."),
+		observabilityx.WithLabelKeys("method", "path", "status"),
+	)
+	httpRequestDurationSpec = observabilityx.NewHistogramSpec(
+		"http_request_duration_seconds",
+		observabilityx.WithDescription("HTTP request duration in seconds."),
+		observabilityx.WithUnit("s"),
+		observabilityx.WithLabelKeys("method", "path", "status"),
+	)
+	httpAssetDeliveryTotalSpec = observabilityx.NewCounterSpec(
+		"http_asset_delivery_total",
+		observabilityx.WithDescription("Total number of asset delivery responses by delivery path."),
+		observabilityx.WithLabelKeys("method", "path", "status", "delivery"),
+	)
+	httpAssetDeliveryDurationSpec = observabilityx.NewHistogramSpec(
+		"http_asset_delivery_duration_seconds",
+		observabilityx.WithDescription("Asset delivery request duration in seconds."),
+		observabilityx.WithUnit("s"),
+		observabilityx.WithLabelKeys("method", "path", "status", "delivery"),
+	)
+)
+
 func newServerApp(cfg *config.Config) (*fiber.App, error) {
 	header, err := buildServerHeader()
 	if err != nil {
@@ -142,13 +167,13 @@ func metricsMiddleware(obs observabilityx.Observability, runtimeMetrics *Runtime
 		duration := time.Since(startedAt).Seconds()
 
 		requestAttrs := requestMetricsAttrs(c)
-		obs.AddCounter(context.Background(), "http_requests_total", 1, requestAttrs...)
-		obs.RecordHistogram(context.Background(), "http_request_duration_seconds", duration, requestAttrs...)
+		obs.Counter(httpRequestsTotalSpec).Add(context.Background(), 1, requestAttrs...)
+		obs.Histogram(httpRequestDurationSpec).Record(context.Background(), duration, requestAttrs...)
 
 		deliveryAttrs := assetDeliveryMetricsAttrs(c)
 		if len(deliveryAttrs) > 0 {
-			obs.AddCounter(context.Background(), "http_asset_delivery_total", 1, deliveryAttrs...)
-			obs.RecordHistogram(context.Background(), "http_asset_delivery_duration_seconds", duration, deliveryAttrs...)
+			obs.Counter(httpAssetDeliveryTotalSpec).Add(context.Background(), 1, deliveryAttrs...)
+			obs.Histogram(httpAssetDeliveryDurationSpec).Record(context.Background(), duration, deliveryAttrs...)
 		}
 		if err != nil {
 			return oops.In("server").Wrap(fmt.Errorf("run metrics middleware chain: %w", err))

@@ -1,0 +1,278 @@
+package metrics
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/DaiYuANg/arcgo/dix"
+	"github.com/DaiYuANg/arcgo/observabilityx"
+)
+
+type Option func(*config)
+
+type config struct {
+	metricPrefix            string
+	includeVersionAttribute bool
+	includeHealthCheckName  bool
+}
+
+func WithMetricPrefix(prefix string) Option {
+	return func(cfg *config) {
+		clean := strings.TrimSpace(prefix)
+		if clean != "" {
+			cfg.metricPrefix = clean
+		}
+	}
+}
+
+func WithVersionAttribute(enabled bool) Option {
+	return func(cfg *config) {
+		cfg.includeVersionAttribute = enabled
+	}
+}
+
+func WithHealthCheckNameAttribute(enabled bool) Option {
+	return func(cfg *config) {
+		cfg.includeHealthCheckName = enabled
+	}
+}
+
+func NewObserver(obs observabilityx.Observability, opts ...Option) dix.Observer {
+	cfg := config{
+		metricPrefix:            "dix",
+		includeVersionAttribute: true,
+		includeHealthCheckName:  true,
+	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&cfg)
+		}
+	}
+
+	return &observer{
+		obs: observabilityx.Normalize(obs, nil),
+		cfg: cfg,
+	}
+}
+
+func WithObservability(obs observabilityx.Observability, opts ...Option) dix.AppOption {
+	return dix.WithObserver(NewObserver(obs, opts...))
+}
+
+type observer struct {
+	obs observabilityx.Observability
+	cfg config
+
+	counters   sync.Map
+	histograms sync.Map
+}
+
+func (o *observer) OnBuild(ctx context.Context, event dix.BuildEvent) {
+	attrs := o.withResultAttrs(event.Meta, event.Profile, event.Err)
+	o.counter("build_total", "app", "profile", "result", "version").
+		Add(contextOrBackground(ctx), 1, attrs...)
+	o.histogram("build_duration_ms", "ms", "app", "profile", "result", "version").
+		Record(contextOrBackground(ctx), durationMS(event.Duration), attrs...)
+	o.histogram("build_modules", "", "app", "profile", "result", "version").
+		Record(contextOrBackground(ctx), float64(event.ModuleCount), attrs...)
+	o.histogram("build_providers", "", "app", "profile", "result", "version").
+		Record(contextOrBackground(ctx), float64(event.ProviderCount), attrs...)
+	o.histogram("build_hooks", "", "app", "profile", "result", "version").
+		Record(contextOrBackground(ctx), float64(event.HookCount), attrs...)
+	o.histogram("build_setups", "", "app", "profile", "result", "version").
+		Record(contextOrBackground(ctx), float64(event.SetupCount), attrs...)
+	o.histogram("build_invokes", "", "app", "profile", "result", "version").
+		Record(contextOrBackground(ctx), float64(event.InvokeCount), attrs...)
+}
+
+func (o *observer) OnStart(ctx context.Context, event dix.StartEvent) {
+	attrs := o.withResultAttrs(event.Meta, event.Profile, event.Err)
+	o.counter("start_total", "app", "profile", "result", "version").
+		Add(contextOrBackground(ctx), 1, attrs...)
+	o.histogram("start_duration_ms", "ms", "app", "profile", "result", "version").
+		Record(contextOrBackground(ctx), durationMS(event.Duration), attrs...)
+	o.histogram("start_registered_hooks", "", "app", "profile", "result", "version").
+		Record(contextOrBackground(ctx), float64(event.StartHookCount), attrs...)
+	o.histogram("start_completed_hooks", "", "app", "profile", "result", "version").
+		Record(contextOrBackground(ctx), float64(event.StartedHookCount), attrs...)
+	if event.RolledBack {
+		o.counter("start_rollback_total", "app", "profile", "result", "version").
+			Add(contextOrBackground(ctx), 1, attrs...)
+	}
+}
+
+func (o *observer) OnStop(ctx context.Context, event dix.StopEvent) {
+	attrs := o.withResultAttrs(event.Meta, event.Profile, event.Err)
+	o.counter("stop_total", "app", "profile", "result", "version").
+		Add(contextOrBackground(ctx), 1, attrs...)
+	o.histogram("stop_duration_ms", "ms", "app", "profile", "result", "version").
+		Record(contextOrBackground(ctx), durationMS(event.Duration), attrs...)
+	o.histogram("stop_registered_hooks", "", "app", "profile", "result", "version").
+		Record(contextOrBackground(ctx), float64(event.StopHookCount), attrs...)
+	o.histogram("stop_shutdown_errors", "", "app", "profile", "result", "version").
+		Record(contextOrBackground(ctx), float64(event.ShutdownErrorCount), attrs...)
+	if event.HookError {
+		o.counter("stop_hook_error_total", "app", "profile", "result", "version").
+			Add(contextOrBackground(ctx), 1, attrs...)
+	}
+}
+
+func (o *observer) OnHealthCheck(ctx context.Context, event dix.HealthCheckEvent) {
+	attrs := o.commonAttrs(event.Meta, event.Profile)
+	attrs = append(attrs,
+		observabilityx.String("kind", string(event.Kind)),
+		observabilityx.String("result", resultOf(event.Err)),
+	)
+	if o.cfg.includeHealthCheckName && event.Name != "" {
+		attrs = append(attrs, observabilityx.String("check", event.Name))
+	}
+	o.counter("health_check_total", "app", "check", "kind", "profile", "result", "version").
+		Add(contextOrBackground(ctx), 1, attrs...)
+	o.histogram("health_check_duration_ms", "ms", "app", "check", "kind", "profile", "result", "version").
+		Record(contextOrBackground(ctx), durationMS(event.Duration), attrs...)
+}
+
+func (o *observer) OnStateTransition(ctx context.Context, event dix.StateTransitionEvent) {
+	attrs := o.commonAttrs(event.Meta, event.Profile)
+	attrs = append(attrs,
+		observabilityx.String("from", event.From.String()),
+		observabilityx.String("to", event.To.String()),
+	)
+	o.counter("state_transition_total", "app", "from", "profile", "to", "version").
+		Add(contextOrBackground(ctx), 1, attrs...)
+}
+
+func (o *observer) counter(suffix string, labelKeys ...string) observabilityx.Counter {
+	spec := o.counterSpec(suffix, labelKeys...)
+	key := fmt.Sprintf("%s|%s|%v", spec.Name, spec.Description, spec.LabelKeys)
+	if cached, ok := o.counters.Load(key); ok {
+		return cached.(observabilityx.Counter)
+	}
+	instrument := o.obs.Counter(spec)
+	actual, _ := o.counters.LoadOrStore(key, instrument)
+	return actual.(observabilityx.Counter)
+}
+
+func (o *observer) histogram(suffix string, unit string, labelKeys ...string) observabilityx.Histogram {
+	spec := o.histogramSpec(suffix, unit, labelKeys...)
+	key := fmt.Sprintf("%s|%s|%s|%v", spec.Name, spec.Description, spec.Unit, spec.LabelKeys)
+	if cached, ok := o.histograms.Load(key); ok {
+		return cached.(observabilityx.Histogram)
+	}
+	instrument := o.obs.Histogram(spec)
+	actual, _ := o.histograms.LoadOrStore(key, instrument)
+	return actual.(observabilityx.Histogram)
+}
+
+func (o *observer) commonAttrs(meta dix.AppMeta, profile dix.Profile) []observabilityx.Attribute {
+	attrs := []observabilityx.Attribute{
+		observabilityx.String("app", meta.Name),
+		observabilityx.String("profile", string(profile)),
+	}
+	if o.cfg.includeVersionAttribute && strings.TrimSpace(meta.Version) != "" {
+		attrs = append(attrs, observabilityx.String("version", meta.Version))
+	}
+	return attrs
+}
+
+func (o *observer) withResultAttrs(meta dix.AppMeta, profile dix.Profile, err error) []observabilityx.Attribute {
+	attrs := o.commonAttrs(meta, profile)
+	return append(attrs, observabilityx.String("result", resultOf(err)))
+}
+
+func (o *observer) metricName(suffix string) string {
+	return o.cfg.metricPrefix + "_" + suffix
+}
+
+func (o *observer) counterSpec(suffix string, labelKeys ...string) observabilityx.CounterSpec {
+	return observabilityx.NewCounterSpec(
+		o.metricName(suffix),
+		observabilityx.WithDescription(o.metricDescription(suffix)),
+		observabilityx.WithLabelKeys(labelKeys...),
+	)
+}
+
+func (o *observer) histogramSpec(suffix string, unit string, labelKeys ...string) observabilityx.HistogramSpec {
+	spec := observabilityx.NewHistogramSpec(
+		o.metricName(suffix),
+		observabilityx.WithDescription(o.metricDescription(suffix)),
+		observabilityx.WithLabelKeys(labelKeys...),
+	)
+	if strings.TrimSpace(unit) == "" {
+		return spec
+	}
+	return observabilityx.NewHistogramSpec(
+		o.metricName(suffix),
+		observabilityx.WithDescription(o.metricDescription(suffix)),
+		observabilityx.WithUnit(unit),
+		observabilityx.WithLabelKeys(labelKeys...),
+	)
+}
+
+func (o *observer) metricDescription(suffix string) string {
+	switch suffix {
+	case "build_total":
+		return "Total number of dix application build attempts."
+	case "build_duration_ms":
+		return "dix application build duration in milliseconds."
+	case "build_modules":
+		return "Number of modules included in a dix application build."
+	case "build_providers":
+		return "Number of providers included in a dix application build."
+	case "build_hooks":
+		return "Number of hooks included in a dix application build."
+	case "build_setups":
+		return "Number of setups included in a dix application build."
+	case "build_invokes":
+		return "Number of invokes included in a dix application build."
+	case "start_total":
+		return "Total number of dix runtime start attempts."
+	case "start_duration_ms":
+		return "dix runtime start duration in milliseconds."
+	case "start_registered_hooks":
+		return "Number of registered start hooks in a dix runtime."
+	case "start_completed_hooks":
+		return "Number of completed start hooks in a dix runtime."
+	case "start_rollback_total":
+		return "Total number of dix runtime starts that triggered rollback."
+	case "stop_total":
+		return "Total number of dix runtime stop attempts."
+	case "stop_duration_ms":
+		return "dix runtime stop duration in milliseconds."
+	case "stop_registered_hooks":
+		return "Number of registered stop hooks in a dix runtime."
+	case "stop_shutdown_errors":
+		return "Number of shutdown errors observed during a dix runtime stop."
+	case "stop_hook_error_total":
+		return "Total number of dix runtime stops that encountered stop hook errors."
+	case "health_check_total":
+		return "Total number of dix health check executions."
+	case "health_check_duration_ms":
+		return "dix health check execution duration in milliseconds."
+	case "state_transition_total":
+		return "Total number of dix runtime state transitions."
+	default:
+		return ""
+	}
+}
+
+func resultOf(err error) string {
+	if err != nil {
+		return "error"
+	}
+	return "ok"
+}
+
+func durationMS(durationValue time.Duration) float64 {
+	return float64(durationValue.Milliseconds())
+}
+
+func contextOrBackground(ctx context.Context) context.Context {
+	if ctx == nil {
+		return context.Background()
+	}
+	return ctx
+}

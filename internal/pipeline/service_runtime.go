@@ -18,6 +18,31 @@ import (
 	"github.com/panjf2000/ants/v2"
 )
 
+var (
+	pipelineStageRunsTotalSpec = observabilityx.NewCounterSpec(
+		"pipeline_stage_runs_total",
+		observabilityx.WithDescription("Total number of pipeline stage executions."),
+		observabilityx.WithLabelKeys("stage", "result"),
+	)
+	pipelineStageDurationSpec = observabilityx.NewHistogramSpec(
+		"pipeline_stage_duration_seconds",
+		observabilityx.WithDescription("Pipeline stage execution duration in seconds."),
+		observabilityx.WithUnit("s"),
+		observabilityx.WithLabelKeys("stage", "result"),
+	)
+	pipelineVariantsGeneratedTotalSpec = observabilityx.NewCounterSpec(
+		"pipeline_variants_generated_total",
+		observabilityx.WithDescription("Total number of generated variants produced by pipeline stages."),
+		observabilityx.WithLabelKeys("stage"),
+	)
+	pipelineVariantsGeneratedBytesTotalSpec = observabilityx.NewCounterSpec(
+		"pipeline_variants_generated_bytes_total",
+		observabilityx.WithDescription("Total size in bytes of generated variants produced by pipeline stages."),
+		observabilityx.WithUnit("By"),
+		observabilityx.WithLabelKeys("stage"),
+	)
+)
+
 func resolveQueueSize(cfg *config.Compression, workers int) int {
 	queueSize := cfg.QueueCapacity()
 	if queueSize < 1 {
@@ -234,8 +259,8 @@ func (s *Service) recordStageRunMetrics(stageName, result string, startedAt time
 		observabilityx.String("stage", strings.TrimSpace(stageName)),
 		observabilityx.String("result", strings.TrimSpace(result)),
 	}
-	s.obs.AddCounter(context.Background(), "pipeline_stage_runs_total", 1, attrs...)
-	s.obs.RecordHistogram(context.Background(), "pipeline_stage_duration_seconds", time.Since(startedAt).Seconds(), attrs...)
+	s.obs.Counter(pipelineStageRunsTotalSpec).Add(context.Background(), 1, attrs...)
+	s.obs.Histogram(pipelineStageDurationSpec).Record(context.Background(), time.Since(startedAt).Seconds(), attrs...)
 }
 
 func (s *Service) recordGeneratedVariantMetrics(stageName string, variant *catalog.Variant) {
@@ -245,8 +270,8 @@ func (s *Service) recordGeneratedVariantMetrics(stageName string, variant *catal
 	attrs := []observabilityx.Attribute{
 		observabilityx.String("stage", strings.TrimSpace(stageName)),
 	}
-	s.obs.AddCounter(context.Background(), "pipeline_variants_generated_total", 1, attrs...)
+	s.obs.Counter(pipelineVariantsGeneratedTotalSpec).Add(context.Background(), 1, attrs...)
 	if variant.Size > 0 {
-		s.obs.AddCounter(context.Background(), "pipeline_variants_generated_bytes_total", variant.Size, attrs...)
+		s.obs.Counter(pipelineVariantsGeneratedBytesTotalSpec).Add(context.Background(), variant.Size, attrs...)
 	}
 }

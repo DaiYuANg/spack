@@ -2,19 +2,21 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/DaiYuANg/arcgo/configx"
 	"github.com/DaiYuANg/arcgo/dix"
+	"github.com/DaiYuANg/arcgo/observabilityx"
 	"github.com/daiyuang/spack/internal/validation"
 	"github.com/go-playground/validator/v10"
 	"github.com/samber/oops"
 )
 
-func NewModule(loadOptions LoadOptions) dix.Module {
+func NewModule(loadOptions LoadOptions, logger *slog.Logger, obs observabilityx.Observability) dix.Module {
 	return dix.NewModule("config",
 		dix.WithModuleProviders(
 			dix.ProviderErr1(func(validate *validator.Validate) (*Config, error) {
-				return loadConfig(loadOptions, validate)
+				return loadConfig(loadOptions, validate, logger, obs)
 			}),
 			dix.Provider1(func(cfg *Config) *Debug { return &cfg.Debug }),
 			dix.Provider1(func(cfg *Config) *Image { return &cfg.Image }),
@@ -29,9 +31,14 @@ func NewModule(loadOptions LoadOptions) dix.Module {
 	)
 }
 
-func loadConfig(loadOptions LoadOptions, validate *validator.Validate) (*Config, error) {
+func loadConfig(
+	loadOptions LoadOptions,
+	validate *validator.Validate,
+	logger *slog.Logger,
+	obs observabilityx.Observability,
+) (*Config, error) {
 	loaded := defaultConfig()
-	err := configx.Load(&loaded, loadOptions.configxOptions(validate)...)
+	err := configx.Load(&loaded, loadOptions.configxOptions(validate, logger, obs)...)
 	if err != nil {
 		return nil, oops.In("config").Wrap(fmt.Errorf("load config: %w", err))
 	}
@@ -43,7 +50,7 @@ func loadConfigWithValidation(loadOptions LoadOptions) (*Config, error) {
 	if err != nil {
 		return nil, oops.In("config").Wrap(fmt.Errorf("build validator: %w", err))
 	}
-	return loadConfig(loadOptions, validate)
+	return loadConfig(loadOptions, validate, nil, nil)
 }
 
 func LoadWithOptions(loadOptions LoadOptions) (*Config, error) {

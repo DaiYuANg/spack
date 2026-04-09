@@ -16,6 +16,31 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
+var (
+	healthCheckRunsTotalSpec = observabilityx.NewCounterSpec(
+		"health_check_runs_total",
+		observabilityx.WithDescription("Total number of health check executions."),
+		observabilityx.WithLabelKeys("kind", "check", "result"),
+	)
+	healthCheckDurationSpec = observabilityx.NewHistogramSpec(
+		"health_check_duration_seconds",
+		observabilityx.WithDescription("Health check execution duration in seconds."),
+		observabilityx.WithUnit("s"),
+		observabilityx.WithLabelKeys("kind", "check", "result"),
+	)
+	healthReportsTotalSpec = observabilityx.NewCounterSpec(
+		"health_reports_total",
+		observabilityx.WithDescription("Total number of aggregated health report generations."),
+		observabilityx.WithLabelKeys("kind", "result"),
+	)
+	healthReportDurationSpec = observabilityx.NewHistogramSpec(
+		"health_report_duration_seconds",
+		observabilityx.WithDescription("Aggregated health report generation duration in seconds."),
+		observabilityx.WithUnit("s"),
+		observabilityx.WithLabelKeys("kind", "result"),
+	)
+)
+
 const (
 	healthEndpoint    = "/healthz"
 	livenessEndpoint  = "/livez"
@@ -143,8 +168,8 @@ func recordHealthCheckMetrics(
 		observabilityx.String("check", strings.TrimSpace(checkName)),
 		observabilityx.String("result", healthMetricResult(healthy)),
 	}
-	obs.AddCounter(ctx, "health_check_runs_total", 1, attrs...)
-	obs.RecordHistogram(ctx, "health_check_duration_seconds", time.Since(startedAt).Seconds(), attrs...)
+	obs.Counter(healthCheckRunsTotalSpec).Add(ctx, 1, attrs...)
+	obs.Histogram(healthCheckDurationSpec).Record(ctx, time.Since(startedAt).Seconds(), attrs...)
 }
 
 func recordHealthReportMetrics(
@@ -159,8 +184,8 @@ func recordHealthReportMetrics(
 		observabilityx.String("kind", string(kind)),
 		observabilityx.String("result", healthMetricResult(healthy)),
 	}
-	obs.AddCounter(ctx, "health_reports_total", 1, attrs...)
-	obs.RecordHistogram(ctx, "health_report_duration_seconds", time.Since(startedAt).Seconds(), attrs...)
+	obs.Counter(healthReportsTotalSpec).Add(ctx, 1, attrs...)
+	obs.Histogram(healthReportDurationSpec).Record(ctx, time.Since(startedAt).Seconds(), attrs...)
 }
 
 func healthMetricResult(healthy bool) string {

@@ -35,31 +35,55 @@ func (r *pipelineRecordingObservability) StartSpan(
 	return ctx, pipelineRecordingSpan{}
 }
 
-func (r *pipelineRecordingObservability) AddCounter(
-	_ context.Context,
-	name string,
-	value int64,
-	attrs ...observabilityx.Attribute,
-) {
-	r.counters = append(r.counters, pipelineMetric{
-		name:  name,
+func (r *pipelineRecordingObservability) Counter(spec observabilityx.CounterSpec) observabilityx.Counter {
+	return pipelineRecordingCounter{name: spec.Name, metrics: &r.counters}
+}
+
+func (r *pipelineRecordingObservability) UpDownCounter(observabilityx.UpDownCounterSpec) observabilityx.UpDownCounter {
+	return pipelineNoopUpDownCounter{}
+}
+
+func (r *pipelineRecordingObservability) Histogram(spec observabilityx.HistogramSpec) observabilityx.Histogram {
+	return pipelineRecordingHistogram{name: spec.Name, metrics: &r.histograms}
+}
+
+func (r *pipelineRecordingObservability) Gauge(observabilityx.GaugeSpec) observabilityx.Gauge {
+	return pipelineNoopGauge{}
+}
+
+type pipelineRecordingCounter struct {
+	name    string
+	metrics *[]pipelineMetric
+}
+
+func (r pipelineRecordingCounter) Add(_ context.Context, value int64, attrs ...observabilityx.Attribute) {
+	*r.metrics = append(*r.metrics, pipelineMetric{
+		name:  r.name,
 		value: float64(value),
 		attrs: pipelineAttrsToMap(attrs),
 	})
 }
 
-func (r *pipelineRecordingObservability) RecordHistogram(
-	_ context.Context,
-	name string,
-	value float64,
-	attrs ...observabilityx.Attribute,
-) {
-	r.histograms = append(r.histograms, pipelineMetric{
-		name:  name,
+type pipelineRecordingHistogram struct {
+	name    string
+	metrics *[]pipelineMetric
+}
+
+func (r pipelineRecordingHistogram) Record(_ context.Context, value float64, attrs ...observabilityx.Attribute) {
+	*r.metrics = append(*r.metrics, pipelineMetric{
+		name:  r.name,
 		value: value,
 		attrs: pipelineAttrsToMap(attrs),
 	})
 }
+
+type pipelineNoopUpDownCounter struct{}
+
+func (pipelineNoopUpDownCounter) Add(context.Context, int64, ...observabilityx.Attribute) {}
+
+type pipelineNoopGauge struct{}
+
+func (pipelineNoopGauge) Set(context.Context, float64, ...observabilityx.Attribute) {}
 
 type pipelineRecordingSpan struct{}
 

@@ -109,29 +109,53 @@ func (r *recordingObservability) StartSpan(
 	return ctx, recordingSpan{}
 }
 
-func (r *recordingObservability) AddCounter(
-	_ context.Context,
-	name string,
-	_ int64,
-	attrs ...observabilityx.Attribute,
-) {
-	r.counters = append(r.counters, recordedMetric{
-		name:  name,
+func (r *recordingObservability) Counter(spec observabilityx.CounterSpec) observabilityx.Counter {
+	return recordingCounter{name: spec.Name, metrics: &r.counters}
+}
+
+func (r *recordingObservability) UpDownCounter(observabilityx.UpDownCounterSpec) observabilityx.UpDownCounter {
+	return noopUpDownCounter{}
+}
+
+func (r *recordingObservability) Histogram(spec observabilityx.HistogramSpec) observabilityx.Histogram {
+	return recordingHistogram{name: spec.Name, metrics: &r.histograms}
+}
+
+func (r *recordingObservability) Gauge(observabilityx.GaugeSpec) observabilityx.Gauge {
+	return noopGauge{}
+}
+
+type recordingCounter struct {
+	name    string
+	metrics *[]recordedMetric
+}
+
+func (r recordingCounter) Add(_ context.Context, _ int64, attrs ...observabilityx.Attribute) {
+	*r.metrics = append(*r.metrics, recordedMetric{
+		name:  r.name,
 		attrs: attrsToMap(attrs),
 	})
 }
 
-func (r *recordingObservability) RecordHistogram(
-	_ context.Context,
-	name string,
-	_ float64,
-	attrs ...observabilityx.Attribute,
-) {
-	r.histograms = append(r.histograms, recordedMetric{
-		name:  name,
+type recordingHistogram struct {
+	name    string
+	metrics *[]recordedMetric
+}
+
+func (r recordingHistogram) Record(_ context.Context, _ float64, attrs ...observabilityx.Attribute) {
+	*r.metrics = append(*r.metrics, recordedMetric{
+		name:  r.name,
 		attrs: attrsToMap(attrs),
 	})
 }
+
+type noopUpDownCounter struct{}
+
+func (noopUpDownCounter) Add(context.Context, int64, ...observabilityx.Attribute) {}
+
+type noopGauge struct{}
+
+func (noopGauge) Set(context.Context, float64, ...observabilityx.Attribute) {}
 
 type recordingSpan struct{}
 

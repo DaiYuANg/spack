@@ -6,7 +6,6 @@ import (
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/dix"
-	dixmetrics "github.com/DaiYuANg/arcgo/dix/metrics"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/logger"
@@ -23,7 +22,7 @@ func createContainer(loadOptions config.LoadOptions, userModules ...dix.Module) 
 
 	allModules := collectionx.NewListWithCapacity[dix.Module](7 + len(userModules))
 	allModules.Add(validation.Module,
-		config.NewModule(loadOptions),
+		config.NewModule(loadOptions, bootstrapLogger, metricsAdapter),
 		logger.Module,
 		metrics.NewModule(metricsAdapter),
 		catalog.Module,
@@ -40,7 +39,8 @@ func createContainer(loadOptions config.LoadOptions, userModules ...dix.Module) 
 		dix.WithVersion(info.Main.Version),
 		dix.WithModules(allModules.Values()...),
 		dix.WithLogger(bootstrapLogger),
-		dixmetrics.WithObservability(metricsAdapter),
+		dix.UseEventLogger(dix.NewSlogEventLogger(bootstrapLogger)),
+		metrics.WithObservability(metricsAdapter),
 	)
 	err := instance.Validate()
 	if err != nil {

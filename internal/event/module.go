@@ -3,18 +3,35 @@ package event
 
 import (
 	"context"
+	"log/slog"
+	"reflect"
 
 	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/DaiYuANg/arcgo/eventx"
+	"github.com/DaiYuANg/arcgo/observabilityx"
 	"github.com/daiyuang/spack/internal/workerpool"
 )
 
 var Module = dix.NewModule("event",
 	dix.WithModuleProviders(
-		dix.Provider1(func(settings *workerpool.Settings) eventx.BusRuntime {
+		dix.Provider3(func(
+			settings *workerpool.Settings,
+			logger *slog.Logger,
+			obs observabilityx.Observability,
+		) eventx.BusRuntime {
 			return eventx.New(
 				eventx.WithParallelDispatch(true),
 				eventx.WithAntsPool(settings.Size),
+				eventx.WithObservability(obs),
+				eventx.WithAsyncErrorHandler(func(_ context.Context, event eventx.Event, err error) {
+					if err == nil {
+						return
+					}
+					logger.Warn("event dispatch failed",
+						slog.String("event_type", reflect.TypeOf(event).String()),
+						slog.String("error", err.Error()),
+					)
+				}),
 			)
 		}),
 	),

@@ -3,13 +3,12 @@ module github.com/daiyuang/spack
 go 1.26.2
 
 require (
-	github.com/DaiYuANg/arcgo/collectionx v0.1.3
-	github.com/DaiYuANg/arcgo/configx v0.2.2
-	github.com/DaiYuANg/arcgo/dix v0.3.2
-	github.com/DaiYuANg/arcgo/dix/metrics v0.0.2
-	github.com/DaiYuANg/arcgo/eventx v0.2.2
-	github.com/DaiYuANg/arcgo/logx v0.1.1
-	github.com/DaiYuANg/arcgo/observabilityx v0.1.3
+	github.com/DaiYuANg/arcgo/collectionx v0.1.4
+	github.com/DaiYuANg/arcgo/configx v0.3.0
+	github.com/DaiYuANg/arcgo/dix v0.5.0
+	github.com/DaiYuANg/arcgo/eventx v0.3.0
+	github.com/DaiYuANg/arcgo/logx v0.1.2
+	github.com/DaiYuANg/arcgo/observabilityx v0.2.0
 	github.com/andybalholm/brotli v1.2.1
 	github.com/anthonynsimon/bild v0.15.0
 	github.com/arl/statsviz v0.8.0
@@ -38,7 +37,7 @@ require (
 
 require (
 	dario.cat/mergo v1.0.2 // indirect
-	github.com/DaiYuANg/arcgo/pkg/option v0.0.1 // indirect
+	github.com/DaiYuANg/arcgo/pkg/option v0.0.2 // indirect
 	github.com/DmitriyVTitov/size v1.5.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.1.6 // indirect

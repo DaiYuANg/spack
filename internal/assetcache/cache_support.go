@@ -6,8 +6,51 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/DaiYuANg/arcgo/observabilityx"
 	"github.com/samber/hot/pkg/base"
 )
+
+var assetCacheCounterSpecs = map[string]observabilityx.CounterSpec{
+	metricAssetCacheWarmEntries: observabilityx.NewCounterSpec(
+		metricAssetCacheWarmEntries,
+		observabilityx.WithDescription("Total number of entries loaded into the in-memory asset cache during warmup."),
+	),
+	metricAssetCacheWarmBytes: observabilityx.NewCounterSpec(
+		metricAssetCacheWarmBytes,
+		observabilityx.WithDescription("Total number of bytes loaded into the in-memory asset cache during warmup."),
+		observabilityx.WithUnit("By"),
+	),
+	metricAssetCacheEvictions: observabilityx.NewCounterSpec(
+		metricAssetCacheEvictions,
+		observabilityx.WithDescription("Total number of asset cache evictions."),
+	),
+	metricAssetCacheEvictedBytes: observabilityx.NewCounterSpec(
+		metricAssetCacheEvictedBytes,
+		observabilityx.WithDescription("Total number of bytes evicted from the in-memory asset cache."),
+		observabilityx.WithUnit("By"),
+	),
+	metricAssetCacheHits: observabilityx.NewCounterSpec(
+		metricAssetCacheHits,
+		observabilityx.WithDescription("Total number of in-memory asset cache hits."),
+	),
+	metricAssetCacheMisses: observabilityx.NewCounterSpec(
+		metricAssetCacheMisses,
+		observabilityx.WithDescription("Total number of in-memory asset cache misses."),
+	),
+	metricAssetCacheLoadErrors: observabilityx.NewCounterSpec(
+		metricAssetCacheLoadErrors,
+		observabilityx.WithDescription("Total number of asset cache read or load errors."),
+	),
+	metricAssetCacheFills: observabilityx.NewCounterSpec(
+		metricAssetCacheFills,
+		observabilityx.WithDescription("Total number of cache fill operations."),
+	),
+	metricAssetCacheFillBytes: observabilityx.NewCounterSpec(
+		metricAssetCacheFillBytes,
+		observabilityx.WithDescription("Total number of bytes inserted into the in-memory asset cache."),
+		observabilityx.WithUnit("By"),
+	),
+}
 
 func (c *Cache) readFile(path string) ([]byte, error) {
 	// #nosec G304 -- path comes from resolver/catalog-selected asset paths already validated against the asset tree.
@@ -45,5 +88,9 @@ func (c *Cache) addCounterWithContext(ctx context.Context, name string, value in
 	if value == 0 || c == nil || c.obs == nil {
 		return
 	}
-	c.obs.AddCounter(ctx, name, value)
+	spec, ok := assetCacheCounterSpecs[name]
+	if !ok {
+		spec = observabilityx.NewCounterSpec(name)
+	}
+	c.obs.Counter(spec).Add(ctx, value)
 }

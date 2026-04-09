@@ -13,6 +13,41 @@ import (
 	"github.com/panjf2000/ants/v2"
 )
 
+var (
+	workerpoolBatchItemsTotalSpec = observabilityx.NewCounterSpec(
+		"workerpool_batch_items_total",
+		observabilityx.WithDescription("Total number of items submitted to workerpool batch runs."),
+		observabilityx.WithLabelKeys("workload", "mode"),
+	)
+	workerpoolBatchRunsTotalSpec = observabilityx.NewCounterSpec(
+		"workerpool_batch_runs_total",
+		observabilityx.WithDescription("Total number of workerpool batch executions."),
+		observabilityx.WithLabelKeys("workload", "mode", "result"),
+	)
+	workerpoolBatchDurationSpec = observabilityx.NewHistogramSpec(
+		"workerpool_batch_duration_seconds",
+		observabilityx.WithDescription("Workerpool batch execution duration in seconds."),
+		observabilityx.WithUnit("s"),
+		observabilityx.WithLabelKeys("workload", "mode", "result"),
+	)
+	workerpoolTaskRunsTotalSpec = observabilityx.NewCounterSpec(
+		"workerpool_task_runs_total",
+		observabilityx.WithDescription("Total number of individual workerpool task executions."),
+		observabilityx.WithLabelKeys("workload", "mode", "result"),
+	)
+	workerpoolTaskDurationSpec = observabilityx.NewHistogramSpec(
+		"workerpool_task_duration_seconds",
+		observabilityx.WithDescription("Individual workerpool task execution duration in seconds."),
+		observabilityx.WithUnit("s"),
+		observabilityx.WithLabelKeys("workload", "mode", "result"),
+	)
+	workerpoolTaskSubmissionsTotalSpec = observabilityx.NewCounterSpec(
+		"workerpool_task_submissions_total",
+		observabilityx.WithDescription("Total number of workerpool task submission attempts."),
+		observabilityx.WithLabelKeys("workload", "result"),
+	)
+)
+
 // RunList executes list items with the shared worker pool when available.
 // It falls back to serial execution when pool is nil.
 func RunList[T any](
@@ -198,7 +233,7 @@ func recordBatchItems(ctx context.Context, obs observabilityx.Observability, wor
 	if count <= 0 {
 		return
 	}
-	obs.AddCounter(ctx, "workerpool_batch_items_total", int64(count), workerpoolAttrs(workload, mode)...)
+	obs.Counter(workerpoolBatchItemsTotalSpec).Add(ctx, int64(count), workerpoolAttrs(workload, mode)...)
 }
 
 func recordBatchRunMetrics(
@@ -210,8 +245,8 @@ func recordBatchRunMetrics(
 	err error,
 ) {
 	attrs := append(workerpoolAttrs(workload, mode), observabilityx.String("result", metricResult(err)))
-	obs.AddCounter(ctx, "workerpool_batch_runs_total", 1, attrs...)
-	obs.RecordHistogram(ctx, "workerpool_batch_duration_seconds", time.Since(startedAt).Seconds(), attrs...)
+	obs.Counter(workerpoolBatchRunsTotalSpec).Add(ctx, 1, attrs...)
+	obs.Histogram(workerpoolBatchDurationSpec).Record(ctx, time.Since(startedAt).Seconds(), attrs...)
 }
 
 func recordTaskRunMetrics(
@@ -223,8 +258,8 @@ func recordTaskRunMetrics(
 	err error,
 ) {
 	attrs := append(workerpoolAttrs(workload, mode), observabilityx.String("result", metricResult(err)))
-	obs.AddCounter(ctx, "workerpool_task_runs_total", 1, attrs...)
-	obs.RecordHistogram(ctx, "workerpool_task_duration_seconds", time.Since(startedAt).Seconds(), attrs...)
+	obs.Counter(workerpoolTaskRunsTotalSpec).Add(ctx, 1, attrs...)
+	obs.Histogram(workerpoolTaskDurationSpec).Record(ctx, time.Since(startedAt).Seconds(), attrs...)
 }
 
 func recordTaskSubmission(ctx context.Context, obs observabilityx.Observability, workload string, submitted bool) {
@@ -232,7 +267,7 @@ func recordTaskSubmission(ctx context.Context, obs observabilityx.Observability,
 	if submitted {
 		result = "submitted"
 	}
-	obs.AddCounter(ctx, "workerpool_task_submissions_total", 1,
+	obs.Counter(workerpoolTaskSubmissionsTotalSpec).Add(ctx, 1,
 		observabilityx.String("workload", normalizeWorkload(workload)),
 		observabilityx.String("result", result),
 	)
