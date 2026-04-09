@@ -12,9 +12,10 @@ ARG BUILDARCH
 ARG TARGETOS
 ARG TARGETARCH
 
-RUN apt-get update \
-    && apt-get upgrade -y -fix-missing \
-    && apt-get install -y -fix-missing --no-install-recommends curl xz-utils ca-certificates \
+RUN sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends curl xz-utils ca-certificates \
     && ARCH="${BUILDARCH}" && \
     case "$ARCH" in \
         amd64)   UPX_ARCH=amd64 ;; \
@@ -36,7 +37,8 @@ RUN upx --best --lzma dist/spack
 
 FROM alpine:latest AS alpine
 
-RUN apk upgrade --no-cache \
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories && \
+    apk upgrade --no-cache \
     && apk add --no-cache ca-certificates curl dumb-init \
     && adduser -D -g '' appuser
 
@@ -63,7 +65,8 @@ WORKDIR /opt
 
 COPY --from=builder /app/dist/spack /opt/spack
 
-RUN apt-get update \
+RUN sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update \
     && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends ca-certificates curl dumb-init \
     && rm -rf /var/lib/apt/lists/*
