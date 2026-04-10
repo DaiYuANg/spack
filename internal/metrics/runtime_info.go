@@ -14,8 +14,7 @@ type RuntimeInfoMetrics struct {
 
 func NewRuntimeInfoMetrics(appName string, cfg *spackconfig.Config, startedAt time.Time) *RuntimeInfoMetrics {
 	if cfg == nil {
-		defaultCfg := spackconfig.DefaultConfig()
-		cfg = &defaultCfg
+		cfg = new(spackconfig.DefaultConfig())
 	}
 	if startedAt.IsZero() {
 		startedAt = time.Now()

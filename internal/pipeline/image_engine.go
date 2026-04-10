@@ -55,7 +55,7 @@ func (builtinImageEngine) SupportedTargetFormats() collectionx.List[string] {
 	return collectionx.NewList("jpeg", "png")
 }
 
-func (builtinImageEngine) Generate(sourcePath, sourceMediaType, targetFormat string, targetWidth int, opts imageEncodeOptions) (imageGenerateResult, error) {
+func (builtinImageEngine) Generate(sourcePath, _, targetFormat string, targetWidth int, opts imageEncodeOptions) (imageGenerateResult, error) {
 	srcImage, sourceWidth, sourceHeight, err := loadBuiltinSourceImage(sourcePath)
 	if err != nil {
 		return imageGenerateResult{}, err

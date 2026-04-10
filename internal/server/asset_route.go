@@ -152,8 +152,7 @@ func resolveAfterVariantArtifactMiss(
 }
 
 func asMissingResolvedVariantError(err error) *missingResolvedVariantError {
-	var missingErr *missingResolvedVariantError
-	if errors.As(err, &missingErr) {
+	if missingErr, ok := errors.AsType[*missingResolvedVariantError](err); ok {
 		return missingErr
 	}
 	return nil

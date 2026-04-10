@@ -19,27 +19,6 @@ type config struct {
 	includeHealthCheckName  bool
 }
 
-func WithMetricPrefix(prefix string) Option {
-	return func(cfg *config) {
-		clean := strings.TrimSpace(prefix)
-		if clean != "" {
-			cfg.metricPrefix = clean
-		}
-	}
-}
-
-func WithVersionAttribute(enabled bool) Option {
-	return func(cfg *config) {
-		cfg.includeVersionAttribute = enabled
-	}
-}
-
-func WithHealthCheckNameAttribute(enabled bool) Option {
-	return func(cfg *config) {
-		cfg.includeHealthCheckName = enabled
-	}
-}
-
 func NewObserver(obs observabilityx.Observability, opts ...Option) dix.Observer {
 	cfg := config{
 		metricPrefix:            "dix",
