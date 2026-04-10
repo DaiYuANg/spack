@@ -79,12 +79,15 @@ func registerMiddleware(
 ) {
 	requestIDConfig := requestid.ConfigDefault
 	requestIDConfig.Header = RequestIDHeader
-	requestIDConfig.Generator = requestIDGenerator
 	app.Use(requestid.New(requestIDConfig))
 	app.Use(etag.New())
 	app.Use(helmet.New(newHelmetConfig()))
-	app.Use(requestLogMiddleware(logger))
-	app.Use(metricsMiddleware(obs, runtimeMetrics))
+	if requestLog := requestLogMiddleware(logger); requestLog != nil {
+		app.Use(requestLog)
+	}
+	if metrics := metricsMiddleware(obs, runtimeMetrics); metrics != nil {
+		app.Use(metrics)
+	}
 
 	if cfg.Debug.Enable {
 		app.Use(expvarmw.New())
@@ -157,7 +160,7 @@ func enqueuePipelineResult(result *resolver.Result, pipelineSvc *pipeline.Servic
 
 func metricsMiddleware(obs observabilityx.Observability, runtimeMetrics *RuntimeMetrics) fiber.Handler {
 	if obs == nil && runtimeMetrics == nil {
-		return passthroughMiddleware("metrics middleware chain")
+		return nil
 	}
 
 	if obs == nil {
@@ -221,7 +224,7 @@ func assetDeliveryMetricsAttrs(c fiber.Ctx) []observabilityx.Attribute {
 
 func requestLogMiddleware(logger *slog.Logger) fiber.Handler {
 	if logger == nil || !logger.Enabled(context.Background(), slog.LevelInfo) {
-		return passthroughMiddleware("request log middleware")
+		return nil
 	}
 
 	return func(c fiber.Ctx) error {
