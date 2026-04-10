@@ -1,8 +1,10 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"strings"
 	"time"
 
@@ -31,7 +33,7 @@ func sendResolvedAsset(
 
 	cacheRequest := buildMemoryCacheRequest(result, request)
 	if bodyCache.ShouldServeRequest(cacheRequest) {
-		return sendCachedResolvedAsset(c, bodyCache, result.FilePath, cacheRequest)
+		return sendCachedResolvedAsset(c, bodyCache, result, cacheRequest)
 	}
 
 	return sendResolvedAssetFile(c, request, result, logger, headerPlan)
@@ -52,11 +54,14 @@ func handleConditionalAssetRequest(c fiber.Ctx, request resolver.Request) bool {
 func sendCachedResolvedAsset(
 	c fiber.Ctx,
 	bodyCache *assetcache.Cache,
-	path string,
+	result *resolver.Result,
 	request cachepolicy.MemoryRequest,
 ) (string, error) {
-	body, found, err := bodyCache.GetOrLoadWithRequest(path, request)
+	body, found, err := bodyCache.GetOrLoadWithRequest(result.FilePath, request)
 	if err != nil {
+		if missingErr := newMissingResolvedVariantError(result, err); missingErr != nil {
+			return "", missingErr
+		}
 		return "", fiber.ErrInternalServerError
 	}
 	if err := c.Send(body); err != nil {
@@ -73,6 +78,9 @@ func sendResolvedAssetFile(
 	headerPlan resolvedHeaderPlan,
 ) (string, error) {
 	if err := c.SendFile(result.FilePath, fiber.SendFile{ByteRange: true}); err != nil {
+		if missingErr := newMissingResolvedVariantError(result, err); missingErr != nil {
+			return "", missingErr
+		}
 		if logger != nil {
 			logger.Error("Send asset failed",
 				slog.String("path", result.FilePath),
@@ -170,4 +178,33 @@ func assetSize(asset *catalog.Asset) (int64, bool) {
 		return 0, false
 	}
 	return nonNegativeSize(asset.Size)
+}
+
+type missingResolvedVariantError struct {
+	artifactPath string
+	cause        error
+}
+
+func (e *missingResolvedVariantError) Error() string {
+	if e == nil {
+		return ""
+	}
+	return fmt.Sprintf("missing resolved variant artifact %q: %v", e.artifactPath, e.cause)
+}
+
+func (e *missingResolvedVariantError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.cause
+}
+
+func newMissingResolvedVariantError(result *resolver.Result, err error) error {
+	if result == nil || result.Variant == nil || err == nil || !errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	return &missingResolvedVariantError{
+		artifactPath: result.Variant.ArtifactPath,
+		cause:        err,
+	}
 }

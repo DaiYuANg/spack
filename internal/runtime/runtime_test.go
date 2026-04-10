@@ -2,6 +2,7 @@ package runtime_test
 
 import (
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
@@ -54,6 +55,9 @@ func TestBuildCatalogAssetSetsHashETagAndMtime(t *testing.T) {
 	}
 	if got := asset.Metadata.GetOrDefault("mtime_unix", ""); got != "1720000321" {
 		t.Fatalf("expected mtime metadata to be preserved, got %q", got)
+	}
+	if got := asset.Metadata.GetOrDefault("last_modified_http", ""); got != modTime.Format(http.TimeFormat) {
+		t.Fatalf("expected http last-modified metadata to be preserved, got %q", got)
 	}
 }
 

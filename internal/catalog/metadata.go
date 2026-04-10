@@ -1,6 +1,7 @@
 package catalog
 
 import (
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -11,6 +12,7 @@ import (
 )
 
 const MetadataModTimeUnixKey = "mtime_unix"
+const MetadataLastModifiedHTTPKey = "last_modified_http"
 
 func CloneMetadata(metadata collectionx.Map[string, string]) collectionx.Map[string, string] {
 	if metadata == nil {
@@ -37,13 +39,31 @@ func MetadataModTime(metadata collectionx.Map[string, string]) mo.Option[time.Ti
 	return mo.Some(time.Unix(seconds, 0))
 }
 
+func MetadataLastModifiedHTTP(metadata collectionx.Map[string, string]) mo.Option[string] {
+	if metadata == nil {
+		return mo.None[string]()
+	}
+
+	if raw, ok := metadata.Get(MetadataLastModifiedHTTPKey); ok {
+		trimmed := strings.TrimSpace(raw)
+		if trimmed != "" {
+			return mo.Some(trimmed)
+		}
+	}
+
+	if modTime, ok := MetadataModTime(metadata).Get(); ok {
+		return mo.Some(modTime.UTC().Format(http.TimeFormat))
+	}
+	return mo.None[string]()
+}
+
 func MetadataWithModTime(metadata collectionx.Map[string, string], modTime time.Time) collectionx.Map[string, string] {
 	cloned := CloneMetadata(metadata)
 	if modTime.IsZero() {
 		return cloned
 	}
 
-	cloned.Set(MetadataModTimeUnixKey, strconv.FormatInt(modTime.Unix(), 10))
+	setMetadataModTime(cloned, modTime)
 	return cloned
 }
 
@@ -62,13 +82,26 @@ func FileModTime(path string) mo.Option[time.Time] {
 
 func EnsureMetadataModTime(metadata collectionx.Map[string, string], path string) collectionx.Map[string, string] {
 	cloned := CloneMetadata(metadata)
-	if MetadataModTime(cloned).IsPresent() {
+	if modTime, ok := MetadataModTime(cloned).Get(); ok {
+		if !MetadataLastModifiedHTTP(cloned).IsPresent() {
+			cloned.Set(MetadataLastModifiedHTTPKey, modTime.UTC().Format(http.TimeFormat))
+		}
 		return cloned
 	}
 
 	if modTime, ok := FileModTime(path).Get(); ok {
-		cloned.Set(MetadataModTimeUnixKey, strconv.FormatInt(modTime.Unix(), 10))
+		setMetadataModTime(cloned, modTime)
 	}
 
 	return cloned
+}
+
+func setMetadataModTime(metadata collectionx.Map[string, string], modTime time.Time) {
+	if metadata == nil || modTime.IsZero() {
+		return
+	}
+
+	utc := modTime.UTC()
+	metadata.Set(MetadataModTimeUnixKey, strconv.FormatInt(utc.Unix(), 10))
+	metadata.Set(MetadataLastModifiedHTTPKey, utc.Format(http.TimeFormat))
 }

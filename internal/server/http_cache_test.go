@@ -123,6 +123,76 @@ func TestVariantRouteSetsCacheHeadersAndHeadHasNoBody(t *testing.T) {
 	}
 }
 
+func TestVariantRouteFallsBackWhenVariantArtifactIsMissing(t *testing.T) {
+	root := t.TempDir()
+	assetPath := filepath.Join(root, "app.js")
+	variantPath := filepath.Join(root, "app.js.br")
+	if err := os.WriteFile(assetPath, []byte("console.log('origin');"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.DefaultConfigForTest()
+	cfg.Debug.Enable = false
+	cfg.Assets.Root = root
+
+	cat := catalog.NewInMemoryCatalog()
+	upsertAssetForTest(t, cat, &catalog.Asset{
+		Path:       "app.js",
+		FullPath:   assetPath,
+		Size:       int64(len("console.log('origin');")),
+		MediaType:  "application/javascript",
+		SourceHash: "hash-app",
+		ETag:       "\"hash-app\"",
+	})
+	upsertVariantForTest(t, cat, &catalog.Variant{
+		ID:           "app.js|encoding=br",
+		AssetPath:    "app.js",
+		ArtifactPath: variantPath,
+		Size:         2,
+		MediaType:    "application/javascript",
+		SourceHash:   "hash-app",
+		ETag:         "\"hash-app-br\"",
+		Encoding:     "br",
+	})
+
+	app := newHTTPTestApp(
+		t,
+		&cfg,
+		slog.New(slog.DiscardHandler),
+		cat,
+		assetcache.NewCacheForTest(cfg.HTTP.MemoryCache, slog.New(slog.DiscardHandler)),
+		resolver.NewResolverForTest(&cfg.Assets, cat, slog.New(slog.DiscardHandler)),
+	)
+
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/app.js", http.NoBody)
+	request.Header.Set("Accept-Encoding", "br")
+	response, err := app.Test(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeHTTPBody(t, response)
+
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 fallback response, got %d", response.StatusCode)
+	}
+	if response.Header.Get("Content-Encoding") != "" {
+		t.Fatalf("expected missing variant to fall back to origin asset, got content-encoding %q", response.Header.Get("Content-Encoding"))
+	}
+	if response.Header.Get("ETag") != "\"hash-app\"" {
+		t.Fatalf("expected fallback asset etag, got %q", response.Header.Get("ETag"))
+	}
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(body) != "console.log('origin');" {
+		t.Fatalf("expected origin asset body, got %q", string(body))
+	}
+	if cat.ListVariants("app.js").Len() != 0 {
+		t.Fatalf("expected missing variant to be removed from catalog, got %#v", cat.ListVariants("app.js").Values())
+	}
+}
+
 func newVariantTestApp(t *testing.T) *fiber.App {
 	t.Helper()
 

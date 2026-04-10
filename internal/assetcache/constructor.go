@@ -38,7 +38,7 @@ func newCache(cfg *config.Config, logger *slog.Logger, obs observabilityx.Observ
 		return cache
 	}
 
-	cache.cache = hot.NewHotCache[string, []byte](hot.WTinyLFU, cacheCfg.MaxEntries).
+	cache.cache = hot.NewHotCache[string, []byte](hot.LRU, cacheCfg.MaxEntries).
 		WithTTL(cacheCfg.ParsedTTL()).
 		WithJanitor().
 		WithEvictionCallback(cache.onEviction).

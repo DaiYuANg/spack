@@ -83,8 +83,8 @@ func IsImageMediaType(mediaType string) bool {
 }
 
 func NormalizeImageFormats(formats collectionx.List[string]) collectionx.List[string] {
-	if formats.IsEmpty() {
-		return collectionx.NewList[string]()
+	if formats == nil || formats.IsEmpty() {
+		return nil
 	}
 
 	normalized := collectionx.FilterMapList(formats, func(_ int, format string) (string, bool) {

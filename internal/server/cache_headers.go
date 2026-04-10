@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/daiyuang/spack/internal/cachepolicy"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/resolver"
@@ -35,14 +36,10 @@ func newResolvedHeaderPlan(
 	if size, ok := resolvedAssetSize(result); ok {
 		contentLength = mo.Some(strconv.FormatInt(size, 10))
 	}
-	lastModifiedHeader := mo.None[string]()
-	if value, ok := lastModified.Get(); ok {
-		lastModifiedHeader = mo.Some(value.UTC().Format(http.TimeFormat))
-	}
 	expires := mo.None[string]()
 
 	if policy != nil {
-		if expiresAt, ok := policy.ExpiresAt(cacheControl, lastModified.OrEmpty(), lastModified.IsPresent()); ok {
+		if expiresAt, ok := policy.ExpiresAt(cacheControl, lastModified.modTime.OrEmpty(), lastModified.modTime.IsPresent()); ok {
 			expires = mo.Some(expiresAt.UTC().Format(http.TimeFormat))
 		}
 	}
@@ -58,7 +55,7 @@ func newResolvedHeaderPlan(
 		vary:            resolvedVaryHeader(sourceMediaType, requestedFormat),
 		etag:            mo.EmptyableToOption(strings.TrimSpace(result.ETag)),
 		contentEncoding: mo.EmptyableToOption(strings.TrimSpace(result.ContentEncoding)),
-		lastModified:    lastModifiedHeader,
+		lastModified:    lastModified.header,
 		cacheControl:    cacheControl,
 		expires:         expires,
 	}
@@ -68,24 +65,26 @@ func (p resolvedHeaderPlan) Apply(c fiber.Ctx) {
 	c.Set(fiber.HeaderContentType, p.contentType)
 	c.Set(fiber.HeaderVary, p.vary)
 	c.Set(fiber.HeaderCacheControl, p.cacheControl)
-	p.contentLength.ForEach(func(value string) { c.Set(fiber.HeaderContentLength, value) })
-	p.etag.ForEach(func(value string) { c.Set(fiber.HeaderETag, value) })
-	p.contentEncoding.ForEach(func(value string) { c.Set(fiber.HeaderContentEncoding, value) })
-	p.lastModified.ForEach(func(value string) { c.Set(fiber.HeaderLastModified, value) })
-
-	if expiresAt, ok := p.expires.Get(); ok {
-		c.Set(fiber.HeaderExpires, expiresAt)
-		return
-	}
-
-	c.Response().Header.Del(fiber.HeaderExpires)
+	applyOptionalHeader(c, fiber.HeaderContentLength, p.contentLength)
+	applyOptionalHeader(c, fiber.HeaderETag, p.etag)
+	applyOptionalHeader(c, fiber.HeaderContentEncoding, p.contentEncoding)
+	applyOptionalHeader(c, fiber.HeaderLastModified, p.lastModified)
+	applyOptionalHeader(c, fiber.HeaderExpires, p.expires)
 }
 
 func (p resolvedHeaderPlan) ApplySendFileOverrides(c fiber.Ctx) {
 	c.Set(fiber.HeaderContentType, p.contentType)
-	p.contentLength.ForEach(func(value string) { c.Set(fiber.HeaderContentLength, value) })
-	p.contentEncoding.ForEach(func(value string) { c.Set(fiber.HeaderContentEncoding, value) })
-	p.lastModified.ForEach(func(value string) { c.Set(fiber.HeaderLastModified, value) })
+	applyOptionalHeader(c, fiber.HeaderContentLength, p.contentLength)
+	applyOptionalHeader(c, fiber.HeaderContentEncoding, p.contentEncoding)
+	applyOptionalHeader(c, fiber.HeaderLastModified, p.lastModified)
+}
+
+func applyOptionalHeader(c fiber.Ctx, key string, value mo.Option[string]) {
+	if headerValue, ok := value.Get(); ok {
+		c.Set(key, headerValue)
+		return
+	}
+	c.Response().Header.Del(key)
 }
 
 func shouldSendNotModified(c fiber.Ctx, request resolver.Request) bool {
@@ -95,18 +94,55 @@ func shouldSendNotModified(c fiber.Ctx, request resolver.Request) bool {
 	return c.Req().Fresh()
 }
 
-func resolvedLastModified(result *resolver.Result) mo.Option[time.Time] {
+type resolvedLastModifiedValue struct {
+	modTime mo.Option[time.Time]
+	header  mo.Option[string]
+}
+
+func resolvedLastModified(result *resolver.Result) resolvedLastModifiedValue {
 	if result == nil {
-		return mo.None[time.Time]()
+		return resolvedLastModifiedValue{
+			modTime: mo.None[time.Time](),
+			header:  mo.None[string](),
+		}
 	}
 
-	if modifiedAt := catalog.MetadataModTime(result.Variant.GetMetadata()); modifiedAt.IsPresent() {
-		return modifiedAt
+	if value, ok := metadataLastModifiedValue(result.Variant.GetMetadata()); ok {
+		return value
 	}
-	if modifiedAt := catalog.MetadataModTime(result.Asset.GetMetadata()); modifiedAt.IsPresent() {
-		return modifiedAt
+	if value, ok := metadataLastModifiedValue(result.Asset.GetMetadata()); ok {
+		return value
 	}
-	return catalog.FileModTime(result.FilePath)
+	if modTime, ok := catalog.FileModTime(result.FilePath).Get(); ok {
+		return resolvedLastModifiedValue{
+			modTime: mo.Some(modTime),
+			header:  mo.Some(modTime.UTC().Format(http.TimeFormat)),
+		}
+	}
+	return resolvedLastModifiedValue{
+		modTime: mo.None[time.Time](),
+		header:  mo.None[string](),
+	}
+}
+
+func metadataLastModifiedValue(metadata collectionx.Map[string, string]) (resolvedLastModifiedValue, bool) {
+	modTime, hasModTime := catalog.MetadataModTime(metadata).Get()
+	header, hasHeader := catalog.MetadataLastModifiedHTTP(metadata).Get()
+	if !hasModTime && !hasHeader {
+		return resolvedLastModifiedValue{}, false
+	}
+
+	value := resolvedLastModifiedValue{
+		modTime: mo.None[time.Time](),
+		header:  mo.None[string](),
+	}
+	if hasModTime {
+		value.modTime = mo.Some(modTime)
+	}
+	if hasHeader {
+		value.header = mo.Some(header)
+	}
+	return value, true
 }
 
 func resolvedVaryHeader(sourceMediaType, requestedFormat string) string {

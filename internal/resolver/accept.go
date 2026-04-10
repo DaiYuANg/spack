@@ -40,7 +40,7 @@ const (
 
 func parseAcceptEncoding(header string, supported collectionx.List[string]) collectionx.List[string] {
 	if strings.TrimSpace(header) == "" {
-		return collectionx.NewList[string]()
+		return nil
 	}
 
 	return buildEncodingCandidates(collectEncodingPreferences(header), supported)
@@ -48,7 +48,7 @@ func parseAcceptEncoding(header string, supported collectionx.List[string]) coll
 
 func parseAcceptImageFormats(header, sourceFormat string, supported collectionx.List[string]) collectionx.List[string] {
 	if strings.TrimSpace(header) == "" {
-		return collectionx.NewList[string]()
+		return nil
 	}
 
 	return buildImageCandidates(collectImagePreferences(header), sourceFormat, supported)
@@ -172,6 +172,9 @@ func buildEncodingCandidates(prefs encodingPreferences, supported collectionx.Li
 		return 1
 	})
 
+	if choices.IsEmpty() {
+		return nil
+	}
 	return collectionx.MapList(choices, func(_ int, choice candidate) string {
 		return choice.encoding
 	})
@@ -255,6 +258,9 @@ func buildImageCandidates(prefs imagePreferences, sourceFormat string, supported
 		return 1
 	})
 
+	if candidates.IsEmpty() {
+		return nil
+	}
 	return collectionx.MapList(candidates, func(_ int, candidate candidate) string {
 		return candidate.format
 	})

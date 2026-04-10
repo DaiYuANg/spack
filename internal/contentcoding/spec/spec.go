@@ -32,8 +32,8 @@ func ResolveNames(raw string) collectionx.List[string] {
 }
 
 func NormalizeNames(values collectionx.List[string]) collectionx.List[string] {
-	if values.IsEmpty() {
-		return collectionx.NewList[string]()
+	if values == nil || values.IsEmpty() {
+		return nil
 	}
 
 	normalized := lo.FilterMap(values.Values(), func(raw string, _ int) (string, bool) {
@@ -41,7 +41,7 @@ func NormalizeNames(values collectionx.List[string]) collectionx.List[string] {
 		return name, IsSupported(name)
 	})
 	if len(normalized) == 0 {
-		return collectionx.NewList[string]()
+		return nil
 	}
 	return collectionx.NewList(collectionx.NewOrderedSet(normalized...).Values()...)
 }

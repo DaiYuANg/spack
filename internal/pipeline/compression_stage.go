@@ -50,7 +50,7 @@ func (s *compressionStage) Plan(asset *catalog.Asset, request Request) collectio
 
 	supportedEncodings := s.strategies.Names()
 	encodings := filterConfiguredEncodings(normalizeEncodings(request.PreferredEncodings), supportedEncodings)
-	if encodings.IsEmpty() {
+	if encodings == nil || encodings.IsEmpty() {
 		encodings = supportedEncodings
 	}
 
@@ -149,10 +149,16 @@ func isCompressible(asset *catalog.Asset) bool {
 }
 
 func normalizeEncodings(encodings collectionx.List[string]) collectionx.List[string] {
+	if encodings == nil {
+		return nil
+	}
 	return contentcodingspec.NormalizeNames(encodings)
 }
 
 func filterConfiguredEncodings(encodings, supported collectionx.List[string]) collectionx.List[string] {
+	if encodings == nil || supported == nil {
+		return nil
+	}
 	return collectionx.FilterMapList(encodings, func(_ int, encoding string) (string, bool) {
 		return encoding, lo.Contains(supported.Values(), encoding)
 	})

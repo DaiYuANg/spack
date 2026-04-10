@@ -24,8 +24,8 @@ func requestKey(request Request) string {
 }
 
 func normalizeRequestStrings(values collectionx.List[string]) collectionx.List[string] {
-	if values.IsEmpty() {
-		return collectionx.NewList[string]()
+	if values == nil || values.IsEmpty() {
+		return nil
 	}
 
 	normalized := collectionx.NewList[string]()
@@ -43,14 +43,14 @@ func normalizeRequestStrings(values collectionx.List[string]) collectionx.List[s
 		return true
 	})
 	if normalized.IsEmpty() {
-		return collectionx.NewList[string]()
+		return nil
 	}
 	return normalized.Sort(strings.Compare)
 }
 
 func normalizeRequestInts(values collectionx.List[int]) collectionx.List[int] {
-	if values.IsEmpty() {
-		return collectionx.NewList[int]()
+	if values == nil || values.IsEmpty() {
+		return nil
 	}
 
 	normalized := collectionx.NewList[int]()
@@ -67,7 +67,7 @@ func normalizeRequestInts(values collectionx.List[int]) collectionx.List[int] {
 		return true
 	})
 	if normalized.IsEmpty() {
-		return collectionx.NewList[int]()
+		return nil
 	}
 	return normalized.Sort(cmp.Compare[int])
 }

@@ -1,6 +1,7 @@
 package catalog_test
 
 import (
+	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
@@ -242,6 +243,9 @@ func TestUpsertAssetBackfillsModTimeMetadata(t *testing.T) {
 	}
 	if got := asset.Metadata.GetOrDefault(catalog.MetadataModTimeUnixKey, ""); got != "1720000321" {
 		t.Fatalf("expected backfilled mod time metadata, got %q", got)
+	}
+	if got := asset.Metadata.GetOrDefault(catalog.MetadataLastModifiedHTTPKey, ""); got != modifiedAt.Format(http.TimeFormat) {
+		t.Fatalf("expected backfilled http last-modified metadata, got %q", got)
 	}
 }
 

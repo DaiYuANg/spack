@@ -2,6 +2,7 @@ package server
 
 import (
 	"cmp"
+	"context"
 	"log/slog"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
@@ -20,6 +21,7 @@ var Module = dix.NewModule("server",
 	dix.WithModuleProviders(
 		dix.Provider0(NewRuntimeMetrics),
 		dix.Provider4(newMiddlewareRegistration),
+		dix.Provider2(newAssetRouteRuntime),
 		dix.Provider2(newHealthCheckDefinitions),
 		dix.Provider3(newHealthRoutesRegistration),
 		dix.Provider4(newRobotsRouteRegistration),
@@ -52,6 +54,11 @@ type robotsRouteRegistration struct {
 
 type assetRouteRegistration struct {
 	appRegistration
+}
+
+type assetRouteRuntime struct {
+	logger        *slog.Logger
+	trackDelivery bool
 }
 
 func newAppRegistration(order int, name string, apply func(*fiber.App)) appRegistration {
@@ -96,15 +103,26 @@ func newRobotsRouteRegistration(
 
 func newAssetRouteRegistration(
 	cfg *config.Config,
-	logger *slog.Logger,
+	runtime assetRouteRuntime,
 	assetResolver *resolver.Resolver,
 	pipelineSvc *pipeline.Service,
 	bodyCache *assetcache.Cache,
 	bus eventx.BusRuntime,
 ) assetRouteRegistration {
 	return assetRouteRegistration{newAppRegistration(300, "asset_route", func(app *fiber.App) {
-		registerAssetRoute(app, cfg, logger, assetResolver, pipelineSvc, bodyCache, bus)
+		registerAssetRoute(app, cfg, runtime.logger, assetResolver, pipelineSvc, bodyCache, bus, runtime.trackDelivery)
 	})}
+}
+
+func newAssetRouteRuntime(logger *slog.Logger, obs observabilityx.Observability) assetRouteRuntime {
+	return assetRouteRuntime{
+		logger:        logger,
+		trackDelivery: shouldTrackAssetDelivery(logger, obs),
+	}
+}
+
+func shouldTrackAssetDelivery(logger *slog.Logger, obs observabilityx.Observability) bool {
+	return obs != nil || (logger != nil && logger.Enabled(context.Background(), slog.LevelInfo))
 }
 
 func newServerRegistrations(

@@ -1,7 +1,6 @@
 package resolver
 
 import (
-	"os"
 	"strings"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
@@ -65,9 +64,6 @@ func isUsableVariant(variant *catalog.Variant, assetSourceHash string) bool {
 	if assetSourceHash != "" && variant.SourceHash != "" && variant.SourceHash != assetSourceHash {
 		return false
 	}
-	if _, err := os.Stat(variant.ArtifactPath); err != nil {
-		return false
-	}
 	return true
 }
 
@@ -83,7 +79,7 @@ func firstNonEmpty(values ...string) string {
 
 func preferredWidths(width int) collectionx.List[int] {
 	if width <= 0 {
-		return collectionx.NewList[int]()
+		return nil
 	}
 	return collectionx.NewList(width)
 }
@@ -97,7 +93,14 @@ func preferredImageFormats(
 		return collectionx.NewList(explicitFormat)
 	}
 	if !media.IsImageMediaType(sourceMediaType) {
-		return collectionx.NewList[string]()
+		return nil
 	}
 	return parseAcceptImageFormats(acceptHeader, media.ImageFormat(sourceMediaType), supportedImageFormats)
+}
+
+func listLen[T any](values collectionx.List[T]) int {
+	if values == nil {
+		return 0
+	}
+	return values.Len()
 }

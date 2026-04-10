@@ -76,7 +76,7 @@ func NewObservedAppForTest(
 		newMiddlewareRegistration(cfg, logger, obs, runtimeMetrics),
 		newHealthRoutesRegistration(cat, healthChecks, obs),
 		newRobotsRouteRegistration(cfg, logger, cat, bodyCache),
-		newAssetRouteRegistration(cfg, logger, assetResolver, pipelineSvc, bodyCache, bus),
+		newAssetRouteRegistration(cfg, newAssetRouteRuntime(logger, obs), assetResolver, pipelineSvc, bodyCache, bus),
 	))
 	if err != nil {
 		panic(err)

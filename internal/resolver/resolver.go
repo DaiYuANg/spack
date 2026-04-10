@@ -46,12 +46,15 @@ func newResolver(
 	logger *slog.Logger,
 	obs observabilityx.Observability,
 ) *Resolver {
+	if obs != nil {
+		obs = observabilityx.Normalize(obs, logger)
+	}
 	return &Resolver{
 		cfg:                cfg,
 		supportedEncodings: contentcodingspec.NormalizeNames(registry.Names()),
 		catalog:            cat,
 		logger:             logger,
-		obs:                observabilityx.Normalize(obs, logger),
+		obs:                obs,
 	}
 }
 
@@ -66,7 +69,7 @@ func (r *Resolver) Resolve(request Request) (*Result, error) {
 	encodings := parseAcceptEncoding(request.AcceptEncoding, r.supportedEncodings)
 	requestedFormat := media.NormalizeImageFormat(request.Format)
 	preferredImageFormats := preferredImageFormats(request.Accept, requestedFormat, asset.MediaType)
-	if request.Width > 0 || preferredImageFormats.Len() > 0 {
+	if request.Width > 0 || listLen(preferredImageFormats) > 0 {
 		if variant := r.pickImageVariant(asset, request.Width, preferredImageFormats); variant != nil {
 			result := &Result{
 				Asset:        asset,
@@ -81,7 +84,7 @@ func (r *Resolver) Resolve(request Request) (*Result, error) {
 		}
 	}
 
-	if !request.RangeRequested && encodings.Len() > 0 {
+	if !request.RangeRequested && listLen(encodings) > 0 {
 		if variant := r.pickVariant(asset, encodings); variant != nil {
 			result := &Result{
 				Asset:           asset,
@@ -111,6 +114,16 @@ func (r *Resolver) Resolve(request Request) (*Result, error) {
 	return result, nil
 }
 
+func (r *Resolver) ResolveAfterVariantArtifactMiss(request Request, variant *catalog.Variant) (*Result, error) {
+	if r == nil {
+		return nil, ErrNotFound
+	}
+	if variant != nil {
+		r.catalog.DeleteVariantByArtifactPath(variant.ArtifactPath)
+	}
+	return r.Resolve(request)
+}
+
 func (r *Resolver) recordMetrics(startedAt time.Time, result *Result, err error) {
 	if r == nil || r.obs == nil {
 		return
@@ -126,17 +139,17 @@ func (r *Resolver) recordMetrics(startedAt time.Time, result *Result, err error)
 		return
 	}
 
-	if count := int64(result.PreferredEncodings.Len()); count > 0 {
+	if count := int64(listLen(result.PreferredEncodings)); count > 0 {
 		r.obs.Counter(resolverGenerationRequestsTotalSpec).Add(context.Background(), count,
 			observabilityx.String("kind", "encoding"),
 		)
 	}
-	if count := int64(result.PreferredWidths.Len()); count > 0 {
+	if count := int64(listLen(result.PreferredWidths)); count > 0 {
 		r.obs.Counter(resolverGenerationRequestsTotalSpec).Add(context.Background(), count,
 			observabilityx.String("kind", "image_width"),
 		)
 	}
-	if count := int64(result.PreferredFormats.Len()); count > 0 {
+	if count := int64(listLen(result.PreferredFormats)); count > 0 {
 		r.obs.Counter(resolverGenerationRequestsTotalSpec).Add(context.Background(), count,
 			observabilityx.String("kind", "image_format"),
 		)

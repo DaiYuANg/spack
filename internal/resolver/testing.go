@@ -14,7 +14,7 @@ import (
 
 // NewResolverForTest exposes resolver construction for external tests.
 func NewResolverForTest(cfg *config.Assets, cat catalog.Catalog, logger *slog.Logger) *Resolver {
-	return NewResolverWithObservabilityForTest(cfg, cat, logger, observabilityx.NopWithLogger(logger))
+	return NewResolverWithObservabilityForTest(cfg, cat, logger, nil)
 }
 
 // NewResolverWithObservabilityForTest exposes resolver construction with an observability backend for external tests.
@@ -43,7 +43,7 @@ func NewResolverWithCompressionForTest(
 		BrotliQuality: compression.BrotliQuality,
 		GzipLevel:     compression.GzipLevel,
 		ZstdLevel:     compression.ZstdLevel,
-	}, compression.NormalizedEncodings()), cat, logger, observabilityx.NopWithLogger(logger))
+	}, compression.NormalizedEncodings()), cat, logger, nil)
 }
 
 // ParseAcceptEncodingForTest exposes encoding preference parsing for external tests.

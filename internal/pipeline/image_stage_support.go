@@ -11,29 +11,32 @@ import (
 )
 
 func (s *imageStage) planFormats(asset *catalog.Asset, request Request) collectionx.List[string] {
-	supported := collectionx.NewList[string]()
+	var supported collectionx.List[string]
 	if s.engine != nil {
 		supported = normalizeImageFormats(s.engine.SupportedTargetFormats())
 	}
 
 	formats := filterSupportedImageFormats(request.PreferredFormats, supported)
-	if !formats.IsEmpty() {
+	if formats != nil && !formats.IsEmpty() {
 		return formats
 	}
 
 	sourceFormat := media.ImageFormat(asset.MediaType)
 	defaultFormats := filterSupportedImageFormats(s.cfg.ParsedFormats(), supported)
 	if sourceFormat != "" {
+		if defaultFormats == nil {
+			defaultFormats = collectionx.NewList[string]()
+		}
 		defaultFormats.Add(sourceFormat)
 	}
 	return filterSupportedImageFormats(defaultFormats, supported)
 }
 
 func (s *imageStage) planWidths(asset *catalog.Asset, request Request, formats collectionx.List[string]) collectionx.List[int] {
-	if !request.PreferredWidths.IsEmpty() {
+	if request.PreferredWidths != nil && !request.PreferredWidths.IsEmpty() {
 		return request.PreferredWidths
 	}
-	if request.PreferredFormats.Len() > 0 {
+	if request.PreferredFormats != nil && request.PreferredFormats.Len() > 0 {
 		return collectionx.NewList(0)
 	}
 
@@ -52,7 +55,7 @@ func (s *imageStage) planWidths(asset *catalog.Asset, request Request, formats c
 }
 
 func shouldPlanOriginalFormatVariants(formats collectionx.List[string], sourceFormat string) bool {
-	if formats.IsEmpty() {
+	if formats == nil || formats.IsEmpty() {
 		return false
 	}
 
@@ -68,6 +71,9 @@ func shouldPlanOriginalFormatVariants(formats collectionx.List[string], sourceFo
 }
 
 func (s *imageStage) planTasks(asset *catalog.Asset, formats collectionx.List[string], widths collectionx.List[int]) collectionx.List[Task] {
+	if formats == nil || widths == nil {
+		return nil
+	}
 	existing := s.catalog.ListVariants(asset.Path)
 	return collectionx.NewList(lo.FlatMap(formats.Values(), func(format string, _ int) []Task {
 		return lo.FilterMap(widths.Values(), func(width int, _ int) (Task, bool) {
@@ -140,7 +146,7 @@ func isMatchingImageVariant(variant *catalog.Variant, sourceHash string, width i
 
 func filterSupportedImageFormats(formats, supported collectionx.List[string]) collectionx.List[string] {
 	normalized := normalizeImageFormats(formats)
-	if normalized.IsEmpty() || supported.IsEmpty() {
+	if normalized == nil || normalized.IsEmpty() || supported == nil || supported.IsEmpty() {
 		return normalized
 	}
 

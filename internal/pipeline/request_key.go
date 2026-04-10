@@ -20,6 +20,9 @@ func buildRequestKey(assetPath string, encodings, formats collectionx.List[strin
 }
 
 func writeStringList(builder *strings.Builder, values collectionx.List[string]) {
+	if values == nil {
+		return
+	}
 	values.Range(func(index int, value string) bool {
 		if index > 0 {
 			writeBuilderByte(builder, ',')
@@ -30,6 +33,9 @@ func writeStringList(builder *strings.Builder, values collectionx.List[string]) 
 }
 
 func writeIntList(builder *strings.Builder, values collectionx.List[int]) {
+	if values == nil {
+		return
+	}
 	values.Range(func(index int, value int) bool {
 		if index > 0 {
 			writeBuilderByte(builder, ',')

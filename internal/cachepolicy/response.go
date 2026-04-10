@@ -2,14 +2,14 @@ package cachepolicy
 
 import (
 	"fmt"
-	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/resolver"
-	"github.com/pquerna/cachecontrol/cacheobject"
 )
 
 // RevalidateCacheControl is the default response policy for original assets.
@@ -51,17 +51,14 @@ func (p StaticResponsePolicy) CacheControl(result *resolver.Result) string {
 }
 
 func (p StaticResponsePolicy) ExpiresAt(cacheControl string, lastModified time.Time, hasLastModified bool) (time.Time, bool) {
-	headers := make(http.Header, 2)
-	headers.Set("Cache-Control", cacheControl)
-	if hasLastModified {
-		headers.Set("Last-Modified", lastModified.UTC().Format(http.TimeFormat))
-	}
+	_ = lastModified
+	_ = hasLastModified
 
-	_, expiresAt, err := cacheobject.UsingRequestResponse(nil, http.StatusOK, headers, false)
-	if err != nil || expiresAt.IsZero() {
+	maxAge, ok := cacheControlMaxAge(cacheControl)
+	if !ok {
 		return time.Time{}, false
 	}
-	return expiresAt, true
+	return time.Now().UTC().Add(maxAge), true
 }
 
 func (p StaticResponsePolicy) variantMaxAge(variant *catalog.Variant) time.Duration {
@@ -72,5 +69,25 @@ func (p StaticResponsePolicy) variantMaxAge(variant *catalog.Variant) time.Durat
 		return resolveNamespaceMaxAge(p.namespaceMaxAge, artifactNamespaceImage, 0)
 	default:
 		return 0
+	}
+}
+
+func cacheControlMaxAge(cacheControl string) (time.Duration, bool) {
+	remaining := cacheControl
+	for {
+		part, rest, found := strings.Cut(remaining, ",")
+		directive := strings.TrimSpace(part)
+		key, value, hasValue := strings.Cut(directive, "=")
+		if hasValue && strings.EqualFold(strings.TrimSpace(key), "max-age") {
+			seconds, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
+			if err != nil || seconds < 0 {
+				return 0, false
+			}
+			return time.Duration(seconds) * time.Second, true
+		}
+		if !found {
+			return 0, false
+		}
+		remaining = rest
 	}
 }
