@@ -124,12 +124,35 @@ func TestLoadIntoDefaultConfigPreservesNestedDefaultsWithPartialDotenv(t *testin
 func TestLoadWithOptions_PrioritizesFlagsOverEnvOverFiles(t *testing.T) {
 	t.Helper()
 
+	unsetPriorityPrecedenceEnv(t)
+	configPath := writePriorityPrecedenceConfig(t)
+	configurePriorityPrecedenceEnv(t)
+	flags := newPriorityPrecedenceFlagSet(t)
+
+	cfg, err := config.LoadWithOptions(config.LoadOptions{
+		Files:   []string{configPath},
+		FlagSet: flags,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertPriorityPrecedenceConfig(t, cfg)
+}
+
+func unsetPriorityPrecedenceEnv(t *testing.T) {
+	t.Helper()
+
 	unsetEnvForTest(t, "SPACK_HTTP_PORT")
 	unsetEnvForTest(t, "SPACK_HTTP_LOW_MEMORY")
 	unsetEnvForTest(t, "SPACK_HTTP_PREFORK")
 	unsetEnvForTest(t, "SPACK_ASSETS_PATH")
 	unsetEnvForTest(t, "SPACK_ASSETS_BACKEND")
 	unsetEnvForTest(t, "SPACK_LOGGER_LEVEL")
+}
+
+func writePriorityPrecedenceConfig(t *testing.T) string {
+	t.Helper()
 
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "spack.yaml")
@@ -145,9 +168,18 @@ func TestLoadWithOptions_PrioritizesFlagsOverEnvOverFiles(t *testing.T) {
 	if err := os.WriteFile(configPath, []byte(configBody), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	return configPath
+}
+
+func configurePriorityPrecedenceEnv(t *testing.T) {
+	t.Helper()
 
 	t.Setenv("SPACK_ASSETS_ROOT", "/env-root")
 	t.Setenv("SPACK_HTTP_PREFORK", "true")
+}
+
+func newPriorityPrecedenceFlagSet(t *testing.T) *pflag.FlagSet {
+	t.Helper()
 
 	flags := pflag.NewFlagSet("spack-test", pflag.ContinueOnError)
 	flags.Int("http.port", 0, "")
@@ -158,14 +190,11 @@ func TestLoadWithOptions_PrioritizesFlagsOverEnvOverFiles(t *testing.T) {
 	if err := flags.Parse([]string{"--http.port=8088", "--http.low_memory=false", "--http.prefork=false", "--assets.backend=local", "--logger.level=debug"}); err != nil {
 		t.Fatal(err)
 	}
+	return flags
+}
 
-	cfg, err := config.LoadWithOptions(config.LoadOptions{
-		Files:   []string{configPath},
-		FlagSet: flags,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+func assertPriorityPrecedenceConfig(t *testing.T, cfg *config.Config) {
+	t.Helper()
 
 	if cfg.HTTP.Port != 8088 {
 		t.Fatalf("expected flag to override http.port to 8088, got %d", cfg.HTTP.Port)

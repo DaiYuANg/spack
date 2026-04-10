@@ -2,23 +2,15 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/DaiYuANg/arcgo/observabilityx"
-	"github.com/daiyuang/spack/internal/assetcache"
-	"github.com/daiyuang/spack/internal/cachepolicy"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/media"
-	"github.com/daiyuang/spack/internal/pipeline"
-	"github.com/daiyuang/spack/internal/requestpath"
-	"github.com/daiyuang/spack/internal/resolver"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/etag"
 	expvarmw "github.com/gofiber/fiber/v3/middleware/expvar"
@@ -101,142 +93,6 @@ func registerMiddleware(
 	app.Use(recoverer.New(recoverConfig))
 }
 
-func registerAssetRoute(
-	app *fiber.App,
-	cfg *config.Config,
-	logger *slog.Logger,
-	assetResolver *resolver.Resolver,
-	pipelineSvc *pipeline.Service,
-	bodyCache *assetcache.Cache,
-	bus eventx.BusRuntime,
-	trackDelivery bool,
-) {
-	responsePolicy := cachepolicy.NewResponsePolicy(&cfg.Compression)
-	app.Use(routePattern(cfg.Assets.Path), func(c fiber.Ctx) error {
-		requestedFormat := media.NormalizeImageFormat(c.Query("format"))
-		request := buildResolverRequest(c, cfg.Assets.Path, requestedFormat)
-		result, err := assetResolver.Resolve(request)
-		if err != nil {
-			return fiber.ErrNotFound
-		}
-
-		enqueuePipelineResult(result, pipelineSvc)
-		delivery, resolvedResult, deliveryErr := sendResolvedAssetWithVariantFallback(
-			c,
-			responsePolicy,
-			request,
-			result,
-			requestedFormat,
-			logger,
-			bodyCache,
-			assetResolver,
-			pipelineSvc,
-		)
-		if deliveryErr != nil {
-			return deliveryErr
-		}
-		if delivery != "" {
-			if trackDelivery {
-				setAssetDelivery(c, delivery)
-			}
-			publishVariantServed(c.Context(), resolvedResult, bus, logger)
-		}
-		return nil
-	})
-}
-
-func sendResolvedAssetWithVariantFallback(
-	c fiber.Ctx,
-	responsePolicy cachepolicy.ResponsePolicy,
-	request resolver.Request,
-	result *resolver.Result,
-	requestedFormat string,
-	logger *slog.Logger,
-	bodyCache *assetcache.Cache,
-	assetResolver *resolver.Resolver,
-	pipelineSvc *pipeline.Service,
-) (string, *resolver.Result, error) {
-	delivery, err := sendResolvedAsset(c, responsePolicy, request, result, requestedFormat, logger, bodyCache)
-	if err == nil {
-		return delivery, result, nil
-	}
-
-	var missingErr *missingResolvedVariantError
-	ok := errors.As(err, &missingErr)
-	if !ok {
-		return "", result, err
-	}
-
-	for attempts := 0; attempts < 3; attempts++ {
-		if bodyCache != nil {
-			bodyCache.Delete(missingErr.artifactPath)
-		}
-
-		nextResult, resolveErr := assetResolver.ResolveAfterVariantArtifactMiss(request, result.Variant)
-		if resolveErr != nil {
-			return "", result, fiber.ErrNotFound
-		}
-		enqueuePipelineResult(nextResult, pipelineSvc)
-
-		delivery, err = sendResolvedAsset(c, responsePolicy, request, nextResult, requestedFormat, logger, bodyCache)
-		if err == nil {
-			return delivery, nextResult, nil
-		}
-
-		missingErr, ok = err.(*missingResolvedVariantError)
-		if !ok {
-			return "", nextResult, err
-		}
-		result = nextResult
-	}
-
-	return "", result, fiber.ErrInternalServerError
-}
-
-func buildResolverRequest(c fiber.Ctx, mountPath, requestedFormat string) resolver.Request {
-	cleanedPath := requestpath.CleanMounted(c.Path(), mountPath)
-	return resolver.Request{
-		Path:           cleanedPath.Value,
-		Accept:         c.Get(fiber.HeaderAccept),
-		AcceptEncoding: c.Get(fiber.HeaderAcceptEncoding),
-		Width:          parsePositiveInt(c.Query("w")),
-		Format:         requestedFormat,
-		RangeRequested: strings.TrimSpace(c.Get(fiber.HeaderRange)) != "",
-	}
-}
-
-func enqueuePipelineResult(result *resolver.Result, pipelineSvc *pipeline.Service) {
-	if pipelineSvc == nil || result == nil || result.Asset == nil {
-		return
-	}
-	if !hasPreferredPipelineRequests(result) {
-		return
-	}
-
-	pipelineSvc.Enqueue(pipeline.Request{
-		AssetPath:          result.Asset.Path,
-		PreferredEncodings: result.PreferredEncodings,
-		PreferredWidths:    result.PreferredWidths,
-		PreferredFormats:   result.PreferredFormats,
-	})
-}
-
-func hasPreferredPipelineRequests(result *resolver.Result) bool {
-	if result == nil {
-		return false
-	}
-	return preferredListLen(result.PreferredEncodings) > 0 ||
-		preferredListLen(result.PreferredWidths) > 0 ||
-		preferredListLen(result.PreferredFormats) > 0
-}
-
-func preferredListLen[T any](values collectionx.List[T]) int {
-	if values == nil {
-		return 0
-	}
-	return values.Len()
-}
-
 func metricsMiddleware(obs observabilityx.Observability, runtimeMetrics *RuntimeMetrics) fiber.Handler {
 	if obs == nil && runtimeMetrics == nil {
 		return nil
@@ -317,33 +173,12 @@ func requestLogMiddleware(logger *slog.Logger) fiber.Handler {
 	}
 }
 
-func passthroughMiddleware(owner string) fiber.Handler {
-	return func(c fiber.Ctx) error {
-		if err := c.Next(); err != nil {
-			return oops.In("server").Owner(owner).Wrap(err)
-		}
-		return nil
-	}
-}
-
 func routePattern(mountPath string) string {
 	mountPath = strings.TrimSpace(mountPath)
 	if lo.Contains([]string{"", "/"}, mountPath) {
 		return "/*"
 	}
 	return strings.TrimRight(mountPath, "/") + "*"
-}
-
-func parsePositiveInt(raw string) int {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return 0
-	}
-	value, err := strconv.Atoi(trimmed)
-	if err != nil || value <= 0 {
-		return 0
-	}
-	return value
 }
 
 func shouldVaryAccept(sourceMediaType, explicitFormat string) bool {
