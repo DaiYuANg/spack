@@ -184,7 +184,7 @@ func (r *Resolver) findAsset(requestPath string) (*catalog.Asset, bool) {
 	if r.cfg.Fallback.On == config.FallbackOnNotFound && resolvedPath.AllowsEntryFallback {
 		target := requestpath.Clean(r.cfg.Fallback.Target).Value
 		if target != "" {
-			if asset, ok := r.catalog.FindAsset(target); ok {
+			if asset, ok := findAssetForRead(r.catalog, target); ok {
 				return asset, true
 			}
 		}
@@ -194,10 +194,10 @@ func (r *Resolver) findAsset(requestPath string) (*catalog.Asset, bool) {
 
 func (r *Resolver) findPrimaryAsset(requestPath requestpath.Cleaned) (*catalog.Asset, bool) {
 	if requestPath.Value == "" {
-		return r.catalog.FindAsset(r.cfg.Entry)
+		return findAssetForRead(r.catalog, r.cfg.Entry)
 	}
 
-	if asset, ok := r.catalog.FindAsset(requestPath.Value); ok {
+	if asset, ok := findAssetForRead(r.catalog, requestPath.Value); ok {
 		return asset, true
 	}
 	if !requestPath.AllowsEntryFallback {
@@ -208,7 +208,7 @@ func (r *Resolver) findPrimaryAsset(requestPath requestpath.Cleaned) (*catalog.A
 	if candidate == requestPath.Value {
 		return nil, false
 	}
-	return r.catalog.FindAsset(candidate)
+	return findAssetForRead(r.catalog, candidate)
 }
 
 func (r *Resolver) pickVariant(asset *catalog.Asset, encodings collectionx.List[string]) *catalog.Variant {

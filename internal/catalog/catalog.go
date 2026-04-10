@@ -58,6 +58,13 @@ func (c *InMemoryCatalog) FindAsset(assetPath string) (*Asset, bool) {
 	return cloneAsset(asset), ok
 }
 
+func (c *InMemoryCatalog) FindAssetView(assetPath string) (*Asset, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.assets.Get(assetPath)
+}
+
 func (c *InMemoryCatalog) DeleteAsset(assetPath string) collectionx.List[*Variant] {
 	c.mu.Lock()
 	defer c.mu.Unlock()

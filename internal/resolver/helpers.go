@@ -16,6 +16,17 @@ type variantViewCatalog interface {
 	ListVariantsView(assetPath string) collectionx.List[*catalog.Variant]
 }
 
+type assetViewCatalog interface {
+	FindAssetView(assetPath string) (*catalog.Asset, bool)
+}
+
+func findAssetForRead(cat catalog.Catalog, assetPath string) (*catalog.Asset, bool) {
+	if fastCat, ok := cat.(assetViewCatalog); ok {
+		return fastCat.FindAssetView(assetPath)
+	}
+	return cat.FindAsset(assetPath)
+}
+
 func listVariantsForRead(cat catalog.Catalog, assetPath string) collectionx.List[*catalog.Variant] {
 	if fastCat, ok := cat.(variantViewCatalog); ok {
 		return fastCat.ListVariantsView(assetPath)
