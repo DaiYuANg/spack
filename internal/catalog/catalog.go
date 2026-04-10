@@ -24,7 +24,7 @@ func (c *InMemoryCatalog) UpsertAsset(asset *Asset) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.assets.Set(asset.Path, cloneAsset(asset))
+	c.assets.Set(asset.Path, prepareAsset(asset))
 	return nil
 }
 
@@ -41,7 +41,7 @@ func (c *InMemoryCatalog) UpsertVariant(variant *Variant) error {
 		id = defaultVariantID(variant)
 	}
 
-	cloned := cloneVariant(variant)
+	cloned := prepareVariant(variant)
 	cloned.ID = id
 	c.removeStaleVariantIndex(variant.AssetPath, id)
 	c.removeConflictingArtifactIndex(cloned.ArtifactPath, variant.AssetPath, id)
@@ -145,7 +145,7 @@ func cloneAsset(asset *Asset) *Asset {
 	}
 
 	cloned := *asset
-	cloned.Metadata = asset.Metadata.Clone()
+	cloned.Metadata = CloneMetadata(asset.Metadata)
 	return &cloned
 }
 
@@ -155,8 +155,26 @@ func cloneVariant(variant *Variant) *Variant {
 	}
 
 	cloned := *variant
-	cloned.Metadata = variant.Metadata
+	cloned.Metadata = CloneMetadata(variant.Metadata)
 	return &cloned
+}
+
+func prepareAsset(asset *Asset) *Asset {
+	cloned := cloneAsset(asset)
+	if cloned == nil {
+		return nil
+	}
+	cloned.Metadata = EnsureMetadataModTime(cloned.Metadata, cloned.FullPath)
+	return cloned
+}
+
+func prepareVariant(variant *Variant) *Variant {
+	cloned := cloneVariant(variant)
+	if cloned == nil {
+		return nil
+	}
+	cloned.Metadata = EnsureMetadataModTime(cloned.Metadata, cloned.ArtifactPath)
+	return cloned
 }
 
 func (c *InMemoryCatalog) removeStaleVariantIndex(assetPath, id string) {

@@ -2,38 +2,90 @@ package server
 
 import (
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/daiyuang/spack/internal/cachepolicy"
+	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/resolver"
 	"github.com/gofiber/fiber/v3"
+	"github.com/samber/mo"
 )
 
-func applyResolvedHeaders(
-	c fiber.Ctx,
+type resolvedHeaderPlan struct {
+	contentType     string
+	contentLength   mo.Option[string]
+	vary            string
+	etag            mo.Option[string]
+	contentEncoding mo.Option[string]
+	lastModified    mo.Option[string]
+	cacheControl    string
+	expires         mo.Option[string]
+}
+
+func newResolvedHeaderPlan(
 	policy cachepolicy.ResponsePolicy,
 	result *resolver.Result,
 	requestedFormat string,
-) {
-	lastModified, hasLastModified := resolvedLastModified(result)
+) resolvedHeaderPlan {
+	lastModified := resolvedLastModified(result)
 	cacheControl := policy.CacheControl(result)
-
-	c.Set(fiber.HeaderContentType, result.MediaType)
+	contentLength := mo.None[string]()
 	if size, ok := resolvedAssetSize(result); ok {
-		c.Set(fiber.HeaderContentLength, strconv.FormatInt(size, 10))
+		contentLength = mo.Some(strconv.FormatInt(size, 10))
 	}
-	setResolvedVaryHeader(c, result.Asset.MediaType, requestedFormat)
-	setIfNotEmpty(c, fiber.HeaderETag, result.ETag)
-	setIfNotEmpty(c, fiber.HeaderContentEncoding, result.ContentEncoding)
-	if hasLastModified {
-		c.Set(fiber.HeaderLastModified, lastModified.UTC().Format(http.TimeFormat))
+	lastModifiedHeader := mo.None[string]()
+	if value, ok := lastModified.Get(); ok {
+		lastModifiedHeader = mo.Some(value.UTC().Format(http.TimeFormat))
 	}
-	c.Set(fiber.HeaderCacheControl, cacheControl)
-	applyExpiresHeader(c, policy, cacheControl, lastModified, hasLastModified)
+	expires := mo.None[string]()
+
+	if policy != nil {
+		if expiresAt, ok := policy.ExpiresAt(cacheControl, lastModified.OrEmpty(), lastModified.IsPresent()); ok {
+			expires = mo.Some(expiresAt.UTC().Format(http.TimeFormat))
+		}
+	}
+
+	sourceMediaType := ""
+	if result != nil && result.Asset != nil {
+		sourceMediaType = result.Asset.MediaType
+	}
+
+	return resolvedHeaderPlan{
+		contentType:     result.MediaType,
+		contentLength:   contentLength,
+		vary:            resolvedVaryHeader(sourceMediaType, requestedFormat),
+		etag:            mo.EmptyableToOption(strings.TrimSpace(result.ETag)),
+		contentEncoding: mo.EmptyableToOption(strings.TrimSpace(result.ContentEncoding)),
+		lastModified:    lastModifiedHeader,
+		cacheControl:    cacheControl,
+		expires:         expires,
+	}
+}
+
+func (p resolvedHeaderPlan) Apply(c fiber.Ctx) {
+	c.Set(fiber.HeaderContentType, p.contentType)
+	c.Set(fiber.HeaderVary, p.vary)
+	c.Set(fiber.HeaderCacheControl, p.cacheControl)
+	p.contentLength.ForEach(func(value string) { c.Set(fiber.HeaderContentLength, value) })
+	p.etag.ForEach(func(value string) { c.Set(fiber.HeaderETag, value) })
+	p.contentEncoding.ForEach(func(value string) { c.Set(fiber.HeaderContentEncoding, value) })
+	p.lastModified.ForEach(func(value string) { c.Set(fiber.HeaderLastModified, value) })
+
+	if expiresAt, ok := p.expires.Get(); ok {
+		c.Set(fiber.HeaderExpires, expiresAt)
+		return
+	}
+
+	c.Response().Header.Del(fiber.HeaderExpires)
+}
+
+func (p resolvedHeaderPlan) ApplySendFileOverrides(c fiber.Ctx) {
+	c.Set(fiber.HeaderContentType, p.contentType)
+	p.contentLength.ForEach(func(value string) { c.Set(fiber.HeaderContentLength, value) })
+	p.contentEncoding.ForEach(func(value string) { c.Set(fiber.HeaderContentEncoding, value) })
+	p.lastModified.ForEach(func(value string) { c.Set(fiber.HeaderLastModified, value) })
 }
 
 func shouldSendNotModified(c fiber.Ctx, request resolver.Request) bool {
@@ -43,86 +95,23 @@ func shouldSendNotModified(c fiber.Ctx, request resolver.Request) bool {
 	return c.Req().Fresh()
 }
 
-func applyExpiresHeader(
-	c fiber.Ctx,
-	policy cachepolicy.ResponsePolicy,
-	cacheControl string,
-	lastModified time.Time,
-	hasLastModified bool,
-) {
-	if policy == nil {
-		c.Response().Header.Del(fiber.HeaderExpires)
-		return
-	}
-
-	expiresAt, ok := policy.ExpiresAt(cacheControl, lastModified, hasLastModified)
-	if !ok {
-		c.Response().Header.Del(fiber.HeaderExpires)
-		return
-	}
-	c.Set(fiber.HeaderExpires, expiresAt.UTC().Format(http.TimeFormat))
-}
-
-func resolvedLastModified(result *resolver.Result) (time.Time, bool) {
+func resolvedLastModified(result *resolver.Result) mo.Option[time.Time] {
 	if result == nil {
-		return time.Time{}, false
+		return mo.None[time.Time]()
 	}
 
-	if modifiedAt, ok := metadataModTime(result.Variant); ok {
-		return modifiedAt, true
+	if modifiedAt := catalog.MetadataModTime(result.Variant.GetMetadata()); modifiedAt.IsPresent() {
+		return modifiedAt
 	}
-	if modifiedAt, ok := metadataModTime(result.Asset); ok {
-		return modifiedAt, true
+	if modifiedAt := catalog.MetadataModTime(result.Asset.GetMetadata()); modifiedAt.IsPresent() {
+		return modifiedAt
 	}
-	return fileModTime(result.FilePath)
+	return catalog.FileModTime(result.FilePath)
 }
 
-type metadataCarrier interface {
-	GetMetadata() collectionx.Map[string, string]
-}
-
-func metadataModTime(carrier metadataCarrier) (time.Time, bool) {
-	if carrier == nil {
-		return time.Time{}, false
-	}
-	value, ok := carrier.GetMetadata().Get("mtime_unix")
-	if !ok {
-		return time.Time{}, false
-	}
-	raw := strings.TrimSpace(value)
-	if raw == "" {
-		return time.Time{}, false
-	}
-
-	seconds, err := strconv.ParseInt(raw, 10, 64)
-	if err != nil || seconds <= 0 {
-		return time.Time{}, false
-	}
-	return time.Unix(seconds, 0), true
-}
-
-func fileModTime(path string) (time.Time, bool) {
-	if strings.TrimSpace(path) == "" {
-		return time.Time{}, false
-	}
-
-	info, err := os.Stat(path)
-	if err != nil {
-		return time.Time{}, false
-	}
-	return info.ModTime(), true
-}
-
-func setResolvedVaryHeader(c fiber.Ctx, sourceMediaType, requestedFormat string) {
+func resolvedVaryHeader(sourceMediaType, requestedFormat string) string {
 	if shouldVaryAccept(sourceMediaType, requestedFormat) {
-		c.Set(fiber.HeaderVary, fiber.HeaderAcceptEncoding+", "+fiber.HeaderAccept)
-		return
+		return fiber.HeaderAcceptEncoding + ", " + fiber.HeaderAccept
 	}
-	c.Set(fiber.HeaderVary, fiber.HeaderAcceptEncoding)
-}
-
-func setIfNotEmpty(c fiber.Ctx, key, value string) {
-	if strings.TrimSpace(value) != "" {
-		c.Set(key, value)
-	}
+	return fiber.HeaderAcceptEncoding
 }

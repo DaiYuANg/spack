@@ -2,7 +2,6 @@ package pipeline
 
 import (
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
@@ -81,11 +80,10 @@ func (s *imageStage) Execute(task Task, asset *catalog.Asset) (*catalog.Variant,
 		ETag:         imageVariantETag(asset.SourceHash, result.Width, targetFormat),
 		Format:       targetFormat,
 		Width:        result.Width,
-		Metadata: collectionx.NewMapFrom(map[string]string{
-			"stage":      "image",
-			"backend":    s.engine.Name(),
-			"mtime_unix": strconv.FormatInt(time.Now().Unix(), 10),
-		}),
+		Metadata: catalog.MetadataWithModTime(collectionx.NewMapFrom(map[string]string{
+			"stage":   "image",
+			"backend": s.engine.Name(),
+		}), time.Now()),
 	}, nil
 }
 

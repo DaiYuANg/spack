@@ -5,7 +5,9 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 
+	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/daiyuang/spack/internal/catalog"
 )
 
@@ -208,5 +210,81 @@ func TestUpsertVariantReplacesArtifactPathCollision(t *testing.T) {
 	}
 	if first.ID != "app.js|encoding=br" {
 		t.Fatalf("expected latest colliding variant to win, got %q", first.ID)
+	}
+}
+
+func TestUpsertAssetBackfillsModTimeMetadata(t *testing.T) {
+	cat := catalog.NewInMemoryCatalog()
+	root := t.TempDir()
+	assetPath := filepath.Join(root, "app.js")
+	modifiedAt := time.Unix(1_720_000_321, 0).UTC()
+
+	if err := os.WriteFile(assetPath, []byte("console.log('app');"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(assetPath, modifiedAt, modifiedAt); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := cat.UpsertAsset(&catalog.Asset{
+		Path:       "app.js",
+		FullPath:   assetPath,
+		MediaType:  "application/javascript",
+		SourceHash: "hash-1",
+		ETag:       "\"hash-1\"",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	asset, ok := cat.FindAsset("app.js")
+	if !ok {
+		t.Fatal("expected asset to be present")
+	}
+	if got := asset.Metadata.GetOrDefault(catalog.MetadataModTimeUnixKey, ""); got != "1720000321" {
+		t.Fatalf("expected backfilled mod time metadata, got %q", got)
+	}
+}
+
+func TestListVariantsReturnsClonedMetadata(t *testing.T) {
+	cat := catalog.NewInMemoryCatalog()
+
+	if err := cat.UpsertAsset(&catalog.Asset{
+		Path:       "app.js",
+		FullPath:   "/assets/app.js",
+		MediaType:  "application/javascript",
+		SourceHash: "hash-1",
+		ETag:       "\"hash-1\"",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := cat.UpsertVariant(&catalog.Variant{
+		ID:           "app.js|encoding=br",
+		AssetPath:    "app.js",
+		ArtifactPath: "/artifacts/app.js.br",
+		MediaType:    "application/javascript",
+		SourceHash:   "hash-1",
+		ETag:         "\"hash-1-br\"",
+		Encoding:     "br",
+		Metadata: collectionx.NewMapFrom(map[string]string{
+			"stage": "compression",
+		}),
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	variants := cat.ListVariants("app.js")
+	first, ok := variants.Get(0)
+	if !ok {
+		t.Fatal("expected variant")
+	}
+	first.Metadata.Set("stage", "mutated")
+
+	again := cat.ListVariants("app.js")
+	stored, ok := again.Get(0)
+	if !ok {
+		t.Fatal("expected stored variant")
+	}
+	if got := stored.Metadata.GetOrDefault("stage", ""); got != "compression" {
+		t.Fatalf("expected stored metadata to stay unchanged, got %q", got)
 	}
 }

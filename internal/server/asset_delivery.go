@@ -23,16 +23,18 @@ func sendResolvedAsset(
 	logger *slog.Logger,
 	bodyCache *assetcache.Cache,
 ) (string, error) {
-	applyResolvedHeaders(c, responsePolicy, result, requestedFormat)
+	headerPlan := newResolvedHeaderPlan(responsePolicy, result, requestedFormat)
+	headerPlan.Apply(c)
 	if handled := handleConditionalAssetRequest(c, request); handled {
 		return "", nil
 	}
 
-	if shouldServeFromMemoryCache(bodyCache, result, request) {
-		return sendCachedResolvedAsset(c, bodyCache, result, request)
+	cacheRequest := buildMemoryCacheRequest(result, request)
+	if bodyCache.ShouldServeRequest(cacheRequest) {
+		return sendCachedResolvedAsset(c, bodyCache, result.FilePath, cacheRequest)
 	}
 
-	return sendResolvedAssetFile(c, responsePolicy, request, result, requestedFormat, logger)
+	return sendResolvedAssetFile(c, request, result, logger, headerPlan)
 }
 
 func handleConditionalAssetRequest(c fiber.Ctx, request resolver.Request) bool {
@@ -50,10 +52,10 @@ func handleConditionalAssetRequest(c fiber.Ctx, request resolver.Request) bool {
 func sendCachedResolvedAsset(
 	c fiber.Ctx,
 	bodyCache *assetcache.Cache,
-	result *resolver.Result,
-	request resolver.Request,
+	path string,
+	request cachepolicy.MemoryRequest,
 ) (string, error) {
-	body, found, err := bodyCache.GetOrLoadWithRequest(result.FilePath, buildMemoryCacheRequest(result, request))
+	body, found, err := bodyCache.GetOrLoadWithRequest(path, request)
 	if err != nil {
 		return "", fiber.ErrInternalServerError
 	}
@@ -65,11 +67,10 @@ func sendCachedResolvedAsset(
 
 func sendResolvedAssetFile(
 	c fiber.Ctx,
-	responsePolicy cachepolicy.ResponsePolicy,
 	request resolver.Request,
 	result *resolver.Result,
-	requestedFormat string,
 	logger *slog.Logger,
+	headerPlan resolvedHeaderPlan,
 ) (string, error) {
 	if err := c.SendFile(result.FilePath, fiber.SendFile{ByteRange: true}); err != nil {
 		if logger != nil {
@@ -82,7 +83,7 @@ func sendResolvedAssetFile(
 	}
 
 	// Override Fiber's extension-derived headers so variant metadata stays authoritative.
-	applyResolvedHeaders(c, responsePolicy, result, requestedFormat)
+	headerPlan.ApplySendFileOverrides(c)
 	if request.RangeRequested {
 		return deliverySendFileRange, nil
 	}
@@ -113,10 +114,6 @@ func logRequest(logger *slog.Logger, c fiber.Ctx, startedAt time.Time) {
 	logger.LogAttrs(c.RequestCtx(), slog.LevelInfo, "HTTP request", attrs...)
 }
 
-func shouldServeFromMemoryCache(bodyCache *assetcache.Cache, result *resolver.Result, request resolver.Request) bool {
-	return bodyCache.ShouldServeRequest(buildMemoryCacheRequest(result, request))
-}
-
 func buildMemoryCacheRequest(result *resolver.Result, request resolver.Request) cachepolicy.MemoryRequest {
 	if result == nil {
 		return cachepolicy.MemoryRequest{
@@ -142,7 +139,9 @@ func buildMemoryCacheRequest(result *resolver.Result, request resolver.Request) 
 	if result.Variant != nil {
 		cacheRequest.AssetPath = result.Variant.AssetPath
 		cacheRequest.Size = result.Variant.Size
-		cacheRequest.MediaType = firstNonEmptyString(result.Variant.MediaType, cacheRequest.MediaType)
+		if mediaType := strings.TrimSpace(result.Variant.MediaType); mediaType != "" {
+			cacheRequest.MediaType = mediaType
+		}
 		cacheRequest.Encoding = result.Variant.Encoding
 		cacheRequest.Format = result.Variant.Format
 		cacheRequest.Width = result.Variant.Width
@@ -150,15 +149,6 @@ func buildMemoryCacheRequest(result *resolver.Result, request resolver.Request) 
 	}
 
 	return cacheRequest
-}
-
-func firstNonEmptyString(values ...string) string {
-	for _, value := range values {
-		if trimmed := strings.TrimSpace(value); trimmed != "" {
-			return trimmed
-		}
-	}
-	return ""
 }
 
 func nonNegativeSize(size int64) (int64, bool) {

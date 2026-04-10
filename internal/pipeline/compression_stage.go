@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
@@ -105,10 +104,9 @@ func (s *compressionStage) Execute(task Task, asset *catalog.Asset) (*catalog.Va
 		SourceHash:   asset.SourceHash,
 		ETag:         fmt.Sprintf("\"%s-%s\"", asset.SourceHash, task.Encoding),
 		Encoding:     task.Encoding,
-		Metadata: collectionx.NewMapFrom(map[string]string{
-			"stage":      "compression",
-			"mtime_unix": strconv.FormatInt(time.Now().Unix(), 10),
-		}),
+		Metadata: catalog.MetadataWithModTime(collectionx.NewMapFrom(map[string]string{
+			"stage": "compression",
+		}), time.Now()),
 	}, nil
 }
 

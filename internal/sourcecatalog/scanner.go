@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
@@ -238,15 +237,12 @@ func normalizedAssetPath(path, suffix string) string {
 }
 
 func assetMetadata(file source.File) collectionx.Map[string, string] {
-	metadata := collectionx.NewMapWithCapacity[string, string](1)
-	metadata.Set("mtime_unix", strconv.FormatInt(file.ModTime.Unix(), 10))
-	return metadata
+	return catalog.MetadataWithModTime(collectionx.NewMap[string, string](), file.ModTime)
 }
 
 func sidecarMetadata(sidecar sidecarFile) collectionx.Map[string, string] {
-	metadata := collectionx.NewMapWithCapacity[string, string](3)
-	metadata.Set("stage", SourceSidecarStage)
-	metadata.Set("mtime_unix", strconv.FormatInt(sidecar.ModTime.Unix(), 10))
-	metadata.Set("source", filepath.ToSlash(sidecar.Path))
-	return metadata
+	return catalog.MetadataWithModTime(collectionx.NewMapFrom(map[string]string{
+		"stage":  SourceSidecarStage,
+		"source": filepath.ToSlash(sidecar.Path),
+	}), sidecar.ModTime)
 }
