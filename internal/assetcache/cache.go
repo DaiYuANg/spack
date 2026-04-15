@@ -87,7 +87,7 @@ func (c *Cache) WarmSelected(ctx context.Context, cat catalog.Catalog) (WarmStat
 	if err := c.warmAssets(ctx, cat, &stats); err != nil {
 		return WarmStats{}, fmt.Errorf("warm selected memory cache: %w", err)
 	}
-	c.recordWarmStats(ctx, stats)
+	go c.recordWarmStats(ctx, stats)
 	return stats, nil
 }
 
@@ -100,7 +100,7 @@ func (c *Cache) Warm(ctx context.Context, cat catalog.Catalog) (WarmStats, error
 	if err := c.warmAssets(ctx, cat, &stats); err != nil {
 		return WarmStats{}, fmt.Errorf("warm memory cache: %w", err)
 	}
-	c.recordWarmStats(ctx, stats)
+	go c.recordWarmStats(ctx, stats)
 
 	return stats, nil
 }

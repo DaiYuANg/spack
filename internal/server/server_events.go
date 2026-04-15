@@ -12,6 +12,18 @@ import (
 	"github.com/samber/lo"
 )
 
+type EventPublisher struct {
+	bus    eventx.BusRuntime
+	logger *slog.Logger
+}
+
+func newEventPublisher(bus eventx.BusRuntime, logger *slog.Logger) *EventPublisher {
+	return &EventPublisher{
+		bus:    bus,
+		logger: logger,
+	}
+}
+
 func publishVariantServed(
 	ctx context.Context,
 	result *resolver.Result,

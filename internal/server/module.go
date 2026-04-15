@@ -27,6 +27,7 @@ var Module = dix.NewModule("server",
 		dix.Provider4(newRobotsRouteRegistration),
 		dix.Provider6(newAssetRouteRegistration),
 		dix.Provider4(newServerRegistrations),
+		dix.Provider2(newEventPublisher),
 		dix.ProviderErr2(newServerFromDeps),
 	),
 	dix.WithModuleSetups(

@@ -18,8 +18,10 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/pprof"
 	recoverer "github.com/gofiber/fiber/v3/middleware/recover"
 	"github.com/gofiber/fiber/v3/middleware/requestid"
+	"github.com/gofiber/fiber/v3/middleware/responsetime"
 	"github.com/samber/lo"
 	"github.com/samber/oops"
+	slogfiber "github.com/samber/slog-fiber"
 )
 
 var (
@@ -76,13 +78,13 @@ func registerMiddleware(
 	app.Use(requestid.New(requestIDConfig))
 	app.Use(etag.New())
 	app.Use(helmet.New(newHelmetConfig()))
-	if requestLog := requestLogMiddleware(logger); requestLog != nil {
-		app.Use(requestLog)
-	}
+	requestLogMiddleware(app, logger, cfg)
 	if metrics := metricsMiddleware(obs, runtimeMetrics); metrics != nil {
 		app.Use(metrics)
 	}
-
+	app.Use(responsetime.New(responsetime.Config{
+		Header: "X-Elapsed",
+	}))
 	if cfg.Debug.Enable {
 		app.Use(expvarmw.New())
 		app.Use(pprof.New(pprof.Config{Prefix: cfg.Debug.PprofPrefix}))
@@ -157,20 +159,14 @@ func assetDeliveryMetricsAttrs(c fiber.Ctx) []observabilityx.Attribute {
 	})
 }
 
-func requestLogMiddleware(logger *slog.Logger) fiber.Handler {
-	if logger == nil || !logger.Enabled(context.Background(), slog.LevelInfo) {
-		return nil
+func requestLogMiddleware(app *fiber.App, logger *slog.Logger, cfg *config.Config) {
+	fiberslogcfg := slogfiber.Config{
+		WithSpanID:         true,
+		WithTraceID:        true,
+		WithRequestHeader:  cfg.HTTP.RequestLogDetail,
+		WithResponseHeader: cfg.HTTP.RequestLogDetail,
 	}
-
-	return func(c fiber.Ctx) error {
-		startedAt := time.Now()
-		err := c.Next()
-		logRequest(logger, c, startedAt)
-		if err != nil {
-			return oops.In("server").Owner("request log middleware").Wrap(err)
-		}
-		return nil
-	}
+	app.Use(slogfiber.NewWithConfig(logger.WithGroup("server"), fiberslogcfg))
 }
 
 func routePattern(mountPath string) string {

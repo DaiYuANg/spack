@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/samber/oops"
 )
 
 func buildRequestKey(assetPath string, encodings, formats collectionx.List[string], widths collectionx.List[int]) string {
@@ -47,7 +48,8 @@ func writeIntList(builder *strings.Builder, values collectionx.List[int]) {
 
 func writeBuilderString(builder *strings.Builder, value string) {
 	if _, err := builder.WriteString(value); err != nil {
-		panic(err)
+		errors := oops.In("request key").Wrap(err)
+		panic(errors)
 	}
 }
 

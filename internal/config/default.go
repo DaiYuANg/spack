@@ -19,6 +19,7 @@ func defaultConfig() Config {
 				MaxFileSize: 64 * 1024,
 				TTL:         "5m",
 			},
+			RequestLogDetail: false,
 		},
 		Assets: Assets{
 			Backend:  SourceBackendLocal,

@@ -5,6 +5,8 @@ import (
 	"net/url"
 	"path"
 	"strings"
+
+	"github.com/samber/lo"
 )
 
 type Cleaned struct {
@@ -99,17 +101,7 @@ func rejectsFastPathValue(value string) bool {
 }
 
 func hasCanonicalSegments(value string) bool {
-	segmentStart := 0
-	for index := 0; index <= len(value); index++ {
-		if index < len(value) && value[index] != '/' {
-			continue
-		}
-		if !isCanonicalSegment(value[segmentStart:index]) {
-			return false
-		}
-		segmentStart = index + 1
-	}
-	return true
+	return lo.EveryBy(strings.Split(value, "/"), isCanonicalSegment)
 }
 
 func isCanonicalSegment(segment string) bool {
@@ -117,13 +109,7 @@ func isCanonicalSegment(segment string) bool {
 }
 
 func hasExtension(value string) bool {
-	for index := len(value) - 1; index >= 0; index-- {
-		switch value[index] {
-		case '/':
-			return false
-		case '.':
-			return index > 0
-		}
-	}
-	return false
+	slash := strings.LastIndexByte(value, '/')
+	dot := strings.LastIndexByte(value, '.')
+	return dot > slash && dot != -1 && dot > 0
 }

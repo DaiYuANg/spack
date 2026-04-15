@@ -12,6 +12,7 @@ import (
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/metrics"
 	"github.com/gofiber/fiber/v3"
+	"github.com/panjf2000/ants/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/samber/mo"
 	"github.com/samber/oops"
@@ -25,8 +26,8 @@ type debugRuntime struct {
 	statsviz   string
 }
 
-func startHTTPRuntime(_ context.Context, runtime httpRuntime) error {
-	go func() {
+func startHTTPRuntime(_ context.Context, runtime httpRuntime, pool *ants.Pool) error {
+	return pool.Submit(func() {
 		address := "127.0.0.1:" + runtime.cfg.HTTP.GetPort()
 		listenConfig := newHTTPListenConfig(runtime.cfg)
 		runtime.logger.Info("HTTP runtime listening",
@@ -39,8 +40,7 @@ func startHTTPRuntime(_ context.Context, runtime httpRuntime) error {
 		if err := runtime.app.Listen(":"+runtime.cfg.HTTP.GetPort(), listenConfig); err != nil {
 			runtime.logger.Error("HTTP runtime stopped", slog.String("err", err.Error()))
 		}
-	}()
-	return nil
+	})
 }
 
 func newHTTPListenConfig(cfg *config.Config) fiber.ListenConfig {

@@ -95,7 +95,7 @@ func (r *Resolver) Resolve(request Request) (*Result, error) {
 				ETag:            firstNonEmpty(variant.ETag, asset.ETag),
 				FallbackUsed:    fallbackUsed,
 			}
-			r.recordMetrics(startedAt, result, nil)
+			go r.recordMetrics(startedAt, result, nil)
 			return result, nil
 		}
 	}
@@ -110,7 +110,7 @@ func (r *Resolver) Resolve(request Request) (*Result, error) {
 		PreferredFormats:   preferredImageFormats,
 		FallbackUsed:       fallbackUsed,
 	}
-	r.recordMetrics(startedAt, result, nil)
+	go r.recordMetrics(startedAt, result, nil)
 	return result, nil
 }
 

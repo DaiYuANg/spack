@@ -16,6 +16,7 @@ import (
 )
 
 const robotsAssetPath = "robots.txt"
+const robotAssetsRoute = "/robots.txt"
 
 //go:embed templates/robots.txt.tmpl
 var robotsTemplateFS embed.FS
@@ -63,8 +64,8 @@ func registerRobotsRoute(
 		return sendGeneratedRobots(c, cfg.Robots)
 	}
 
-	app.Get("/robots.txt", handler)
-	app.Head("/robots.txt", handler)
+	app.Get(robotAssetsRoute, handler)
+	app.Head(robotAssetsRoute, handler)
 }
 
 func staticRobotsAsset(cfg config.Robots, cat catalog.Catalog) (*catalog.Asset, bool) {

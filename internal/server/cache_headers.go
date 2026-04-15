@@ -38,10 +38,8 @@ func newResolvedHeaderPlan(
 	}
 	expires := mo.None[string]()
 
-	if policy != nil {
-		if expiresAt, ok := policy.ExpiresAt(cacheControl, lastModified.modTime.OrEmpty(), lastModified.modTime.IsPresent()); ok {
-			expires = mo.Some(expiresAt.UTC().Format(http.TimeFormat))
-		}
+	if expiresAt, ok := policy.ExpiresAt(cacheControl, lastModified.modTime.OrEmpty(), lastModified.modTime.IsPresent()); ok {
+		expires = mo.Some(expiresAt.UTC().Format(http.TimeFormat))
 	}
 
 	sourceMediaType := ""
