@@ -29,16 +29,16 @@ func normalizeRequestStrings(values collectionx.List[string]) collectionx.List[s
 	}
 
 	normalized := collectionx.NewList[string]()
-	seen := make(map[string]struct{})
+	seen := collectionx.NewMapWithCapacity[string, struct{}](values.Len())
 	values.Range(func(_ int, value string) bool {
 		normalizedValue := strings.ToLower(strings.TrimSpace(value))
 		if normalizedValue == "" {
 			return true
 		}
-		if _, ok := seen[normalizedValue]; ok {
+		if _, ok := seen.Get(normalizedValue); ok {
 			return true
 		}
-		seen[normalizedValue] = struct{}{}
+		seen.Set(normalizedValue, struct{}{})
 		normalized.Add(normalizedValue)
 		return true
 	})
@@ -54,15 +54,16 @@ func normalizeRequestInts(values collectionx.List[int]) collectionx.List[int] {
 	}
 
 	normalized := collectionx.NewList[int]()
-	seen := make(map[int]struct{})
+	seen := collectionx.NewMapWithCapacity[int, struct{}](values.Len())
+	//seen := make(map[int]struct{})
 	values.Range(func(_ int, value int) bool {
 		if value <= 0 {
 			return true
 		}
-		if _, ok := seen[value]; ok {
+		if _, ok := seen.Get(value); ok {
 			return true
 		}
-		seen[value] = struct{}{}
+		seen.Set(value, struct{}{})
 		normalized.Add(value)
 		return true
 	})
