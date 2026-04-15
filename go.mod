@@ -3,17 +3,17 @@ module github.com/daiyuang/spack
 go 1.26.2
 
 require (
-	github.com/DaiYuANg/arcgo/collectionx v0.1.4
-	github.com/DaiYuANg/arcgo/configx v0.3.0
-	github.com/DaiYuANg/arcgo/dix v0.5.0
-	github.com/DaiYuANg/arcgo/eventx v0.3.0
-	github.com/DaiYuANg/arcgo/logx v0.1.2
-	github.com/DaiYuANg/arcgo/observabilityx v0.2.0
+	github.com/DaiYuANg/arcgo/collectionx v0.1.5
+	github.com/DaiYuANg/arcgo/configx v0.3.1
+	github.com/DaiYuANg/arcgo/dix v0.5.1
+	github.com/DaiYuANg/arcgo/eventx v0.3.1
+	github.com/DaiYuANg/arcgo/logx v0.1.3
+	github.com/DaiYuANg/arcgo/observabilityx v0.2.1
 	github.com/andybalholm/brotli v1.2.1
 	github.com/anthonynsimon/bild v0.15.0
 	github.com/arl/statsviz v0.8.0
 	github.com/gabriel-vasile/mimetype v1.4.13
-	github.com/go-co-op/gocron/v2 v2.20.0
+	github.com/go-co-op/gocron/v2 v2.21.0
 	github.com/go-git/go-git/v5 v5.17.2
 	github.com/go-playground/validator/v10 v10.30.2
 	github.com/gofiber/fiber/v3 v3.1.0
@@ -85,12 +85,12 @@ require (
 	github.com/samber/do/v2 v2.0.0 // indirect
 	github.com/samber/go-singleflightx v0.3.2 // indirect
 	github.com/samber/go-type-to-string v1.8.0 // indirect
-	github.com/samber/oops/loggers/zerolog v0.0.0-20260409201923-0372e7b9d26f // indirect
+	github.com/samber/oops/loggers/zerolog v0.0.0-20260412154111-1460827f264f // indirect
 	github.com/samber/slog-common v0.22.0 // indirect
 	github.com/samber/slog-zerolog/v2 v2.9.2 // indirect
 	github.com/sergi/go-diff v1.4.0 // indirect
 	github.com/skeema/knownhosts v1.3.1 // indirect
-	github.com/tinylib/msgp v1.6.3 // indirect
+	github.com/tinylib/msgp v1.6.4 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.70.0 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
