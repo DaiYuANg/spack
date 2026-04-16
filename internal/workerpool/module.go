@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/panjf2000/ants/v2"
+	"github.com/samber/oops"
 )
 
 var Module = dix.NewModule("workerpool",
@@ -16,12 +18,13 @@ var Module = dix.NewModule("workerpool",
 		dix.Provider2(NewRuntimeMetrics),
 	),
 	dix.WithModuleHooks(
-		dix.OnStop(func(ctx context.Context, pool *ants.Pool) error {
+		dix.OnStop2(func(ctx context.Context, pool *ants.Pool, logger *slog.Logger) error {
 			if pool == nil {
 				return nil
 			}
+			logger.Info("close ant pool")
 			if err := pool.ReleaseTimeout(releaseTimeout()); err != nil && !errors.Is(err, ants.ErrPoolClosed) {
-				return fmt.Errorf("release worker pool: %w", err)
+				return oops.In("ants pool").Wrap(fmt.Errorf("release worker pool: %w", err))
 			}
 			return nil
 		}),

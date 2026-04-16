@@ -32,5 +32,5 @@ func newPool(settings *Settings) (*ants.Pool, error) {
 }
 
 func releaseTimeout() time.Duration {
-	return 3 * time.Second
+	return 10 * time.Second
 }
