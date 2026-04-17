@@ -81,7 +81,7 @@ func syncSourceCatalog(
 	cat catalog.Catalog,
 	bodyCache *assetcache.Cache,
 ) (SourceRescanReport, error) {
-	snapshot, report, err := collectScannedSnapshot(ctx, scanner)
+	snapshot, report, err := collectScannedSnapshot(ctx, scanner, cat)
 	if err != nil {
 		return SourceRescanReport{}, err
 	}
@@ -97,9 +97,9 @@ func syncSourceCatalog(
 	return report, nil
 }
 
-func collectScannedSnapshot(ctx context.Context, scanner sourcecatalog.Scanner) (sourcecatalog.Snapshot, SourceRescanReport, error) {
+func collectScannedSnapshot(ctx context.Context, scanner sourcecatalog.Scanner, cat catalog.Catalog) (sourcecatalog.Snapshot, SourceRescanReport, error) {
 	scanErr := oops.In("task").Owner("source rescan")
-	snapshot, err := scanner.Scan(ctx)
+	snapshot, err := scanner.ScanWithCatalog(ctx, cat)
 	if err != nil {
 		return sourcecatalog.Snapshot{}, SourceRescanReport{}, scanErr.Wrap(err)
 	}
@@ -110,12 +110,9 @@ func collectScannedSnapshot(ctx context.Context, scanner sourcecatalog.Scanner) 
 }
 
 func indexAssetsByPath(assets collectionx.List[*catalog.Asset]) collectionx.Map[string, *catalog.Asset] {
-	byPath := collectionx.NewMapWithCapacity[string, *catalog.Asset](assets.Len())
-	assets.Range(func(_ int, asset *catalog.Asset) bool {
-		byPath.Set(asset.Path, asset)
-		return true
+	return collectionx.AssociateList(assets, func(_ int, asset *catalog.Asset) (string, *catalog.Asset) {
+		return asset.Path, asset
 	})
-	return byPath
 }
 
 func reconcileScannedAssets(

@@ -246,7 +246,7 @@ func (s *Service) upsertStageVariant(ctx context.Context, stage Stage, asset *ca
 		)
 		return
 	}
-	go s.recordGeneratedVariantMetrics(ctx, stage.Name(), variant)
+	s.recordGeneratedVariantMetrics(ctx, stage.Name(), variant)
 	go s.catMetrics.SyncCatalog(s.catalog)
 	s.publishVariantGenerated(ctx, stage.Name(), variant)
 }

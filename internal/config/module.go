@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/DaiYuANg/arcgo/configx"
 	"github.com/DaiYuANg/arcgo/dix"
@@ -38,8 +39,28 @@ func loadConfig(
 	obs observabilityx.Observability,
 ) (*Config, error) {
 	loaded := defaultConfig()
-	err := configx.Load(&loaded, loadOptions.configxOptions(validate, logger, obs)...)
+	if len(loadOptions.Files) > 0 {
+		fileOnly := configx.New(
+			configx.WithFiles(loadOptions.Files...),
+			configx.WithPriority(configx.SourceFile),
+		)
+		fileConfig, fileErr := fileOnly.LoadConfig()
+		if fileErr != nil {
+			return nil, oops.In("config").Wrap(fmt.Errorf("load config: %w", fileErr))
+		}
+		if fileConfig.Exists("assets.fallback.target") &&
+			strings.TrimSpace(fileConfig.GetString("assets.fallback.target")) == "" &&
+			strings.TrimSpace(fileConfig.GetString("assets.fallback.on")) != "" {
+			return nil, oops.In("config").Wrap(fmt.Errorf("load config: assets.fallback.target failed validation: required_with"))
+		}
+	}
+
+	loader := configx.New(loadOptions.configxOptions(validate, logger, obs)...)
+	raw, err := loader.LoadConfig()
 	if err != nil {
+		return nil, oops.In("config").Wrap(fmt.Errorf("load config: %w", err))
+	}
+	if err := raw.UnmarshalWithValidate("", &loaded); err != nil {
 		return nil, oops.In("config").Wrap(fmt.Errorf("load config: %w", err))
 	}
 	return &loaded, nil

@@ -30,6 +30,11 @@ type Scanner struct {
 	matchers collectionx.List[sidecarMatcher]
 }
 
+type existingScanState struct {
+	assets   collectionx.Map[string, *catalog.Asset]
+	sidecars collectionx.Map[string, *catalog.Variant]
+}
+
 type sidecarMatcher struct {
 	encoding string
 	suffix   string
@@ -50,6 +55,10 @@ func NewScanner(src source.Source, registry contentcoding.Registry) Scanner {
 }
 
 func (s Scanner) Scan(ctx context.Context) (Snapshot, error) {
+	return s.ScanWithCatalog(ctx, nil)
+}
+
+func (s Scanner) ScanWithCatalog(ctx context.Context, cat catalog.Catalog) (Snapshot, error) {
 	scanErr := oops.In("sourcecatalog").Owner("scan")
 	filesByPath := collectionx.NewMap[string, source.File]()
 	totalBytes := int64(0)
@@ -68,12 +77,13 @@ func (s Scanner) Scan(ctx context.Context) (Snapshot, error) {
 		return Snapshot{}, scanErr.Wrap(err)
 	}
 
+	existing := buildExistingScanState(cat)
 	sidecars := recognizeSidecars(filesByPath, s.matchers)
-	assets, err := buildAssets(filesByPath, sidecars)
+	assets, err := buildAssets(filesByPath, sidecars, existing.assets)
 	if err != nil {
 		return Snapshot{}, err
 	}
-	variants, err := buildSidecarVariants(sidecars, assets)
+	variants, err := buildSidecarVariants(sidecars, assets, existing.sidecars)
 	if err != nil {
 		return Snapshot{}, err
 	}
@@ -83,6 +93,31 @@ func (s Scanner) Scan(ctx context.Context) (Snapshot, error) {
 		Variants:   variants,
 		TotalBytes: totalBytes,
 	}, nil
+}
+
+func buildExistingScanState(cat catalog.Catalog) existingScanState {
+	state := existingScanState{
+		assets:   collectionx.NewMap[string, *catalog.Asset](),
+		sidecars: collectionx.NewMap[string, *catalog.Variant](),
+	}
+	if cat == nil {
+		return state
+	}
+
+	assets := cat.AllAssets()
+	state.assets = collectionx.AssociateList(assets, func(_ int, asset *catalog.Asset) (string, *catalog.Asset) {
+		return asset.Path, asset
+	})
+	assets.Range(func(_ int, asset *catalog.Asset) bool {
+		cat.ListVariants(asset.Path).Range(func(_ int, variant *catalog.Variant) bool {
+			if IsSourceSidecarVariant(variant) {
+				state.sidecars.Set(variant.ArtifactPath, variant)
+			}
+			return true
+		})
+		return true
+	})
+	return state
 }
 
 func BuildAsset(file source.File) (*catalog.Asset, error) {
@@ -164,7 +199,11 @@ func matchSidecar(path string, filesByPath collectionx.Map[string, source.File],
 	})
 }
 
-func buildAssets(filesByPath collectionx.Map[string, source.File], sidecars collectionx.Map[string, sidecarFile]) (collectionx.Map[string, *catalog.Asset], error) {
+func buildAssets(
+	filesByPath collectionx.Map[string, source.File],
+	sidecars collectionx.Map[string, sidecarFile],
+	existingAssets collectionx.Map[string, *catalog.Asset],
+) (collectionx.Map[string, *catalog.Asset], error) {
 	assets := collectionx.NewMapWithCapacity[string, *catalog.Asset](filesByPath.Len())
 	var buildErr error
 	sortedKeys(filesByPath).Range(func(_ int, path string) bool {
@@ -172,6 +211,11 @@ func buildAssets(filesByPath collectionx.Map[string, source.File], sidecars coll
 			return true
 		}
 		file, _ := filesByPath.Get(path)
+		if asset, ok := existingAssets.Get(path); ok && canReuseAsset(asset, file) {
+			asset.Metadata = catalog.MetadataWithModTime(asset.Metadata, file.ModTime)
+			assets.Set(path, asset)
+			return true
+		}
 		asset, err := BuildAsset(file)
 		if err != nil {
 			buildErr = err
@@ -186,13 +230,29 @@ func buildAssets(filesByPath collectionx.Map[string, source.File], sidecars coll
 	return assets, nil
 }
 
-func buildSidecarVariants(sidecars collectionx.Map[string, sidecarFile], assets collectionx.Map[string, *catalog.Asset]) (collectionx.Map[string, *catalog.Variant], error) {
+func buildSidecarVariants(
+	sidecars collectionx.Map[string, sidecarFile],
+	assets collectionx.Map[string, *catalog.Asset],
+	existingSidecars collectionx.Map[string, *catalog.Variant],
+) (collectionx.Map[string, *catalog.Variant], error) {
 	variants := collectionx.NewMapWithCapacity[string, *catalog.Variant](sidecars.Len())
 	var buildErr error
 	sortedKeys(sidecars).Range(func(_ int, sidecarPath string) bool {
 		sidecar, _ := sidecars.Get(sidecarPath)
 		asset, ok := assets.Get(sidecar.assetPath)
 		if !ok || asset == nil {
+			return true
+		}
+		if variant, ok := existingSidecars.Get(sidecar.FullPath); ok && canReuseSidecarVariant(variant, sidecar, asset) {
+			variant.ID = asset.Path + sidecar.suffix
+			variant.AssetPath = asset.Path
+			variant.ArtifactPath = sidecar.FullPath
+			variant.Size = sidecar.Size
+			variant.Encoding = sidecar.encoding
+			variant.SourceHash = asset.SourceHash
+			variant.MediaType = asset.MediaType
+			variant.Metadata = catalog.MetadataWithModTime(variant.Metadata, sidecar.ModTime)
+			variants.Set(variant.ID, variant)
 			return true
 		}
 		variant, err := buildSidecarVariant(sidecar, asset)
@@ -207,6 +267,34 @@ func buildSidecarVariants(sidecars collectionx.Map[string, sidecarFile], assets 
 		return nil, buildErr
 	}
 	return variants, nil
+}
+
+func canReuseAsset(asset *catalog.Asset, file source.File) bool {
+	if asset == nil {
+		return false
+	}
+	modTime, ok := catalog.MetadataModTime(asset.Metadata).Get()
+	return ok &&
+		asset.Path == file.Path &&
+		asset.FullPath == file.FullPath &&
+		asset.Size == file.Size &&
+		asset.MediaType != "" &&
+		asset.SourceHash != "" &&
+		asset.ETag != "" &&
+		modTime.Equal(file.ModTime)
+}
+
+func canReuseSidecarVariant(variant *catalog.Variant, sidecar sidecarFile, asset *catalog.Asset) bool {
+	if variant == nil || asset == nil || !IsSourceSidecarVariant(variant) {
+		return false
+	}
+	modTime, ok := catalog.MetadataModTime(variant.Metadata).Get()
+	return ok &&
+		variant.ArtifactPath == sidecar.FullPath &&
+		variant.Encoding == sidecar.encoding &&
+		variant.Size == sidecar.Size &&
+		variant.ETag != "" &&
+		modTime.Equal(sidecar.ModTime)
 }
 
 func buildSidecarVariant(sidecar sidecarFile, asset *catalog.Asset) (*catalog.Variant, error) {

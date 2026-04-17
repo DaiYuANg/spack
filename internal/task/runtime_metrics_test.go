@@ -57,7 +57,19 @@ func (j fakeJob) ID() uuid.UUID {
 	return j.id
 }
 
+func (fakeJob) IsRunning() (bool, error) {
+	return false, nil
+}
+
 func (fakeJob) LastRun() (time.Time, error) {
+	return time.Time{}, nil
+}
+
+func (fakeJob) LastRunCompletedAt() (time.Time, error) {
+	return time.Time{}, nil
+}
+
+func (fakeJob) LastRunStartedAt() (time.Time, error) {
 	return time.Time{}, nil
 }
 
@@ -74,6 +86,10 @@ func (fakeJob) NextRuns(int) ([]time.Time, error) {
 }
 
 func (fakeJob) RunNow() error {
+	return nil
+}
+
+func (fakeJob) Schedule() gocron.JobSchedule {
 	return nil
 }
 

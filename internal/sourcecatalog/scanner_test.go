@@ -6,8 +6,10 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/contentcoding"
 	"github.com/daiyuang/spack/internal/source"
@@ -67,6 +69,102 @@ func TestScannerLeavesDisabledEncodingSidecarsAsAssets(t *testing.T) {
 	}
 }
 
+func TestScannerReusesUnchangedAssetFromCatalog(t *testing.T) {
+	modTime := time.Unix(1_720_000_321, 123_000_000).UTC()
+	src := fakeSource{files: []source.File{{
+		Path:     "app.js",
+		FullPath: "/missing/app.js",
+		Size:     17,
+		ModTime:  modTime,
+	}}}
+	scanner := newScannerFromSource(src, config.DefaultConfigForTest().Compression.NormalizedEncodings())
+	cat := catalog.NewInMemoryCatalog()
+	if err := cat.UpsertAsset(&catalog.Asset{
+		Path:       "app.js",
+		FullPath:   "/missing/app.js",
+		Size:       17,
+		MediaType:  "application/javascript",
+		SourceHash: "hash-app",
+		ETag:       "\"hash-app\"",
+		Metadata:   catalog.MetadataWithModTime(collectionx.NewMap[string, string](), modTime),
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	snapshot, err := scanner.ScanWithCatalog(context.Background(), cat)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	asset, ok := snapshot.Assets.Get("app.js")
+	if !ok || asset == nil {
+		t.Fatal("expected app.js asset to be reused from catalog")
+	}
+	if asset.SourceHash != "hash-app" {
+		t.Fatalf("expected reused source hash, got %q", asset.SourceHash)
+	}
+}
+
+func TestScannerReusesUnchangedSourceSidecarFromCatalog(t *testing.T) {
+	modTime := time.Unix(1_720_000_322, 456_000_000).UTC()
+	src := fakeSource{files: []source.File{
+		{
+			Path:     "app.js",
+			FullPath: "/missing/app.js",
+			Size:     17,
+			ModTime:  modTime,
+		},
+		{
+			Path:     "app.js.br",
+			FullPath: "/missing/app.js.br",
+			Size:     10,
+			ModTime:  modTime,
+		},
+	}}
+	scanner := newScannerFromSource(src, config.DefaultConfigForTest().Compression.NormalizedEncodings())
+	cat := catalog.NewInMemoryCatalog()
+	if err := cat.UpsertAsset(&catalog.Asset{
+		Path:       "app.js",
+		FullPath:   "/missing/app.js",
+		Size:       17,
+		MediaType:  "application/javascript",
+		SourceHash: "hash-app",
+		ETag:       "\"hash-app\"",
+		Metadata:   catalog.MetadataWithModTime(collectionx.NewMap[string, string](), modTime),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := cat.UpsertVariant(&catalog.Variant{
+		ID:           "app.js.br",
+		AssetPath:    "app.js",
+		ArtifactPath: "/missing/app.js.br",
+		Size:         10,
+		MediaType:    "application/javascript",
+		SourceHash:   "hash-app",
+		ETag:         "\"hash-sidecar\"",
+		Encoding:     "br",
+		Metadata: catalog.MetadataWithModTime(collectionx.NewMapFrom(map[string]string{
+			"stage":  sourcecatalog.SourceSidecarStage,
+			"source": "app.js.br",
+		}), modTime),
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	snapshot, err := scanner.ScanWithCatalog(context.Background(), cat)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	variant, ok := snapshot.Variants.Get("app.js.br")
+	if !ok || variant == nil {
+		t.Fatal("expected app.js.br sidecar variant to be reused from catalog")
+	}
+	if variant.ETag != "\"hash-sidecar\"" {
+		t.Fatalf("expected reused sidecar etag, got %q", variant.ETag)
+	}
+}
+
 func newScannerForTest(t *testing.T, root string, encodings collectionx.List[string]) sourcecatalog.Scanner {
 	t.Helper()
 
@@ -75,12 +173,29 @@ func newScannerForTest(t *testing.T, root string, encodings collectionx.List[str
 		t.Fatal(err)
 	}
 
+	return newScannerFromSource(src, encodings)
+}
+
+func newScannerFromSource(src source.Source, encodings collectionx.List[string]) sourcecatalog.Scanner {
 	cfg := config.DefaultConfigForTest()
 	return sourcecatalog.NewScanner(src, contentcoding.NewRegistry(contentcoding.Options{
 		BrotliQuality: cfg.Compression.BrotliQuality,
 		GzipLevel:     cfg.Compression.GzipLevel,
 		ZstdLevel:     cfg.Compression.ZstdLevel,
 	}, encodings))
+}
+
+type fakeSource struct {
+	files []source.File
+}
+
+func (s fakeSource) Walk(walkFn func(source.File) error) error {
+	for _, file := range s.files {
+		if err := walkFn(file); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func writeSourceFile(t *testing.T, path string, body []byte) {

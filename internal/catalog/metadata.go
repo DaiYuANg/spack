@@ -12,6 +12,7 @@ import (
 )
 
 const MetadataModTimeUnixKey = "mtime_unix"
+const MetadataModTimeUnixNanoKey = "mtime_unix_nano"
 const MetadataLastModifiedHTTPKey = "last_modified_http"
 
 func CloneMetadata(metadata collectionx.Map[string, string]) collectionx.Map[string, string] {
@@ -24,6 +25,14 @@ func CloneMetadata(metadata collectionx.Map[string, string]) collectionx.Map[str
 func MetadataModTime(metadata collectionx.Map[string, string]) mo.Option[time.Time] {
 	if metadata == nil {
 		return mo.None[time.Time]()
+	}
+
+	rawNanos, hasNanos := metadata.Get(MetadataModTimeUnixNanoKey)
+	if hasNanos {
+		nanos, err := strconv.ParseInt(strings.TrimSpace(rawNanos), 10, 64)
+		if err == nil && nanos > 0 {
+			return mo.Some(time.Unix(0, nanos))
+		}
 	}
 
 	raw, ok := metadata.Get(MetadataModTimeUnixKey)
@@ -103,5 +112,6 @@ func setMetadataModTime(metadata collectionx.Map[string, string], modTime time.T
 
 	utc := modTime.UTC()
 	metadata.Set(MetadataModTimeUnixKey, strconv.FormatInt(utc.Unix(), 10))
+	metadata.Set(MetadataModTimeUnixNanoKey, strconv.FormatInt(utc.UnixNano(), 10))
 	metadata.Set(MetadataLastModifiedHTTPKey, utc.Format(http.TimeFormat))
 }

@@ -107,16 +107,13 @@ func collectWarmAssets(cfg *config.Config, cat catalog.Catalog) collectionx.List
 		assetPaths.Add(staticRobotsAssetPath)
 	}
 
-	assets := collectionx.NewList[*catalog.Asset]()
-	for _, assetPath := range assetPaths.Values() {
+	return collectionx.FilterMapList(collectionx.NewList(assetPaths.Values()...), func(_ int, assetPath string) (*catalog.Asset, bool) {
 		if strings.TrimSpace(assetPath) == "" {
-			continue
+			return nil, false
 		}
-		if asset, ok := cat.FindAsset(assetPath); ok && asset != nil {
-			assets.Add(asset)
-		}
-	}
-	return assets
+		asset, ok := cat.FindAsset(assetPath)
+		return asset, ok && asset != nil
+	})
 }
 
 func buildHotsetCatalog(
