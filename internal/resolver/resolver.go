@@ -225,30 +225,22 @@ func (r *Resolver) findPrimaryAsset(requestPath requestpath.Cleaned) (*catalog.A
 }
 
 func (r *Resolver) pickVariant(asset *catalog.Asset, encodings collectionx.List[string]) *catalog.Variant {
-	variants := listVariantsForRead(r.catalog, asset.Path)
 	usable := newVariantUsabilityCache()
 
 	var picked *catalog.Variant
 	encodings.Range(func(_ int, encoding string) bool {
-		variants.Range(func(_ int, variant *catalog.Variant) bool {
-			if variant.Encoding != encoding || !usable.IsUsable(variant, asset.SourceHash) {
-				return true
-			}
-			picked = variant
-			return false
-		})
-		return picked == nil
+		variant, ok := findEncodingVariantForRead(r.catalog, asset.Path, encoding)
+		if !ok || !usable.IsUsable(variant, asset.SourceHash) {
+			return true
+		}
+		picked = variant
+		return false
 	})
 	return picked
 }
 
 func (r *Resolver) pickImageVariant(asset *catalog.Asset, width int, formats collectionx.List[string]) *catalog.Variant {
 	sourceFormat := media.ImageFormat(asset.MediaType)
-	variants := listVariantsForRead(r.catalog, asset.Path)
-	if variants.IsEmpty() {
-		return nil
-	}
-
 	if formats.IsEmpty() {
 		formats = collectionx.NewList(sourceFormat)
 	}
@@ -256,6 +248,18 @@ func (r *Resolver) pickImageVariant(asset *catalog.Asset, width int, formats col
 	usable := newVariantUsabilityCache()
 	var picked *catalog.Variant
 	formats.Range(func(_ int, format string) bool {
+		if width <= 0 {
+			variant, ok := findImageVariantForRead(r.catalog, asset.Path, format, 0)
+			if ok && matchesImageVariant(variant, usable, asset.SourceHash, format, sourceFormat) {
+				picked = variant
+				return false
+			}
+			return true
+		}
+		variants := listImageVariantsForRead(r.catalog, asset.Path, format)
+		if variants.IsEmpty() {
+			return true
+		}
 		picked = pickImageVariantForFormat(variants, usable, asset.SourceHash, format, sourceFormat, width)
 		return picked == nil
 	})

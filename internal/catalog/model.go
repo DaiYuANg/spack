@@ -1,9 +1,8 @@
 package catalog
 
 import (
-	"sync"
-
 	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/hashicorp/go-memdb"
 )
 
 type Asset struct {
@@ -60,21 +59,16 @@ type Catalog interface {
 	DeleteVariants(assetPath string) collectionx.List[*Variant]
 	DeleteVariantByArtifactPath(artifactPath string) bool
 	FindAsset(assetPath string) (*Asset, bool)
+	FindEncodingVariant(assetPath, encoding string) (*Variant, bool)
+	FindImageVariant(assetPath, format string, width int) (*Variant, bool)
 	ListVariants(assetPath string) collectionx.List[*Variant]
+	ListImageVariants(assetPath, format string) collectionx.List[*Variant]
 	AllAssets() collectionx.List[*Asset]
 	AssetCount() int
 	VariantCount() int
 	Snapshot() *Snapshot
 }
 
-type variantRef struct {
-	assetPath string
-	id        string
-}
-
 type InMemoryCatalog struct {
-	mu            sync.RWMutex
-	assets        collectionx.Map[string, *Asset]
-	variants      collectionx.Table[string, string, *Variant]
-	artifactIndex collectionx.Map[string, variantRef]
+	db *memdb.MemDB
 }

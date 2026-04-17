@@ -74,10 +74,9 @@ func (s *imageStage) planTasks(asset *catalog.Asset, formats collectionx.List[st
 	if formats == nil || widths == nil {
 		return nil
 	}
-	existing := s.catalog.ListVariants(asset.Path)
 	return collectionx.NewList(lo.FlatMap(formats.Values(), func(format string, _ int) []Task {
 		return lo.FilterMap(widths.Values(), func(width int, _ int) (Task, bool) {
-			if !shouldCreateImageTask(asset, existing, width, format) {
+			if !shouldCreateImageTask(asset, s.catalog, width, format) {
 				return Task{}, false
 			}
 			return Task{
@@ -89,14 +88,18 @@ func (s *imageStage) planTasks(asset *catalog.Asset, formats collectionx.List[st
 	})...)
 }
 
-func shouldCreateImageTask(asset *catalog.Asset, variants collectionx.List[*catalog.Variant], width int, format string) bool {
+func shouldCreateImageTask(asset *catalog.Asset, cat catalog.Catalog, width int, format string) bool {
 	if width < 0 {
 		return false
 	}
 	if width == 0 && format == media.ImageFormat(asset.MediaType) {
 		return false
 	}
-	return !hasImageVariant(variants, asset.SourceHash, width, format)
+	variant, ok := cat.FindImageVariant(asset.Path, format, width)
+	if !ok {
+		return true
+	}
+	return !hasImageVariant(variant, asset.SourceHash, width, format)
 }
 
 func resolveTargetFormat(task Task, asset *catalog.Asset) (string, error) {
@@ -120,11 +123,8 @@ func shouldSkipImageArtifact(asset *catalog.Asset, srcWidth, outputWidth int, me
 	return outputWidth == srcWidth && mediaType == asset.MediaType && int64(payloadSize) >= asset.Size
 }
 
-func hasImageVariant(variants collectionx.List[*catalog.Variant], sourceHash string, width int, format string) bool {
-	_, ok := variants.FirstWhere(func(_ int, variant *catalog.Variant) bool {
-		return isMatchingImageVariant(variant, sourceHash, width, format)
-	}).Get()
-	return ok
+func hasImageVariant(variant *catalog.Variant, sourceHash string, width int, format string) bool {
+	return isMatchingImageVariant(variant, sourceHash, width, format)
 }
 
 func isMatchingImageVariant(variant *catalog.Variant, sourceHash string, width int, format string) bool {

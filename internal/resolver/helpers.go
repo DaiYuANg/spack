@@ -11,8 +11,13 @@ import (
 
 var supportedImageFormats = media.SupportedImageFormats()
 
-type variantViewCatalog interface {
-	ListVariantsView(assetPath string) collectionx.List[*catalog.Variant]
+type encodingVariantViewCatalog interface {
+	FindEncodingVariantView(assetPath, encoding string) (*catalog.Variant, bool)
+}
+
+type imageVariantViewCatalog interface {
+	FindImageVariantView(assetPath, format string, width int) (*catalog.Variant, bool)
+	ListImageVariantsView(assetPath, format string) collectionx.List[*catalog.Variant]
 }
 
 type assetViewCatalog interface {
@@ -26,11 +31,25 @@ func findAssetForRead(cat catalog.Catalog, assetPath string) (*catalog.Asset, bo
 	return cat.FindAsset(assetPath)
 }
 
-func listVariantsForRead(cat catalog.Catalog, assetPath string) collectionx.List[*catalog.Variant] {
-	if fastCat, ok := cat.(variantViewCatalog); ok {
-		return fastCat.ListVariantsView(assetPath)
+func findEncodingVariantForRead(cat catalog.Catalog, assetPath, encoding string) (*catalog.Variant, bool) {
+	if fastCat, ok := cat.(encodingVariantViewCatalog); ok {
+		return fastCat.FindEncodingVariantView(assetPath, encoding)
 	}
-	return cat.ListVariants(assetPath)
+	return cat.FindEncodingVariant(assetPath, encoding)
+}
+
+func findImageVariantForRead(cat catalog.Catalog, assetPath, format string, width int) (*catalog.Variant, bool) {
+	if fastCat, ok := cat.(imageVariantViewCatalog); ok {
+		return fastCat.FindImageVariantView(assetPath, format, width)
+	}
+	return cat.FindImageVariant(assetPath, format, width)
+}
+
+func listImageVariantsForRead(cat catalog.Catalog, assetPath, format string) collectionx.List[*catalog.Variant] {
+	if fastCat, ok := cat.(imageVariantViewCatalog); ok {
+		return fastCat.ListImageVariantsView(assetPath, format)
+	}
+	return cat.ListImageVariants(assetPath, format)
 }
 
 type variantUsabilityCache map[string]bool

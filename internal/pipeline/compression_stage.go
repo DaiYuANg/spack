@@ -54,9 +54,9 @@ func (s *compressionStage) Plan(asset *catalog.Asset, request Request) collectio
 		encodings = supportedEncodings
 	}
 
-	existing := s.catalog.ListVariants(asset.Path)
 	return collectionx.NewList(lo.FilterMap(encodings.Values(), func(encoding string, _ int) (Task, bool) {
-		if hasEncodingVariant(existing, asset.SourceHash, encoding) {
+		variant, ok := s.catalog.FindEncodingVariant(asset.Path, encoding)
+		if ok && hasEncodingVariant(variant, asset.SourceHash, encoding) {
 			return Task{}, false
 		}
 		return Task{
@@ -123,25 +123,18 @@ func (s *compressionStage) compress(raw []byte, encoding string) ([]byte, string
 	return compressed, strategy.Suffix(), nil
 }
 
-func hasEncodingVariant(variants collectionx.List[*catalog.Variant], sourceHash, encoding string) bool {
-	found := false
-	variants.Range(func(_ int, variant *catalog.Variant) bool {
-		if variant.Encoding != encoding {
-			return true
-		}
-		if sourceHash != "" && variant.SourceHash != "" && variant.SourceHash != sourceHash {
-			return true
-		}
-		if variant.ArtifactPath == "" {
-			return true
-		}
-		if _, err := os.Stat(variant.ArtifactPath); err != nil {
-			return true
-		}
-		found = true
+func hasEncodingVariant(variant *catalog.Variant, sourceHash, encoding string) bool {
+	if variant == nil || variant.Encoding != encoding {
 		return false
-	})
-	return found
+	}
+	if sourceHash != "" && variant.SourceHash != "" && variant.SourceHash != sourceHash {
+		return false
+	}
+	if variant.ArtifactPath == "" {
+		return false
+	}
+	_, err := os.Stat(variant.ArtifactPath)
+	return err == nil
 }
 
 func isCompressible(asset *catalog.Asset) bool {

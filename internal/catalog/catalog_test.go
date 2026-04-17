@@ -292,3 +292,74 @@ func TestListVariantsReturnsClonedMetadata(t *testing.T) {
 		t.Fatalf("expected stored metadata to stay unchanged, got %q", got)
 	}
 }
+
+func TestFindEncodingVariantUsesAssetEncodingIndex(t *testing.T) {
+	cat := catalog.NewInMemoryCatalog()
+
+	if err := cat.UpsertAsset(&catalog.Asset{
+		Path:       "app.js",
+		FullPath:   "/assets/app.js",
+		MediaType:  "application/javascript",
+		SourceHash: "hash-1",
+		ETag:       "\"hash-1\"",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := cat.UpsertVariant(&catalog.Variant{
+		ID:           "custom-br-id",
+		AssetPath:    "app.js",
+		ArtifactPath: "/artifacts/app.js.br",
+		MediaType:    "application/javascript",
+		SourceHash:   "hash-1",
+		ETag:         "\"hash-1-br\"",
+		Encoding:     "br",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	variant, ok := cat.FindEncodingVariant("app.js", "br")
+	if !ok {
+		t.Fatal("expected encoding variant to be present")
+	}
+	if variant.ID != "custom-br-id" {
+		t.Fatalf("expected indexed variant id custom-br-id, got %q", variant.ID)
+	}
+}
+
+func TestFindImageVariantFallsBackToMediaTypeWhenFormatEmpty(t *testing.T) {
+	cat := catalog.NewInMemoryCatalog()
+
+	if err := cat.UpsertAsset(&catalog.Asset{
+		Path:       "hero.jpg",
+		FullPath:   "/assets/hero.jpg",
+		MediaType:  "image/jpeg",
+		SourceHash: "hash-1",
+		ETag:       "\"hash-1\"",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := cat.UpsertVariant(&catalog.Variant{
+		ID:           "hero.jpg|width=640",
+		AssetPath:    "hero.jpg",
+		ArtifactPath: "/artifacts/hero.w640.jpg",
+		MediaType:    "image/jpeg",
+		SourceHash:   "hash-1",
+		ETag:         "\"hash-1-w640\"",
+		Width:        640,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	variant, ok := cat.FindImageVariant("hero.jpg", "jpeg", 640)
+	if !ok {
+		t.Fatal("expected image variant lookup to use media type fallback")
+	}
+	if variant.Width != 640 {
+		t.Fatalf("expected width 640 variant, got %#v", variant)
+	}
+
+	variants := cat.ListImageVariants("hero.jpg", "jpeg")
+	if variants.Len() != 1 {
+		t.Fatalf("expected image variant list to be filtered by derived format, got %#v", variants.Values())
+	}
+}

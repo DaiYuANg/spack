@@ -2,148 +2,322 @@
 package catalog
 
 import (
-	"cmp"
 	"errors"
 	"strconv"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/samber/lo"
+	"github.com/daiyuang/spack/internal/media"
+	"github.com/hashicorp/go-memdb"
+)
+
+const (
+	catalogAssetsTable                  = "assets"
+	catalogVariantsTable                = "variants"
+	catalogVariantArtifactPathIndex     = "artifact_path"
+	catalogVariantAssetEncodingIndex    = "asset_path_encoding"
+	catalogVariantAssetFormatWidthIndex = "asset_path_format_width"
 )
 
 var ErrAssetNotFound = errors.New("asset not found")
 
+type assetRecord struct {
+	Path  string
+	Asset *Asset
+}
+
+type variantRecord struct {
+	AssetPath    string
+	ID           string
+	ArtifactPath string
+	Encoding     string
+	ImageFormat  string
+	Width        int
+	Variant      *Variant
+}
+
+func NewCatalog() Catalog {
+	return NewInMemoryCatalog()
+}
+
 func NewInMemoryCatalog() *InMemoryCatalog {
-	return &InMemoryCatalog{
-		assets:        collectionx.NewMap[string, *Asset](),
-		variants:      collectionx.NewTable[string, string, *Variant](),
-		artifactIndex: collectionx.NewMap[string, variantRef](),
+	db, err := memdb.NewMemDB(newCatalogSchema())
+	if err != nil {
+		panic(err)
+	}
+	return &InMemoryCatalog{db: db}
+}
+
+func newCatalogSchema() *memdb.DBSchema {
+	return &memdb.DBSchema{
+		Tables: map[string]*memdb.TableSchema{
+			catalogAssetsTable: {
+				Name: catalogAssetsTable,
+				Indexes: map[string]*memdb.IndexSchema{
+					"id": {
+						Name:   "id",
+						Unique: true,
+						Indexer: &memdb.StringFieldIndex{
+							Field: "Path",
+						},
+					},
+				},
+			},
+			catalogVariantsTable: {
+				Name: catalogVariantsTable,
+				Indexes: map[string]*memdb.IndexSchema{
+					"id": {
+						Name:   "id",
+						Unique: true,
+						Indexer: &memdb.CompoundIndex{
+							Indexes: []memdb.Indexer{
+								&memdb.StringFieldIndex{Field: "AssetPath"},
+								&memdb.StringFieldIndex{Field: "ID"},
+							},
+						},
+					},
+					catalogVariantArtifactPathIndex: {
+						Name:         catalogVariantArtifactPathIndex,
+						Unique:       true,
+						AllowMissing: true,
+						Indexer: &memdb.StringFieldIndex{
+							Field: "ArtifactPath",
+						},
+					},
+					catalogVariantAssetEncodingIndex: {
+						Name:         catalogVariantAssetEncodingIndex,
+						Unique:       true,
+						AllowMissing: true,
+						Indexer: &memdb.CompoundIndex{
+							Indexes: []memdb.Indexer{
+								&memdb.StringFieldIndex{Field: "AssetPath"},
+								&memdb.StringFieldIndex{Field: "Encoding"},
+							},
+						},
+					},
+					catalogVariantAssetFormatWidthIndex: {
+						Name:         catalogVariantAssetFormatWidthIndex,
+						Unique:       true,
+						AllowMissing: true,
+						Indexer: &memdb.CompoundIndex{
+							Indexes: []memdb.Indexer{
+								&memdb.StringFieldIndex{Field: "AssetPath"},
+								&memdb.StringFieldIndex{Field: "ImageFormat"},
+								&memdb.IntFieldIndex{Field: "Width"},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
 func (c *InMemoryCatalog) UpsertAsset(asset *Asset) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	record := newAssetRecord(asset)
 
-	c.assets.Set(asset.Path, prepareAsset(asset))
+	txn := c.db.Txn(true)
+	defer txn.Abort()
+
+	if err := txn.Insert(catalogAssetsTable, record); err != nil {
+		return err
+	}
+	txn.Commit()
 	return nil
 }
 
 func (c *InMemoryCatalog) UpsertVariant(variant *Variant) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if _, ok := c.assets.Get(variant.AssetPath); !ok {
-		return ErrAssetNotFound
-	}
-
 	id := variant.ID
 	if id == "" {
 		id = defaultVariantID(variant)
 	}
 
-	cloned := prepareVariant(variant)
-	cloned.ID = id
-	c.removeStaleVariantIndex(variant.AssetPath, id)
-	c.removeConflictingArtifactIndex(cloned.ArtifactPath, variant.AssetPath, id)
-	c.variants.Put(variant.AssetPath, id, cloned)
-	c.indexArtifactPath(cloned.ArtifactPath, variant.AssetPath, id)
+	record := newVariantRecord(variant, id)
+	txn := c.db.Txn(true)
+	defer txn.Abort()
+
+	if !assetExists(txn, record.AssetPath) {
+		return ErrAssetNotFound
+	}
+
+	pendingDeletes := make(map[string]*variantRecord, 4)
+	collectVariantDelete(txn, pendingDeletes, "id", record.AssetPath, record.ID)
+	if record.ArtifactPath != "" {
+		collectVariantDelete(txn, pendingDeletes, catalogVariantArtifactPathIndex, record.ArtifactPath)
+	}
+	if record.Encoding != "" {
+		collectVariantDelete(txn, pendingDeletes, catalogVariantAssetEncodingIndex, record.AssetPath, record.Encoding)
+	}
+	if record.ImageFormat != "" {
+		collectVariantDelete(txn, pendingDeletes, catalogVariantAssetFormatWidthIndex, record.AssetPath, record.ImageFormat, record.Width)
+	}
+
+	for _, existing := range pendingDeletes {
+		if err := txn.Delete(catalogVariantsTable, existing); err != nil && !errors.Is(err, memdb.ErrNotFound) {
+			return err
+		}
+	}
+	if err := txn.Insert(catalogVariantsTable, record); err != nil {
+		return err
+	}
+	txn.Commit()
 	return nil
 }
 
 func (c *InMemoryCatalog) FindAsset(assetPath string) (*Asset, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	asset, ok := c.assets.Get(assetPath)
+	asset, ok := c.FindAssetView(assetPath)
 	return cloneAsset(asset), ok
 }
 
 func (c *InMemoryCatalog) FindAssetView(assetPath string) (*Asset, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	txn := c.db.Txn(false)
+	defer txn.Abort()
 
-	return c.assets.Get(assetPath)
+	record, ok := findAssetRecord(txn, assetPath)
+	if !ok {
+		return nil, false
+	}
+	return record.Asset, true
+}
+
+func (c *InMemoryCatalog) FindEncodingVariant(assetPath, encoding string) (*Variant, bool) {
+	variant, ok := c.FindEncodingVariantView(assetPath, encoding)
+	return cloneVariant(variant), ok
+}
+
+func (c *InMemoryCatalog) FindEncodingVariantView(assetPath, encoding string) (*Variant, bool) {
+	txn := c.db.Txn(false)
+	defer txn.Abort()
+
+	record, ok := findVariantRecord(txn, catalogVariantAssetEncodingIndex, assetPath, encoding)
+	if !ok {
+		return nil, false
+	}
+	return record.Variant, true
+}
+
+func (c *InMemoryCatalog) FindImageVariant(assetPath, format string, width int) (*Variant, bool) {
+	variant, ok := c.FindImageVariantView(assetPath, format, width)
+	return cloneVariant(variant), ok
+}
+
+func (c *InMemoryCatalog) FindImageVariantView(assetPath, format string, width int) (*Variant, bool) {
+	txn := c.db.Txn(false)
+	defer txn.Abort()
+
+	record, ok := findVariantRecord(txn, catalogVariantAssetFormatWidthIndex, assetPath, format, width)
+	if !ok {
+		return nil, false
+	}
+	return record.Variant, true
 }
 
 func (c *InMemoryCatalog) DeleteAsset(assetPath string) collectionx.List[*Variant] {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	txn := c.db.Txn(true)
+	defer txn.Abort()
 
-	c.assets.Delete(assetPath)
-	return c.deleteVariantsLocked(assetPath)
+	record, ok := findAssetRecord(txn, assetPath)
+	if ok {
+		if err := txn.Delete(catalogAssetsTable, record); err != nil && !errors.Is(err, memdb.ErrNotFound) {
+			panic(err)
+		}
+	}
+
+	removed := deleteVariantsByAssetPath(txn, assetPath)
+	txn.Commit()
+	return removed
 }
 
 func (c *InMemoryCatalog) DeleteVariants(assetPath string) collectionx.List[*Variant] {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	txn := c.db.Txn(true)
+	defer txn.Abort()
 
-	return c.deleteVariantsLocked(assetPath)
+	removed := deleteVariantsByAssetPath(txn, assetPath)
+	txn.Commit()
+	return removed
 }
 
 func (c *InMemoryCatalog) DeleteVariantByArtifactPath(artifactPath string) bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	txn := c.db.Txn(true)
+	defer txn.Abort()
 
-	ref, ok := c.artifactIndex.Get(artifactPath)
+	record, ok := findVariantRecord(txn, catalogVariantArtifactPathIndex, artifactPath)
 	if !ok {
 		return false
 	}
-
-	c.artifactIndex.Delete(artifactPath)
-	return c.variants.Delete(ref.assetPath, ref.id)
+	if err := txn.Delete(catalogVariantsTable, record); err != nil {
+		if errors.Is(err, memdb.ErrNotFound) {
+			return false
+		}
+		panic(err)
+	}
+	txn.Commit()
+	return true
 }
 
 func (c *InMemoryCatalog) ListVariants(assetPath string) collectionx.List[*Variant] {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	return cloneVariantList(c.variants.Row(assetPath))
+	return cloneVariants(c.ListVariantsView(assetPath))
 }
 
 func (c *InMemoryCatalog) ListVariantsView(assetPath string) collectionx.List[*Variant] {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	txn := c.db.Txn(false)
+	defer txn.Abort()
 
-	return sortedVariantList(c.variants.Row(assetPath))
+	return variantViews(txn, "id_prefix", assetPath)
+}
+
+func (c *InMemoryCatalog) ListImageVariants(assetPath, format string) collectionx.List[*Variant] {
+	return cloneVariants(c.ListImageVariantsView(assetPath, format))
+}
+
+func (c *InMemoryCatalog) ListImageVariantsView(assetPath, format string) collectionx.List[*Variant] {
+	txn := c.db.Txn(false)
+	defer txn.Abort()
+
+	return variantViews(txn, catalogVariantAssetFormatWidthIndex+"_prefix", assetPath, format)
 }
 
 func (c *InMemoryCatalog) AllAssets() collectionx.List[*Asset] {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	txn := c.db.Txn(false)
+	defer txn.Abort()
 
-	out := collectionx.MapList(collectionx.NewList(c.assets.Values()...), func(_ int, asset *Asset) *Asset {
-		return cloneAsset(asset)
-	})
-	out.Sort(func(left, right *Asset) int {
-		return cmp.Compare(left.Path, right.Path)
-	})
+	iter, err := txn.Get(catalogAssetsTable, "id")
+	if err != nil {
+		panic(err)
+	}
+
+	out := collectionx.NewList[*Asset]()
+	for raw := iter.Next(); raw != nil; raw = iter.Next() {
+		out.Add(cloneAsset(raw.(*assetRecord).Asset))
+	}
 	return out
 }
 
 func (c *InMemoryCatalog) AssetCount() int {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	return c.assets.Len()
+	return countRecords(c.db.Txn(false), catalogAssetsTable)
 }
 
 func (c *InMemoryCatalog) VariantCount() int {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	return c.variants.Len()
+	return countRecords(c.db.Txn(false), catalogVariantsTable)
 }
 
 func (c *InMemoryCatalog) Snapshot() *Snapshot {
-	assets := c.AllAssets()
-	return &Snapshot{
-		Assets: collectionx.MapList(assets, func(_ int, asset *Asset) *Entry {
-			return &Entry{
-				Asset:    asset,
-				Variants: c.ListVariants(asset.Path),
-			}
-		}),
+	txn := c.db.Txn(false)
+	defer txn.Abort()
+
+	assets, err := txn.Get(catalogAssetsTable, "id")
+	if err != nil {
+		panic(err)
 	}
+
+	entries := collectionx.NewList[*Entry]()
+	for raw := assets.Next(); raw != nil; raw = assets.Next() {
+		record := raw.(*assetRecord)
+		entries.Add(&Entry{
+			Asset:    cloneAsset(record.Asset),
+			Variants: cloneVariants(variantViews(txn, "id_prefix", record.Path)),
+		})
+	}
+	return &Snapshot{Assets: entries}
 }
 
 func cloneAsset(asset *Asset) *Asset {
@@ -166,6 +340,12 @@ func cloneVariant(variant *Variant) *Variant {
 	return &cloned
 }
 
+func cloneVariants(variants collectionx.List[*Variant]) collectionx.List[*Variant] {
+	return collectionx.MapList(variants, func(_ int, variant *Variant) *Variant {
+		return cloneVariant(variant)
+	})
+}
+
 func prepareAsset(asset *Asset) *Asset {
 	cloned := cloneAsset(asset)
 	if cloned == nil {
@@ -184,68 +364,36 @@ func prepareVariant(variant *Variant) *Variant {
 	return cloned
 }
 
-func (c *InMemoryCatalog) removeStaleVariantIndex(assetPath, id string) {
-	existing, ok := c.variants.Get(assetPath, id)
-	if !ok || existing == nil {
-		return
+func newAssetRecord(asset *Asset) *assetRecord {
+	prepared := prepareAsset(asset)
+	return &assetRecord{
+		Path:  prepared.Path,
+		Asset: prepared,
 	}
-	c.artifactIndex.Delete(existing.ArtifactPath)
 }
 
-func (c *InMemoryCatalog) removeConflictingArtifactIndex(artifactPath, assetPath, id string) {
-	if artifactPath == "" {
-		return
+func newVariantRecord(variant *Variant, id string) *variantRecord {
+	prepared := prepareVariant(variant)
+	prepared.ID = id
+	return &variantRecord{
+		AssetPath:    prepared.AssetPath,
+		ID:           prepared.ID,
+		ArtifactPath: prepared.ArtifactPath,
+		Encoding:     prepared.Encoding,
+		ImageFormat:  imageFormatKey(prepared),
+		Width:        prepared.Width,
+		Variant:      prepared,
 	}
-
-	ref, ok := c.artifactIndex.Get(artifactPath)
-	if !ok || (ref.assetPath == assetPath && ref.id == id) {
-		return
-	}
-
-	c.variants.Delete(ref.assetPath, ref.id)
 }
 
-func (c *InMemoryCatalog) indexArtifactPath(artifactPath, assetPath, id string) {
-	if artifactPath == "" {
-		return
+func imageFormatKey(variant *Variant) string {
+	if variant == nil {
+		return ""
 	}
-	c.artifactIndex.Set(artifactPath, variantRef{assetPath: assetPath, id: id})
-}
-
-func (c *InMemoryCatalog) deleteVariantsLocked(assetPath string) collectionx.List[*Variant] {
-	byAsset := c.variants.Row(assetPath)
-	if len(byAsset) == 0 {
-		c.variants.DeleteRow(assetPath)
-		return collectionx.NewList[*Variant]()
+	if variant.Format != "" {
+		return variant.Format
 	}
-
-	out := cloneVariantList(byAsset)
-
-	out.Range(func(_ int, variant *Variant) bool {
-		c.artifactIndex.Delete(variant.ArtifactPath)
-		return true
-	})
-	c.variants.DeleteRow(assetPath)
-	return out
-}
-
-func cloneVariantList(byAsset map[string]*Variant) collectionx.List[*Variant] {
-	out := sortedVariantList(byAsset)
-	return collectionx.MapList(out, func(_ int, variant *Variant) *Variant {
-		return cloneVariant(variant)
-	})
-}
-
-func sortedVariantList(byAsset map[string]*Variant) collectionx.List[*Variant] {
-	if len(byAsset) == 0 {
-		return collectionx.NewList[*Variant]()
-	}
-
-	out := collectionx.NewList(lo.Values(byAsset)...)
-	out.Sort(func(left, right *Variant) int {
-		return cmp.Compare(left.ID, right.ID)
-	})
-	return out
+	return media.ImageFormat(variant.MediaType)
 }
 
 func defaultVariantID(variant *Variant) string {
@@ -260,4 +408,93 @@ func defaultVariantID(variant *Variant) string {
 		id += "|width=" + strconv.Itoa(variant.Width)
 	}
 	return id
+}
+
+func assetExists(txn *memdb.Txn, assetPath string) bool {
+	_, ok := findAssetRecord(txn, assetPath)
+	return ok
+}
+
+func findAssetRecord(txn *memdb.Txn, assetPath string) (*assetRecord, bool) {
+	raw, err := txn.First(catalogAssetsTable, "id", assetPath)
+	if err != nil || raw == nil {
+		return nil, false
+	}
+	return raw.(*assetRecord), true
+}
+
+func findVariantRecord(txn *memdb.Txn, index string, args ...interface{}) (*variantRecord, bool) {
+	raw, err := txn.First(catalogVariantsTable, index, args...)
+	if err != nil || raw == nil {
+		return nil, false
+	}
+	return raw.(*variantRecord), true
+}
+
+func collectVariantDelete(txn *memdb.Txn, pending map[string]*variantRecord, index string, args ...interface{}) {
+	record, ok := findVariantRecord(txn, index, args...)
+	if !ok {
+		return
+	}
+	pending[variantRecordKey(record)] = record
+}
+
+func variantRecordKey(record *variantRecord) string {
+	if record == nil {
+		return ""
+	}
+	return record.AssetPath + "\x00" + record.ID
+}
+
+func deleteVariantsByAssetPath(txn *memdb.Txn, assetPath string) collectionx.List[*Variant] {
+	records := variantRecords(txn, "id_prefix", assetPath)
+	removed := cloneVariantRecords(records)
+	records.Range(func(_ int, record *variantRecord) bool {
+		if err := txn.Delete(catalogVariantsTable, record); err != nil && !errors.Is(err, memdb.ErrNotFound) {
+			panic(err)
+		}
+		return true
+	})
+	return removed
+}
+
+func countRecords(txn *memdb.Txn, table string) int {
+	defer txn.Abort()
+
+	iter, err := txn.Get(table, "id")
+	if err != nil {
+		panic(err)
+	}
+
+	total := 0
+	for raw := iter.Next(); raw != nil; raw = iter.Next() {
+		total++
+	}
+	return total
+}
+
+func variantViews(txn *memdb.Txn, index string, args ...interface{}) collectionx.List[*Variant] {
+	records := variantRecords(txn, index, args...)
+	return collectionx.MapList(records, func(_ int, record *variantRecord) *Variant {
+		return record.Variant
+	})
+}
+
+func variantRecords(txn *memdb.Txn, index string, args ...interface{}) collectionx.List[*variantRecord] {
+	iter, err := txn.Get(catalogVariantsTable, index, args...)
+	if err != nil {
+		panic(err)
+	}
+
+	out := collectionx.NewList[*variantRecord]()
+	for raw := iter.Next(); raw != nil; raw = iter.Next() {
+		out.Add(raw.(*variantRecord))
+	}
+	return out
+}
+
+func cloneVariantRecords(records collectionx.List[*variantRecord]) collectionx.List[*Variant] {
+	return collectionx.MapList(records, func(_ int, record *variantRecord) *Variant {
+		return cloneVariant(record.Variant)
+	})
 }
