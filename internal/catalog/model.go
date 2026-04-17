@@ -5,6 +5,21 @@ import (
 	"github.com/hashicorp/go-memdb"
 )
 
+type assetRecord struct {
+	Path  string
+	Asset *Asset
+}
+
+type variantRecord struct {
+	AssetPath    string
+	ID           string
+	ArtifactPath string
+	Encoding     string
+	ImageFormat  string
+	Width        int
+	Variant      *Variant
+}
+
 type Asset struct {
 	Path       string                          `json:"path"`
 	FullPath   string                          `json:"full_path"`
