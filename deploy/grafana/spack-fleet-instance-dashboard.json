@@ -15,6 +15,12 @@
     },
     {
       "type": "panel",
+      "id": "row",
+      "name": "Row",
+      "version": ""
+    },
+    {
+      "type": "panel",
       "id": "stat",
       "name": "Stat",
       "version": ""
@@ -57,23 +63,30 @@
   "panels": [
     {
       "id": 1,
+      "type": "row",
+      "title": "Stable - Fleet Metadata",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
       "type": "stat",
       "title": "Selected Instances",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 0,
-        "y": 0
-      },
       "targets": [
         {
           "expr": "count(count by (instance) (spack_build_info{instance=~\"$instance\"}))",
           "legendFormat": "value",
-          "refId": "A"
+          "refId": "A",
+          "instant": true
         }
       ],
       "options": {
@@ -93,30 +106,32 @@
       "fieldConfig": {
         "defaults": {
           "unit": "none",
+          "noValue": "0",
           "decimals": 0
         },
         "overrides": []
+      },
+      "id": 2,
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 1
       }
     },
     {
-      "id": 2,
       "type": "stat",
       "title": "Versions Deployed",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 4,
-        "y": 0
-      },
       "targets": [
         {
           "expr": "count(count by (version) (spack_build_info{instance=~\"$instance\"}))",
           "legendFormat": "value",
-          "refId": "A"
+          "refId": "A",
+          "instant": true
         }
       ],
       "options": {
@@ -136,30 +151,542 @@
       "fieldConfig": {
         "defaults": {
           "unit": "none",
+          "noValue": "0",
           "decimals": 0
         },
         "overrides": []
+      },
+      "id": 3,
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 1
       }
     },
     {
-      "id": 3,
+      "type": "stat",
+      "title": "Modified Builds",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "(count(count by (instance) (spack_build_info{instance=~\"$instance\",vcs_modified=\"true\"}))) or vector(0)",
+          "legendFormat": "value",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "noValue": "0",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "id": 4,
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 1
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Debug Enabled Instances",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "(count(count by (instance) (spack_config_info{instance=~\"$instance\",debug_enabled=\"true\"}))) or vector(0)",
+          "legendFormat": "value",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "noValue": "0",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "id": 5,
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 1
+      }
+    },
+    {
+      "type": "table",
+      "title": "Build / Version by Instance",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "count by (instance, version, vcs_revision, vcs_time, vcs_modified, go_version) (spack_build_info{instance=~\"$instance\"})",
+          "legendFormat": "",
+          "refId": "A",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "countRows": false,
+          "fields": ""
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": ""
+        },
+        "overrides": []
+      },
+      "id": 6,
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 5
+      }
+    },
+    {
+      "type": "table",
+      "title": "Runtime Config by Instance",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "count by (instance, compression_mode, compression_pipeline_enabled, assets_backend, image_enabled, memory_cache_enabled, memory_cache_warmup_enabled, debug_enabled, logger_level, robots_enabled) (spack_config_info{instance=~\"$instance\"})",
+          "legendFormat": "",
+          "refId": "A",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "countRows": false,
+          "fields": ""
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": ""
+        },
+        "overrides": []
+      },
+      "id": 7,
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 5
+      }
+    },
+    {
+      "id": 8,
+      "type": "row",
+      "title": "Stable - Inventory and Capacity by Instance",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 11
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Catalog Assets / Variants",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "max by (instance) (spack_catalog_assets_current{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} assets",
+          "refId": "A"
+        },
+        {
+          "expr": "max by (instance) (spack_catalog_variants_current{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} variants",
+          "refId": "B"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "noValue": "0",
+          "decimals": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 9,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Catalog Source Bytes",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "max by (instance) (spack_catalog_source_bytes_current{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "noValue": "0",
+          "decimals": 1,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 10,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Pipeline Queue Capacity",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "max by (instance) (pipeline_queue_capacity{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "noValue": "0",
+          "decimals": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 11,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 20
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Async Capacity",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "max by (instance) (spack_async_capacity_current{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "noValue": "0",
+          "decimals": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 12,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Scheduler Registered Jobs",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "sum by (instance) (spack_task_scheduler_jobs_registered_current{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "noValue": "0",
+          "decimals": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 13,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 28
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Asset Warmup Totals",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "sum by (instance) (spack_asset_cache_warm_entries_total{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} entries",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (instance) (spack_asset_cache_warm_bytes_total{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} bytes",
+          "refId": "B"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "decimals": 1,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 14,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 28
+      }
+    },
+    {
+      "id": 15,
+      "type": "row",
+      "title": "Live - HTTP and Asset Delivery by Instance",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 36
+      }
+    },
+    {
       "type": "stat",
       "title": "Total QPS",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 8,
-        "y": 0
-      },
       "targets": [
         {
-          "expr": "sum(rate(spack_http_requests_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "expr": "(sum(rate(spack_http_requests_total{instance=~\"$instance\"}[$__rate_interval]))) or vector(0)",
           "legendFormat": "value",
-          "refId": "A"
+          "refId": "A",
+          "instant": true
         }
       ],
       "options": {
@@ -179,30 +706,32 @@
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
+          "noValue": "0",
           "decimals": 2
         },
         "overrides": []
+      },
+      "id": 16,
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 37
       }
     },
     {
-      "id": 4,
       "type": "stat",
       "title": "HTTP P95",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 12,
-        "y": 0
-      },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(spack_http_request_duration_seconds_bucket{instance=~\"$instance\"}[$__rate_interval])))",
+          "expr": "(histogram_quantile(0.95, sum by (le) (rate(spack_http_request_duration_seconds_bucket{instance=~\"$instance\"}[$__rate_interval])))) or vector(0)",
           "legendFormat": "value",
-          "refId": "A"
+          "refId": "A",
+          "instant": true
         }
       ],
       "options": {
@@ -222,30 +751,32 @@
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "decimals": 2
+          "noValue": "0",
+          "decimals": 3
         },
         "overrides": []
+      },
+      "id": 17,
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 37
       }
     },
     {
-      "id": 5,
       "type": "stat",
-      "title": "Cache Hit Ratio",
+      "title": "5xx Ratio",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 16,
-        "y": 0
-      },
       "targets": [
         {
-          "expr": "sum(rate(spack_asset_cache_hits_total{instance=~\"$instance\"}[$__rate_interval])) / clamp_min(sum(rate(spack_asset_cache_hits_total{instance=~\"$instance\"}[$__rate_interval])) + sum(rate(spack_asset_cache_misses_total{instance=~\"$instance\"}[$__rate_interval])), 1)",
+          "expr": "((sum(rate(spack_http_requests_total{instance=~\"$instance\",status=~\"5..\"}[$__rate_interval]))) or vector(0)) / clamp_min(((sum(rate(spack_http_requests_total{instance=~\"$instance\"}[$__rate_interval]))) or vector(0)), 1)",
           "legendFormat": "value",
-          "refId": "A"
+          "refId": "A",
+          "instant": true
         }
       ],
       "options": {
@@ -265,30 +796,34 @@
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit",
-          "decimals": 2
+          "noValue": "0",
+          "decimals": 2,
+          "min": 0,
+          "max": 1
         },
         "overrides": []
+      },
+      "id": 18,
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 37
       }
     },
     {
-      "id": 6,
       "type": "stat",
-      "title": "Pipeline Queue",
+      "title": "In Flight",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 20,
-        "y": 0
-      },
       "targets": [
         {
-          "expr": "sum(pipeline_queue_length{instance=~\"$instance\"})",
+          "expr": "(sum(spack_http_requests_in_flight{instance=~\"$instance\"})) or vector(0)",
           "legendFormat": "value",
-          "refId": "A"
+          "refId": "A",
+          "instant": true
         }
       ],
       "options": {
@@ -308,165 +843,25 @@
       "fieldConfig": {
         "defaults": {
           "unit": "none",
+          "noValue": "0",
           "decimals": 0
         },
         "overrides": []
-      }
-    },
-    {
-      "id": 7,
-      "type": "table",
-      "title": "Build / Version by Instance",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
       },
+      "id": 19,
       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 4
-      },
-      "targets": [
-        {
-          "expr": "count by (instance, version, vcs_revision, go_version, vcs_time, vcs_modified) (spack_build_info{instance=~\"$instance\"})",
-          "format": "table",
-          "instant": true,
-          "refId": "A"
-        }
-      ],
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "__name__": true,
-              "Value": true
-            },
-            "renameByName": {
-              "instance": "Instance",
-              "version": "Version",
-              "vcs_revision": "VCS Revision",
-              "go_version": "Go Version",
-              "vcs_time": "VCS Time",
-              "vcs_modified": "VCS Modified"
-            }
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "options": {
-        "showHeader": true
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 37
       }
     },
     {
-      "id": 8,
-      "type": "table",
-      "title": "Runtime Config by Instance",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 4
-      },
-      "targets": [
-        {
-          "expr": "count by (instance, compression_mode, assets_backend, debug_enabled, logger_level, image_enabled, memory_cache_enabled, memory_cache_warmup_enabled) (spack_config_info{instance=~\"$instance\"})",
-          "format": "table",
-          "instant": true,
-          "refId": "A"
-        }
-      ],
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "__name__": true,
-              "Value": true
-            },
-            "renameByName": {
-              "instance": "Instance",
-              "compression_mode": "Compression Mode",
-              "assets_backend": "Assets Backend",
-              "debug_enabled": "Debug Enabled",
-              "logger_level": "Logger Level",
-              "image_enabled": "Image Enabled",
-              "memory_cache_enabled": "Memory Cache",
-              "memory_cache_warmup_enabled": "Warmup Enabled"
-            }
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "options": {
-        "showHeader": true
-      }
-    },
-    {
-      "id": 9,
-      "type": "timeseries",
-      "title": "HTTP QPS Total",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 12
-      },
-      "targets": [
-        {
-          "expr": "sum(rate(spack_http_requests_total{instance=~\"$instance\"}[$__rate_interval]))",
-          "legendFormat": "total",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "reqps"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 10,
       "type": "timeseries",
       "title": "HTTP QPS by Instance",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 12
       },
       "targets": [
         {
@@ -475,12 +870,6 @@
           "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "reqps"
-        },
-        "overrides": []
-      },
       "options": {
         "legend": {
           "displayMode": "list",
@@ -489,111 +878,40 @@
         },
         "tooltip": {
           "mode": "multi",
-          "sort": "desc"
+          "sort": "none"
         }
-      }
-    },
-    {
-      "id": 11,
-      "type": "timeseries",
-      "title": "HTTP Request Rate by Status",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
       },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "noValue": "0",
+          "decimals": 2,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 20,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 20
-      },
-      "targets": [
-        {
-          "expr": "sum by (status) (rate(spack_http_requests_total{instance=~\"$instance\"}[$__rate_interval]))",
-          "legendFormat": "{{status}}",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "reqps"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
+        "y": 41
       }
     },
     {
-      "id": 12,
       "type": "timeseries",
-      "title": "HTTP Latency (P50 / P95 / P99)",
+      "title": "HTTP P95 by Instance",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 20
-      },
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.50, sum by (le) (rate(spack_http_request_duration_seconds_bucket{instance=~\"$instance\"}[$__rate_interval])))",
-          "legendFormat": "p50",
-          "refId": "A"
-        },
-        {
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(spack_http_request_duration_seconds_bucket{instance=~\"$instance\"}[$__rate_interval])))",
-          "legendFormat": "p95",
-          "refId": "B"
-        },
-        {
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(spack_http_request_duration_seconds_bucket{instance=~\"$instance\"}[$__rate_interval])))",
-          "legendFormat": "p99",
-          "refId": "C"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 13,
-      "type": "timeseries",
-      "title": "HTTP Latency P95 by Instance",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 28
       },
       "targets": [
         {
@@ -602,12 +920,6 @@
           "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s"
-        },
-        "overrides": []
-      },
       "options": {
         "legend": {
           "displayMode": "list",
@@ -616,37 +928,48 @@
         },
         "tooltip": {
           "mode": "multi",
-          "sort": "desc"
+          "sort": "none"
         }
-      }
-    },
-    {
-      "id": 14,
-      "type": "timeseries",
-      "title": "Asset Delivery Rate by Mode",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
       },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "0",
+          "decimals": 3,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 21,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 28
+        "y": 41
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP Status Mix",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
       "targets": [
         {
-          "expr": "sum by (delivery) (rate(spack_http_asset_delivery_total{instance=~\"$instance\"}[$__rate_interval]))",
-          "legendFormat": "{{delivery}}",
+          "expr": "sum by (instance, status) (rate(spack_http_requests_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "{{instance}} {{status}}",
           "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ops"
-        },
-        "overrides": []
-      },
       "options": {
         "legend": {
           "displayMode": "list",
@@ -655,37 +978,391 @@
         },
         "tooltip": {
           "mode": "multi",
-          "sort": "desc"
+          "sort": "none"
         }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "noValue": "0",
+          "decimals": 2,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 22,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 49
       }
     },
     {
-      "id": 15,
       "type": "timeseries",
-      "title": "Cache Hit Ratio by Instance",
+      "title": "Top Paths by QPS",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (instance, path) (rate(spack_http_requests_total{instance=~\"$instance\"}[$__rate_interval])))",
+          "legendFormat": "{{instance}} {{path}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "noValue": "0",
+          "decimals": 2,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 23,
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 36
+        "w": 12,
+        "x": 12,
+        "y": 49
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Asset Delivery by Instance / Mode",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
       "targets": [
         {
-          "expr": "sum by (instance) (rate(spack_asset_cache_hits_total{instance=~\"$instance\"}[$__rate_interval])) / clamp_min(sum by (instance) (rate(spack_asset_cache_hits_total{instance=~\"$instance\"}[$__rate_interval])) + sum by (instance) (rate(spack_asset_cache_misses_total{instance=~\"$instance\"}[$__rate_interval])), 1)",
+          "expr": "sum by (instance, delivery) (rate(spack_http_asset_delivery_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "{{instance}} {{delivery}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "0",
+          "decimals": 2,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 24,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 57
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Asset Delivery P95 by Instance / Mode",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (instance, delivery, le) (rate(spack_http_asset_delivery_duration_seconds_bucket{instance=~\"$instance\"}[$__rate_interval])))",
+          "legendFormat": "{{instance}} {{delivery}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "0",
+          "decimals": 3,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 25,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 57
+      }
+    },
+    {
+      "id": 26,
+      "type": "row",
+      "title": "Live - Cache, Resolver, Pipeline by Instance",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 65
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Cache Events by Instance",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "sum by (instance) (rate(spack_asset_cache_hits_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "{{instance}} hits",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (instance) (rate(spack_asset_cache_misses_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "{{instance}} misses",
+          "refId": "B"
+        },
+        {
+          "expr": "sum by (instance) (rate(spack_asset_cache_fills_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "{{instance}} fills",
+          "refId": "C"
+        },
+        {
+          "expr": "sum by (instance) (rate(spack_asset_cache_evictions_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "{{instance}} evictions",
+          "refId": "D"
+        },
+        {
+          "expr": "sum by (instance) (rate(spack_asset_cache_load_errors_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "{{instance}} load errors",
+          "refId": "E"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "0",
+          "decimals": 2,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 27,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 66
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Cache Bytes by Instance",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "sum by (instance) (rate(spack_asset_cache_fill_bytes_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "{{instance}} fill bytes/s",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (instance) (rate(spack_asset_cache_evicted_bytes_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "{{instance}} evicted bytes/s",
+          "refId": "B"
+        },
+        {
+          "expr": "sum by (instance) (rate(spack_asset_cache_warm_bytes_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "{{instance}} warm bytes/s",
+          "refId": "C"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "noValue": "0",
+          "decimals": 1,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 28,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 66
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Resolver Rate by Instance / Result",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "sum by (instance, result) (rate(spack_resolver_resolutions_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "{{instance}} {{result}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "0",
+          "decimals": 2,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 29,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 74
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Resolver P95 by Instance",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (instance, le) (rate(spack_resolver_resolution_duration_seconds_bucket{instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit"
-        },
-        "overrides": []
-      },
       "options": {
         "legend": {
           "displayMode": "list",
@@ -694,136 +1371,45 @@
         },
         "tooltip": {
           "mode": "multi",
-          "sort": "desc"
+          "sort": "none"
         }
-      }
-    },
-    {
-      "id": 16,
-      "type": "timeseries",
-      "title": "Asset Cache Events",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
       },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 36
-      },
-      "targets": [
-        {
-          "expr": "sum(rate(spack_asset_cache_hits_total{instance=~\"$instance\"}[$__rate_interval]))",
-          "legendFormat": "hits",
-          "refId": "A"
-        },
-        {
-          "expr": "sum(rate(spack_asset_cache_misses_total{instance=~\"$instance\"}[$__rate_interval]))",
-          "legendFormat": "misses",
-          "refId": "B"
-        },
-        {
-          "expr": "sum(rate(spack_asset_cache_fills_total{instance=~\"$instance\"}[$__rate_interval]))",
-          "legendFormat": "fills",
-          "refId": "C"
-        },
-        {
-          "expr": "sum(rate(spack_asset_cache_evictions_total{instance=~\"$instance\"}[$__rate_interval]))",
-          "legendFormat": "evictions",
-          "refId": "D"
-        },
-        {
-          "expr": "sum(rate(spack_asset_cache_load_errors_total{instance=~\"$instance\"}[$__rate_interval]))",
-          "legendFormat": "load errors",
-          "refId": "E"
-        }
-      ],
       "fieldConfig": {
         "defaults": {
-          "unit": "ops"
+          "unit": "s",
+          "noValue": "0",
+          "decimals": 3,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
         },
         "overrides": []
       },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
+      "id": 30,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 74
       }
     },
     {
-      "id": 17,
       "type": "timeseries",
-      "title": "Asset Cache Bytes",
+      "title": "Pipeline Queue by Instance",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 36
-      },
-      "targets": [
-        {
-          "expr": "sum(rate(spack_asset_cache_fill_bytes_total{instance=~\"$instance\"}[$__rate_interval]))",
-          "legendFormat": "fill bytes",
-          "refId": "A"
-        },
-        {
-          "expr": "sum(rate(spack_asset_cache_warm_bytes_total{instance=~\"$instance\"}[$__rate_interval]))",
-          "legendFormat": "warm bytes",
-          "refId": "B"
-        },
-        {
-          "expr": "sum(rate(spack_asset_cache_evicted_bytes_total{instance=~\"$instance\"}[$__rate_interval]))",
-          "legendFormat": "evicted bytes",
-          "refId": "C"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "Bps"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 18,
-      "type": "timeseries",
-      "title": "Pipeline Queue Length / Capacity by Instance",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 44
       },
       "targets": [
         {
           "expr": "max by (instance) (pipeline_queue_length{instance=~\"$instance\"})",
-          "legendFormat": "{{instance}} queue",
+          "legendFormat": "{{instance}} length",
           "refId": "A"
         },
         {
@@ -832,12 +1418,6 @@
           "refId": "B"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none"
-        },
-        "overrides": []
-      },
       "options": {
         "legend": {
           "displayMode": "list",
@@ -846,23 +1426,140 @@
         },
         "tooltip": {
           "mode": "multi",
-          "sort": "desc"
+          "sort": "none"
         }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "noValue": "0",
+          "decimals": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 31,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 82
       }
     },
     {
-      "id": 19,
       "type": "timeseries",
-      "title": "Pipeline Enqueue Drops / Dedupe by Instance",
+      "title": "Pipeline Stage Runs by Instance",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
+      "targets": [
+        {
+          "expr": "sum by (instance, stage, result) (rate(spack_pipeline_stage_runs_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "{{instance}} {{stage}} {{result}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "0",
+          "decimals": 2,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 32,
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 44
+        "w": 12,
+        "x": 12,
+        "y": 82
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Pipeline Stage P95 by Instance",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (instance, stage, result, le) (rate(spack_pipeline_stage_duration_seconds_bucket{instance=~\"$instance\"}[$__rate_interval])))",
+          "legendFormat": "{{instance}} {{stage}} {{result}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "0",
+          "decimals": 3,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 33,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 90
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Pipeline Drops / Cleanup by Instance",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
       "targets": [
         {
@@ -874,53 +1571,13 @@
           "expr": "sum by (instance) (rate(pipeline_enqueue_deduplicated_total{instance=~\"$instance\"}[$__rate_interval]))",
           "legendFormat": "{{instance}} deduped",
           "refId": "B"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ops"
         },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 20,
-      "type": "timeseries",
-      "title": "Pipeline Cleanup Removed Bytes by Reason",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 44
-      },
-      "targets": [
         {
-          "expr": "sum by (reason) (rate(pipeline_cleanup_removed_bytes_total{instance=~\"$instance\"}[$__rate_interval]))",
-          "legendFormat": "{{reason}}",
-          "refId": "A"
+          "expr": "sum by (instance) (rate(pipeline_cleanup_runs_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "{{instance}} cleanup runs",
+          "refId": "C"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "Bps"
-        },
-        "overrides": []
-      },
       "options": {
         "legend": {
           "displayMode": "list",
@@ -929,37 +1586,61 @@
         },
         "tooltip": {
           "mode": "multi",
-          "sort": "desc"
+          "sort": "none"
         }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "0",
+          "decimals": 2,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 34,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 90
       }
     },
     {
-      "id": 21,
-      "type": "timeseries",
-      "title": "Scheduler Job Events",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
+      "id": 35,
+      "type": "row",
+      "title": "Live - Async, Event Bus, Scheduler by Instance",
+      "collapsed": false,
+      "panels": [],
       "gridPos": {
-        "h": 8,
-        "w": 8,
+        "h": 1,
+        "w": 24,
         "x": 0,
-        "y": 52
+        "y": 98
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Async Batch Runs by Instance",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
       "targets": [
         {
-          "expr": "sum by (job, event) (rate(spack_task_scheduler_job_events_total{instance=~\"$instance\",event=~\"started|completed|failed\"}[$__rate_interval]))",
-          "legendFormat": "{{job}} {{event}}",
+          "expr": "sum by (instance, workload, mode, result) (rate(spack_async_batch_runs_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "{{instance}} {{workload}} {{mode}} {{result}}",
           "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ops"
-        },
-        "overrides": []
-      },
       "options": {
         "legend": {
           "displayMode": "list",
@@ -968,101 +1649,473 @@
         },
         "tooltip": {
           "mode": "multi",
-          "sort": "desc"
+          "sort": "none"
         }
-      }
-    },
-    {
-      "id": 22,
-      "type": "timeseries",
-      "title": "Scheduler Job Execution P95",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
       },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 52
-      },
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.95, sum by (job, le) (rate(spack_task_scheduler_job_execution_seconds_bucket{instance=~\"$instance\"}[$__rate_interval])))",
-          "legendFormat": "{{job}}",
-          "refId": "A"
-        }
-      ],
       "fieldConfig": {
         "defaults": {
-          "unit": "s"
+          "unit": "ops",
+          "noValue": "0",
+          "decimals": 2,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
         },
         "overrides": []
       },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 23,
-      "type": "timeseries",
-      "title": "Scheduler Job Delay P95",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
+      "id": 36,
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 52
-      },
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.95, sum by (job, le) (rate(spack_task_scheduler_job_scheduling_delay_seconds_bucket{instance=~\"$instance\"}[$__rate_interval])))",
-          "legendFormat": "{{job}}",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 24,
-      "type": "timeseries",
-      "title": "Process CPU Cores Used / sec",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 6,
+        "w": 12,
         "x": 0,
-        "y": 60
+        "y": 99
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Async Task Runs by Instance",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "sum by (instance, workload, mode, result) (rate(spack_async_task_runs_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "{{instance}} {{workload}} {{mode}} {{result}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "0",
+          "decimals": 2,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 37,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 99
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Event Dispatch by Instance",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "sum by (instance, event_name, mode, result) (rate(spack_eventx_dispatch_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "{{instance}} {{event_name}} {{mode}} {{result}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "0",
+          "decimals": 2,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 38,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 107
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Event Enqueue by Instance",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "sum by (instance, event_name, result) (rate(spack_eventx_async_enqueue_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "{{instance}} {{event_name}} {{result}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "0",
+          "decimals": 2,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 39,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 107
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Scheduler Running by Instance",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "max by (instance) (spack_task_scheduler_running{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "noValue": "0",
+          "decimals": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 40,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 115
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Scheduler Job Events by Instance",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "sum by (instance, job, event) (rate(spack_task_scheduler_job_events_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "{{instance}} {{job}} {{event}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (instance, event) (rate(spack_task_scheduler_events_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "{{instance}} scheduler {{event}}",
+          "refId": "B"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "0",
+          "decimals": 2,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 41,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 115
+      }
+    },
+    {
+      "id": 42,
+      "type": "row",
+      "title": "Live - Runtime, DIX, Go, Process by Instance",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 123
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Runtime / Process Uptime",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "max by (instance) (time() - spack_runtime_start_time_seconds{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} runtime",
+          "refId": "A"
+        },
+        {
+          "expr": "max by (instance) (time() - process_start_time_seconds{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} process",
+          "refId": "B"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "0",
+          "decimals": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 43,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 124
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "DIX State Transitions by Instance",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "sum by (instance, from, to) (rate(spack_dix_state_transition_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "legendFormat": "{{instance}} {{from}} -> {{to}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "0",
+          "decimals": 2,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 44,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 124
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "DIX Build / Start Duration P95 by Instance",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (instance, result, le) (rate(spack_dix_build_duration_ms_bucket{instance=~\"$instance\"}[$__rate_interval])))",
+          "legendFormat": "{{instance}} build {{result}}",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (instance, result, le) (rate(spack_dix_start_duration_ms_bucket{instance=~\"$instance\"}[$__rate_interval])))",
+          "legendFormat": "{{instance}} start {{result}}",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (instance, result, le) (rate(spack_dix_stop_duration_ms_bucket{instance=~\"$instance\"}[$__rate_interval])))",
+          "legendFormat": "{{instance}} stop {{result}}",
+          "refId": "C"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "noValue": "0",
+          "decimals": 2,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 45,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 132
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Process CPU by Instance",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
       "targets": [
         {
@@ -1071,12 +2124,6 @@
           "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none"
-        },
-        "overrides": []
-      },
       "options": {
         "legend": {
           "displayMode": "list",
@@ -1085,37 +2132,53 @@
         },
         "tooltip": {
           "mode": "multi",
-          "sort": "desc"
+          "sort": "none"
         }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "decimals": 2,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 46,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 132
       }
     },
     {
-      "id": 25,
       "type": "timeseries",
       "title": "Process RSS by Instance",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 6,
-        "y": 60
-      },
       "targets": [
         {
-          "expr": "process_resident_memory_bytes{instance=~\"$instance\"}",
+          "expr": "max by (instance) (process_resident_memory_bytes{instance=~\"$instance\"})",
           "legendFormat": "{{instance}}",
           "refId": "A"
+        },
+        {
+          "expr": "max by (instance) (process_virtual_memory_max_bytes{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} virtual max",
+          "refId": "B"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes"
-        },
-        "overrides": []
-      },
       "options": {
         "legend": {
           "displayMode": "list",
@@ -1124,37 +2187,123 @@
         },
         "tooltip": {
           "mode": "multi",
-          "sort": "desc"
+          "sort": "none"
         }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "noValue": "0",
+          "decimals": 1,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 47,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 140
       }
     },
     {
-      "id": 26,
       "type": "timeseries",
-      "title": "Goroutines by Instance",
+      "title": "Go Heap by Instance",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 12,
-        "y": 60
-      },
       "targets": [
         {
-          "expr": "go_goroutines{instance=~\"$instance\"}",
-          "legendFormat": "{{instance}}",
+          "expr": "max by (instance) (go_memstats_heap_alloc_bytes{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} alloc",
           "refId": "A"
+        },
+        {
+          "expr": "max by (instance) (go_memstats_heap_inuse_bytes{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} inuse",
+          "refId": "B"
+        },
+        {
+          "expr": "max by (instance) (go_memstats_heap_sys_bytes{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} sys",
+          "refId": "C"
+        },
+        {
+          "expr": "max by (instance) (go_memstats_alloc_bytes{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} alloc current",
+          "refId": "D"
+        },
+        {
+          "expr": "max by (instance) (go_memstats_heap_idle_bytes{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} idle",
+          "refId": "E"
+        },
+        {
+          "expr": "max by (instance) (go_memstats_heap_released_bytes{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} released",
+          "refId": "F"
+        },
+        {
+          "expr": "max by (instance) (go_memstats_next_gc_bytes{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} next gc",
+          "refId": "G"
+        },
+        {
+          "expr": "max by (instance) (go_memstats_gc_sys_bytes{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} gc sys",
+          "refId": "H"
+        },
+        {
+          "expr": "max by (instance) (go_memstats_other_sys_bytes{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} other sys",
+          "refId": "I"
+        },
+        {
+          "expr": "max by (instance) (go_memstats_mcache_inuse_bytes{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} mcache",
+          "refId": "J"
+        },
+        {
+          "expr": "max by (instance) (go_memstats_mcache_sys_bytes{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} mcache sys",
+          "refId": "K"
+        },
+        {
+          "expr": "max by (instance) (go_memstats_mspan_inuse_bytes{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} mspan",
+          "refId": "L"
+        },
+        {
+          "expr": "max by (instance) (go_memstats_mspan_sys_bytes{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} mspan sys",
+          "refId": "M"
+        },
+        {
+          "expr": "max by (instance) (go_memstats_buck_hash_sys_bytes{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} bucket hash",
+          "refId": "N"
+        },
+        {
+          "expr": "max by (instance) (go_memstats_stack_sys_bytes{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} stack sys",
+          "refId": "O"
+        },
+        {
+          "expr": "max by (instance) (go_memstats_sys_bytes{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} total sys",
+          "refId": "P"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none"
-        },
-        "overrides": []
-      },
       "options": {
         "legend": {
           "displayMode": "list",
@@ -1163,37 +2312,108 @@
         },
         "tooltip": {
           "mode": "multi",
-          "sort": "desc"
+          "sort": "none"
         }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "noValue": "0",
+          "decimals": 1,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 48,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 140
       }
     },
     {
-      "id": 27,
+      "type": "timeseries",
+      "title": "Goroutines / Threads by Instance",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "max by (instance) (go_goroutines{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} goroutines",
+          "refId": "A"
+        },
+        {
+          "expr": "max by (instance) (go_threads{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} threads",
+          "refId": "B"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "noValue": "0",
+          "decimals": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 49,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 148
+      }
+    },
+    {
       "type": "timeseries",
       "title": "Open FDs by Instance",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 18,
-        "y": 60
-      },
       "targets": [
         {
-          "expr": "process_open_fds{instance=~\"$instance\"}",
-          "legendFormat": "{{instance}}",
+          "expr": "max by (instance) (process_open_fds{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} open",
           "refId": "A"
+        },
+        {
+          "expr": "max by (instance) (process_max_fds{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} max",
+          "refId": "B"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none"
-        },
-        "overrides": []
-      },
       "options": {
         "legend": {
           "displayMode": "list",
@@ -1202,8 +2422,157 @@
         },
         "tooltip": {
           "mode": "multi",
-          "sort": "desc"
+          "sort": "none"
         }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "noValue": "0",
+          "decimals": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 50,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 148
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Go Runtime Settings by Instance",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "max by (instance) (go_gc_gogc_percent{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} GOGC",
+          "refId": "A"
+        },
+        {
+          "expr": "max by (instance) (go_gc_gomemlimit_bytes{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} GOMEMLIMIT",
+          "refId": "B"
+        },
+        {
+          "expr": "max by (instance) (go_memstats_last_gc_time_seconds{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} last GC",
+          "refId": "C"
+        },
+        {
+          "expr": "max by (instance) (go_info{instance=~\"$instance\"})",
+          "legendFormat": "{{instance}} go info",
+          "refId": "D"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "decimals": 1,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 51,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 156
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "DIX Build Shape by Instance",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "expr": "(sum by (instance) (spack_dix_build_setups_sum{instance=~\"$instance\"})) / clamp_min(sum by (instance) (spack_dix_build_setups_count{instance=~\"$instance\"}), 1)",
+          "legendFormat": "{{instance}} setups",
+          "refId": "A"
+        },
+        {
+          "expr": "(sum by (instance) (spack_dix_build_invokes_sum{instance=~\"$instance\"})) / clamp_min(sum by (instance) (spack_dix_build_invokes_count{instance=~\"$instance\"}), 1)",
+          "legendFormat": "{{instance}} invokes",
+          "refId": "B"
+        },
+        {
+          "expr": "(sum by (instance) (spack_dix_start_completed_hooks_sum{instance=~\"$instance\"})) / clamp_min(sum by (instance) (spack_dix_start_completed_hooks_count{instance=~\"$instance\"}), 1)",
+          "legendFormat": "{{instance}} completed start hooks",
+          "refId": "C"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "noValue": "0",
+          "decimals": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 52,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 156
       }
     }
   ],
@@ -1239,11 +2608,13 @@
         },
         "refresh": 2,
         "includeAll": true,
+        "allValue": ".*",
         "multi": true,
-        "definition": "label_values(spack_http_requests_total, instance)",
+        "label": "Instance",
+        "definition": "label_values(spack_build_info, instance)",
         "query": {
           "qryType": 1,
-          "query": "label_values(spack_http_requests_total, instance)",
+          "query": "label_values(spack_build_info, instance)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "current": {
@@ -1263,9 +2634,9 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "",
+  "timezone": "browser",
   "title": "SPACK Fleet & Instance Overview",
   "uid": "spack-fleet-overview",
-  "version": 5,
+  "version": 1,
   "weekStart": ""
 }
