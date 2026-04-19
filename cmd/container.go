@@ -2,10 +2,9 @@
 package cmd
 
 import (
-	"runtime/debug"
-
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/dix"
+	"github.com/daiyuang/spack/internal/appmeta"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	spacklogger "github.com/daiyuang/spack/internal/logger"
@@ -17,8 +16,9 @@ import (
 )
 
 func createContainer(loadOptions config.LoadOptions, userModules ...dix.Module) (*dix.App, error) {
-	allModules := collectionx.NewListWithCapacity[dix.Module](7 + len(userModules))
-	allModules.Add(validation.Module,
+	allModules := collectionx.NewListWithCapacity[dix.Module](8 + len(userModules))
+	allModules.Add(appmeta.Module,
+		validation.Module,
 		config.NewModule(loadOptions),
 		spacklogger.Module,
 		metrics.Module,
@@ -27,14 +27,10 @@ func createContainer(loadOptions config.LoadOptions, userModules ...dix.Module) 
 		task.Module,
 	)
 	allModules.Add(userModules...)
-	info, ok := debug.ReadBuildInfo()
-	if !ok {
-		panic("could not read build info")
-	}
 	instance := dix.New(
 		"spack",
-		dix.WithVersion(info.Main.Version),
 		dix.WithModules(allModules.Values()...),
+		dix.WithRunStopTimeout(dix.DefaultRunStopTimeout),
 	)
 	err := instance.Validate()
 	if err != nil {

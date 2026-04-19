@@ -28,7 +28,7 @@ var Module = dix.NewModule("server",
 		dix.Provider6(newAssetRouteRegistration),
 		dix.Provider4(newServerRegistrations),
 		dix.Provider2(newEventPublisher),
-		dix.ProviderErr2(newServerFromDeps),
+		dix.Provider3(newServerFromDeps),
 	),
 	dix.WithModuleSetups(
 		dix.Setup(registerHealthCheckSetup),
@@ -145,16 +145,17 @@ func newServerRegistrations(
 	})
 }
 
-func newServerFromDeps(cfg *config.Config, registrations collectionx.List[appRegistration]) (*fiber.App, error) {
-	app, err := newServerApp(cfg)
-	if err != nil {
-		return nil, err
-	}
+func newServerFromDeps(
+	cfg *config.Config,
+	meta dix.AppMeta,
+	registrations collectionx.List[appRegistration],
+) *fiber.App {
+	app := newServerApp(cfg, meta)
 	registrations.Range(func(_ int, registration appRegistration) bool {
 		if registration.Apply != nil {
 			registration.Apply(app)
 		}
 		return true
 	})
-	return app, nil
+	return app
 }

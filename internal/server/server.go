@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/DaiYuANg/arcgo/observabilityx"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/media"
@@ -49,11 +50,8 @@ var (
 	)
 )
 
-func newServerApp(cfg *config.Config) (*fiber.App, error) {
-	header, err := buildServerHeader()
-	if err != nil {
-		return nil, oops.In("server").Owner("app").Wrap(err)
-	}
+func newServerApp(cfg *config.Config, meta dix.AppMeta) *fiber.App {
+	header := buildServerHeader(meta)
 	return fiber.New(fiber.Config{
 		AppName:           "Spack",
 		Immutable:         true,
@@ -63,7 +61,7 @@ func newServerApp(cfg *config.Config) (*fiber.App, error) {
 		ServerHeader:      header,
 		StrictRouting:     true,
 		ReduceMemoryUsage: cfg.HTTP.LowMemory,
-	}), nil
+	})
 }
 
 func registerMiddleware(

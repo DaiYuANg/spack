@@ -72,16 +72,12 @@ func NewObservedAppForTest(
 	bus eventx.BusRuntime,
 ) *fiber.App {
 	healthChecks := newHealthCheckDefinitions(cfg, cat)
-	app, err := newServerFromDeps(cfg, newServerRegistrations(
+	return newServerFromDeps(cfg, dix.AppMeta{Version: "test"}, newServerRegistrations(
 		newMiddlewareRegistration(cfg, logger, obs, runtimeMetrics),
 		newHealthRoutesRegistration(cat, healthChecks, obs),
 		newRobotsRouteRegistration(cfg, logger, cat, bodyCache),
 		newAssetRouteRegistration(cfg, newAssetRouteRuntime(logger, obs), assetResolver, pipelineSvc, bodyCache, bus),
 	))
-	if err != nil {
-		panic(err)
-	}
-	return app
 }
 
 // NewHelmetConfigForTest exposes the helmet configuration for external tests.

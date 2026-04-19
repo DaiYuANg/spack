@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"runtime/debug"
 	"strings"
 	"testing"
 
@@ -43,10 +44,20 @@ func TestCreateContainerBuildPublishesDixMetrics(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if got := app.RunStopTimeout(); got != dix.DefaultRunStopTimeout {
+		t.Fatalf("expected run stop timeout %s, got %s", dix.DefaultRunStopTimeout, got)
+	}
 
 	rt, err := app.Build()
 	if err != nil {
 		t.Fatal(err)
+	}
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		t.Fatal("expected build info to be available")
+	}
+	if got := rt.Meta().Version; got != info.Main.Version {
+		t.Fatalf("expected runtime version %q, got %q", info.Main.Version, got)
 	}
 
 	adapter, err := dix.ResolveAs[*obsprom.Adapter](rt.Container())
