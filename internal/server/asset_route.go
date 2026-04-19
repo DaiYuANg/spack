@@ -20,6 +20,17 @@ import (
 
 const maxVariantFallbackAttempts = 3
 
+type assetDeliveryRuntime struct {
+	mountPath      string
+	responsePolicy cachepolicy.ResponsePolicy
+	logger         *slog.Logger
+	assetResolver  *resolver.Resolver
+	pipelineSvc    *pipeline.Service
+	bodyCache      *assetcache.Cache
+	bus            eventx.BusRuntime
+	trackDelivery  bool
+}
+
 func registerAssetRoute(
 	app *fiber.App,
 	cfg *config.Config,
@@ -30,52 +41,60 @@ func registerAssetRoute(
 	bus eventx.BusRuntime,
 	trackDelivery bool,
 ) {
-	responsePolicy := cachepolicy.NewResponsePolicy(&cfg.Compression)
-	app.Use(routePattern(cfg.Assets.Path), func(c fiber.Ctx) error {
-		requestedFormat := media.NormalizeImageFormat(c.Query("format"))
-		request := buildResolverRequest(c, cfg.Assets.Path, requestedFormat)
-		result, err := assetResolver.Resolve(request)
-		if err != nil {
-			return fiber.ErrNotFound
-		}
-
-		enqueuePipelineResult(result, pipelineSvc)
-		delivery, resolvedResult, deliveryErr := sendResolvedAssetWithVariantFallback(
-			c,
-			responsePolicy,
-			request,
-			result,
-			requestedFormat,
-			logger,
-			bodyCache,
-			assetResolver,
-			pipelineSvc,
-		)
-		if deliveryErr != nil {
-			return deliveryErr
-		}
-		if delivery != "" {
-			if trackDelivery {
-				setAssetDelivery(c, delivery)
-			}
-			publishVariantServed(c.Context(), resolvedResult, bus, logger)
-		}
-		return nil
-	})
+	runtime := newAssetDeliveryRuntime(cfg, logger, assetResolver, pipelineSvc, bodyCache, bus, trackDelivery)
+	app.Use(routePattern(cfg.Assets.Path), runtime.handle)
 }
 
-func sendResolvedAssetWithVariantFallback(
+func newAssetDeliveryRuntime(
+	cfg *config.Config,
+	logger *slog.Logger,
+	assetResolver *resolver.Resolver,
+	pipelineSvc *pipeline.Service,
+	bodyCache *assetcache.Cache,
+	bus eventx.BusRuntime,
+	trackDelivery bool,
+) *assetDeliveryRuntime {
+	return &assetDeliveryRuntime{
+		mountPath:      cfg.Assets.Path,
+		responsePolicy: cachepolicy.NewResponsePolicy(&cfg.Compression),
+		logger:         logger,
+		assetResolver:  assetResolver,
+		pipelineSvc:    pipelineSvc,
+		bodyCache:      bodyCache,
+		bus:            bus,
+		trackDelivery:  trackDelivery,
+	}
+}
+
+func (r *assetDeliveryRuntime) handle(c fiber.Ctx) error {
+	requestedFormat := media.NormalizeImageFormat(c.Query("format"))
+	request := buildResolverRequest(c, r.mountPath, requestedFormat)
+	result, err := r.assetResolver.Resolve(request)
+	if err != nil {
+		return fiber.ErrNotFound
+	}
+
+	r.enqueuePipelineResult(result)
+	delivery, resolvedResult, deliveryErr := r.sendResolvedAssetWithVariantFallback(c, request, result, requestedFormat)
+	if deliveryErr != nil {
+		return deliveryErr
+	}
+	if delivery != "" {
+		if r.trackDelivery {
+			setAssetDelivery(c, delivery)
+		}
+		publishVariantServed(c.Context(), resolvedResult, r.bus, r.logger)
+	}
+	return nil
+}
+
+func (r *assetDeliveryRuntime) sendResolvedAssetWithVariantFallback(
 	c fiber.Ctx,
-	responsePolicy cachepolicy.ResponsePolicy,
 	request resolver.Request,
 	result *resolver.Result,
 	requestedFormat string,
-	logger *slog.Logger,
-	bodyCache *assetcache.Cache,
-	assetResolver *resolver.Resolver,
-	pipelineSvc *pipeline.Service,
 ) (string, *resolver.Result, error) {
-	delivery, err := sendResolvedAsset(c, responsePolicy, request, result, requestedFormat, logger, bodyCache)
+	delivery, err := r.sendResolvedAsset(c, request, result, requestedFormat)
 	if err == nil {
 		return delivery, result, nil
 	}
@@ -85,40 +104,24 @@ func sendResolvedAssetWithVariantFallback(
 		return "", result, err
 	}
 
-	return retryResolvedAssetDelivery(
-		c,
-		responsePolicy,
-		request,
-		result,
-		requestedFormat,
-		logger,
-		bodyCache,
-		assetResolver,
-		pipelineSvc,
-		missingErr,
-	)
+	return r.retryResolvedAssetDelivery(c, request, result, requestedFormat, missingErr)
 }
 
-func retryResolvedAssetDelivery(
+func (r *assetDeliveryRuntime) retryResolvedAssetDelivery(
 	c fiber.Ctx,
-	responsePolicy cachepolicy.ResponsePolicy,
 	request resolver.Request,
 	result *resolver.Result,
 	requestedFormat string,
-	logger *slog.Logger,
-	bodyCache *assetcache.Cache,
-	assetResolver *resolver.Resolver,
-	pipelineSvc *pipeline.Service,
 	missingErr *missingResolvedVariantError,
 ) (string, *resolver.Result, error) {
 	for range maxVariantFallbackAttempts {
-		nextResult, resolveErr := resolveAfterVariantArtifactMiss(bodyCache, assetResolver, request, result, missingErr)
+		nextResult, resolveErr := r.resolveAfterVariantArtifactMiss(request, result, missingErr)
 		if resolveErr != nil {
 			return "", result, resolveErr
 		}
-		enqueuePipelineResult(nextResult, pipelineSvc)
+		r.enqueuePipelineResult(nextResult)
 
-		delivery, err := sendResolvedAsset(c, responsePolicy, request, nextResult, requestedFormat, logger, bodyCache)
+		delivery, err := r.sendResolvedAsset(c, request, nextResult, requestedFormat)
 		if err == nil {
 			return delivery, nextResult, nil
 		}
@@ -133,18 +136,16 @@ func retryResolvedAssetDelivery(
 	return "", result, fiber.ErrInternalServerError
 }
 
-func resolveAfterVariantArtifactMiss(
-	bodyCache *assetcache.Cache,
-	assetResolver *resolver.Resolver,
+func (r *assetDeliveryRuntime) resolveAfterVariantArtifactMiss(
 	request resolver.Request,
 	result *resolver.Result,
 	missingErr *missingResolvedVariantError,
 ) (*resolver.Result, error) {
-	if bodyCache != nil {
-		bodyCache.Delete(missingErr.artifactPath)
+	if r.bodyCache != nil {
+		r.bodyCache.Delete(missingErr.artifactPath)
 	}
 
-	nextResult, err := assetResolver.ResolveAfterVariantArtifactMiss(request, result.Variant)
+	nextResult, err := r.assetResolver.ResolveAfterVariantArtifactMiss(request, result.Variant)
 	if err != nil {
 		return nil, fiber.ErrNotFound
 	}
@@ -170,12 +171,12 @@ func buildResolverRequest(c fiber.Ctx, mountPath, requestedFormat string) resolv
 	}
 }
 
-func enqueuePipelineResult(result *resolver.Result, pipelineSvc *pipeline.Service) {
-	if pipelineSvc == nil || result == nil || result.Asset == nil || !hasPreferredPipelineRequests(result) {
+func (r *assetDeliveryRuntime) enqueuePipelineResult(result *resolver.Result) {
+	if r.pipelineSvc == nil || result == nil || result.Asset == nil || !hasPreferredPipelineRequests(result) {
 		return
 	}
 
-	pipelineSvc.Enqueue(pipeline.Request{
+	r.pipelineSvc.Enqueue(pipeline.Request{
 		AssetPath:          result.Asset.Path,
 		PreferredEncodings: result.PreferredEncodings,
 		PreferredWidths:    result.PreferredWidths,

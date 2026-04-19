@@ -42,12 +42,15 @@ func registerRobotsRoute(
 		return
 	}
 
-	responsePolicy := cachepolicy.NewResponsePolicy(&cfg.Compression)
+	deliveryRuntime := &assetDeliveryRuntime{
+		responsePolicy: cachepolicy.NewResponsePolicy(&cfg.Compression),
+		logger:         logger,
+		bodyCache:      bodyCache,
+	}
 	handler := func(c fiber.Ctx) error {
 		if asset, ok := staticRobotsAsset(cfg.Robots, cat); ok {
-			_, err := sendResolvedAsset(
+			_, err := deliveryRuntime.sendResolvedAsset(
 				c,
-				responsePolicy,
 				resolver.Request{RangeRequested: strings.TrimSpace(c.Get(fiber.HeaderRange)) != ""},
 				&resolver.Result{
 					Asset:     asset,
@@ -56,8 +59,6 @@ func registerRobotsRoute(
 					ETag:      asset.ETag,
 				},
 				"",
-				logger,
-				bodyCache,
 			)
 			return err
 		}

@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/cachepolicy"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/resolver"
@@ -16,27 +15,24 @@ import (
 	"github.com/samber/lo"
 )
 
-func sendResolvedAsset(
+func (r *assetDeliveryRuntime) sendResolvedAsset(
 	c fiber.Ctx,
-	responsePolicy cachepolicy.ResponsePolicy,
 	request resolver.Request,
 	result *resolver.Result,
 	requestedFormat string,
-	logger *slog.Logger,
-	bodyCache *assetcache.Cache,
 ) (string, error) {
-	headerPlan := newResolvedHeaderPlan(responsePolicy, result, requestedFormat)
+	headerPlan := newResolvedHeaderPlan(r.responsePolicy, result, requestedFormat)
 	headerPlan.Apply(c)
 	if handled := handleConditionalAssetRequest(c, request); handled {
 		return "", nil
 	}
 
 	cacheRequest := buildMemoryCacheRequest(result, request)
-	if bodyCache.ShouldServeRequest(cacheRequest) {
-		return sendCachedResolvedAsset(c, bodyCache, result, cacheRequest)
+	if r.bodyCache.ShouldServeRequest(cacheRequest) {
+		return r.sendCachedResolvedAsset(c, result, cacheRequest)
 	}
 
-	return sendResolvedAssetFile(c, request, result, logger, headerPlan)
+	return r.sendResolvedAssetFile(c, request, result, headerPlan)
 }
 
 func handleConditionalAssetRequest(c fiber.Ctx, request resolver.Request) bool {
@@ -51,13 +47,12 @@ func handleConditionalAssetRequest(c fiber.Ctx, request resolver.Request) bool {
 	return false
 }
 
-func sendCachedResolvedAsset(
+func (r *assetDeliveryRuntime) sendCachedResolvedAsset(
 	c fiber.Ctx,
-	bodyCache *assetcache.Cache,
 	result *resolver.Result,
 	request cachepolicy.MemoryRequest,
 ) (string, error) {
-	body, found, err := bodyCache.GetOrLoadWithRequest(result.FilePath, request)
+	body, found, err := r.bodyCache.GetOrLoadWithRequest(result.FilePath, request)
 	if err != nil {
 		if missingErr := newMissingResolvedVariantError(result, err); missingErr != nil {
 			return "", missingErr
@@ -70,19 +65,18 @@ func sendCachedResolvedAsset(
 	return lo.Ternary(found, deliveryMemoryCacheHit, deliveryMemoryCacheFill), nil
 }
 
-func sendResolvedAssetFile(
+func (r *assetDeliveryRuntime) sendResolvedAssetFile(
 	c fiber.Ctx,
 	request resolver.Request,
 	result *resolver.Result,
-	logger *slog.Logger,
 	headerPlan resolvedHeaderPlan,
 ) (string, error) {
 	if err := c.SendFile(result.FilePath, fiber.SendFile{ByteRange: true}); err != nil {
 		if missingErr := newMissingResolvedVariantError(result, err); missingErr != nil {
 			return "", missingErr
 		}
-		if logger != nil {
-			logger.Error("Send asset failed",
+		if r.logger != nil {
+			r.logger.Error("Send asset failed",
 				slog.String("path", result.FilePath),
 				slog.String("err", err.Error()),
 			)

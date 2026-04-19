@@ -27,6 +27,16 @@ type ArtifactJanitorReport struct {
 	CacheInvalidations int
 }
 
+type artifactJanitorRun struct {
+	ctx        context.Context
+	root       string
+	rootHandle *os.Root
+	expected   collectionx.Set[string]
+	cat        catalog.Catalog
+	bodyCache  *assetcache.Cache
+	report     *ArtifactJanitorReport
+}
+
 func registerArtifactJanitorTask(ctx context.Context, scheduler gocron.Scheduler, runtime *artifactJanitorRuntime) (bool, error) {
 	if runtime == nil || runtime.store == nil || strings.TrimSpace(runtime.store.Root()) == "" {
 		return false, nil
@@ -86,70 +96,57 @@ func syncArtifactCatalog(
 		return ArtifactJanitorReport{}, nil
 	}
 
-	expected, report, err := collectCatalogArtifactPaths(ctx, cat, bodyCache)
-	if err != nil {
+	run := artifactJanitorRun{
+		ctx:       ctx,
+		root:      root,
+		expected:  collectionx.NewSet[string](),
+		cat:       cat,
+		bodyCache: bodyCache,
+		report:    &ArtifactJanitorReport{},
+	}
+	if err := run.collectCatalogArtifactPaths(); err != nil {
 		return ArtifactJanitorReport{}, err
 	}
-	if err := removeOrphanArtifacts(ctx, root, expected, cat, bodyCache, &report); err != nil {
+	if err := run.removeOrphanArtifacts(); err != nil {
 		return ArtifactJanitorReport{}, err
 	}
-
-	report.RemovedDirectories += pruneEmptyArtifactDirs(root)
-	return report, nil
+	run.report.RemovedDirectories += pruneEmptyArtifactDirs(root)
+	return *run.report, nil
 }
 
-func collectCatalogArtifactPaths(
-	ctx context.Context,
-	cat catalog.Catalog,
-	bodyCache *assetcache.Cache,
-) (collectionx.Set[string], ArtifactJanitorReport, error) {
-	expected := collectionx.NewSet[string]()
-	report := ArtifactJanitorReport{}
-	for _, variant := range cat.AllVariants().Values() {
-		if err := janitorContextErr(ctx); err != nil {
-			return nil, ArtifactJanitorReport{}, err
+func (r *artifactJanitorRun) collectCatalogArtifactPaths() error {
+	for _, variant := range r.cat.AllVariants().Values() {
+		if err := r.contextErr(); err != nil {
+			return err
 		}
-		if err := collectCatalogVariant(variant, cat, bodyCache, expected, &report); err != nil {
-			return nil, ArtifactJanitorReport{}, err
+		if err := r.collectCatalogVariant(variant); err != nil {
+			return err
 		}
 	}
-	return expected, report, nil
+	return nil
 }
 
-func collectCatalogVariant(
-	variant *catalog.Variant,
-	cat catalog.Catalog,
-	bodyCache *assetcache.Cache,
-	expected collectionx.Set[string],
-	report *ArtifactJanitorReport,
-) error {
+func (r *artifactJanitorRun) collectCatalogVariant(variant *catalog.Variant) error {
 	artifactPath := variantArtifactPath(variant)
 	if artifactPath == "" {
 		return nil
 	}
 	if artifactExists(artifactPath) {
-		expected.Add(artifactPath)
+		r.expected.Add(artifactPath)
 		return nil
 	}
 	if _, statErr := os.Stat(artifactPath); statErr != nil && !os.IsNotExist(statErr) {
 		return oops.In("task").Owner("artifact janitor").With("artifact_path", artifactPath).Wrap(statErr)
 	}
-	if cat.DeleteVariantByArtifactPath(artifactPath) {
-		report.MissingVariants++
-		report.CacheInvalidations += invalidateAssetCache(bodyCache, artifactPath)
+	if r.cat.DeleteVariantByArtifactPath(artifactPath) {
+		r.report.MissingVariants++
+		r.report.CacheInvalidations += invalidateAssetCache(r.bodyCache, artifactPath)
 	}
 	return nil
 }
 
-func removeOrphanArtifacts(
-	ctx context.Context,
-	root string,
-	expected collectionx.Set[string],
-	cat catalog.Catalog,
-	bodyCache *assetcache.Cache,
-	report *ArtifactJanitorReport,
-) error {
-	rootHandle, err := openArtifactRoot(root)
+func (r *artifactJanitorRun) removeOrphanArtifacts() error {
+	rootHandle, err := openArtifactRoot(r.root)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -160,44 +157,31 @@ func removeOrphanArtifacts(
 		return nil
 	}
 
-	walkErr := walkOrphanArtifacts(ctx, rootHandle, root, expected, cat, bodyCache, report)
+	r.rootHandle = rootHandle
+	walkErr := r.walkOrphanArtifacts()
 	closeErr := closeRoot(rootHandle)
+	r.rootHandle = nil
 	if walkErr != nil {
 		return walkErr
 	}
 	return closeErr
 }
 
-func removeOrphanArtifact(
-	root *os.Root,
-	relativePath string,
-	artifactPath string,
-	cat catalog.Catalog,
-	bodyCache *assetcache.Cache,
-	report *ArtifactJanitorReport,
-) error {
-	if removeErr := root.Remove(filepath.ToSlash(relativePath)); removeErr != nil && !os.IsNotExist(removeErr) {
+func (r *artifactJanitorRun) removeOrphanArtifact(relativePath string, artifactPath string) error {
+	if removeErr := r.rootHandle.Remove(filepath.ToSlash(relativePath)); removeErr != nil && !os.IsNotExist(removeErr) {
 		return oops.In("task").Owner("artifact janitor").With("artifact_path", artifactPath).Wrap(removeErr)
 	}
-	if report != nil {
-		report.RemovedOrphans++
-		report.CacheInvalidations += invalidateAssetCache(bodyCache, artifactPath)
+	if r.report != nil {
+		r.report.RemovedOrphans++
+		r.report.CacheInvalidations += invalidateAssetCache(r.bodyCache, artifactPath)
 	}
-	cat.DeleteVariantByArtifactPath(artifactPath)
+	r.cat.DeleteVariantByArtifactPath(artifactPath)
 	return nil
 }
 
-func walkOrphanArtifacts(
-	ctx context.Context,
-	rootHandle *os.Root,
-	root string,
-	expected collectionx.Set[string],
-	cat catalog.Catalog,
-	bodyCache *assetcache.Cache,
-	report *ArtifactJanitorReport,
-) error {
-	walkErr := fs.WalkDir(rootHandle.FS(), ".", func(relativePath string, entry fs.DirEntry, err error) error {
-		return visitArtifactPath(ctx, rootHandle, root, relativePath, entry, err, expected, cat, bodyCache, report)
+func (r *artifactJanitorRun) walkOrphanArtifacts() error {
+	walkErr := fs.WalkDir(r.rootHandle.FS(), ".", func(relativePath string, entry fs.DirEntry, err error) error {
+		return r.visitArtifactPath(relativePath, entry, err)
 	})
 	if walkErr == nil || os.IsNotExist(walkErr) {
 		return nil

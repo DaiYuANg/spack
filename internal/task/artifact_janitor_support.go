@@ -1,14 +1,11 @@
 package task
 
 import (
-	"context"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/samber/oops"
 )
@@ -24,36 +21,25 @@ func openArtifactRoot(root string) (*os.Root, error) {
 	return nil, oops.In("task").Owner("artifact janitor").Wrap(err)
 }
 
-func visitArtifactPath(
-	ctx context.Context,
-	rootHandle *os.Root,
-	root string,
-	relativePath string,
-	entry fs.DirEntry,
-	walkErr error,
-	expected collectionx.Set[string],
-	cat catalog.Catalog,
-	bodyCache *assetcache.Cache,
-	report *ArtifactJanitorReport,
-) error {
+func (r *artifactJanitorRun) visitArtifactPath(relativePath string, entry fs.DirEntry, walkErr error) error {
 	if walkErr != nil {
 		return walkErr
 	}
-	if ctxErr := janitorContextErr(ctx); ctxErr != nil {
+	if ctxErr := r.contextErr(); ctxErr != nil {
 		return ctxErr
 	}
 	if entry.IsDir() {
 		return nil
 	}
 
-	artifactPath := filepath.Join(root, filepath.FromSlash(relativePath))
-	if report != nil {
-		report.ScannedArtifacts++
+	artifactPath := filepath.Join(r.root, filepath.FromSlash(relativePath))
+	if r.report != nil {
+		r.report.ScannedArtifacts++
 	}
-	if expected != nil && expected.Contains(artifactPath) {
+	if r.expected != nil && r.expected.Contains(artifactPath) {
 		return nil
 	}
-	return removeOrphanArtifact(rootHandle, relativePath, artifactPath, cat, bodyCache, report)
+	return r.removeOrphanArtifact(relativePath, artifactPath)
 }
 
 func artifactExists(path string) bool {
@@ -68,11 +54,11 @@ func variantArtifactPath(variant *catalog.Variant) string {
 	return strings.TrimSpace(variant.ArtifactPath)
 }
 
-func janitorContextErr(ctx context.Context) error {
-	if ctx == nil {
+func (r *artifactJanitorRun) contextErr() error {
+	if r == nil || r.ctx == nil {
 		return nil
 	}
-	if err := ctx.Err(); err != nil {
+	if err := r.ctx.Err(); err != nil {
 		return oops.In("task").Owner("artifact janitor").Wrap(err)
 	}
 	return nil
