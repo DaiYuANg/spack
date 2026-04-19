@@ -42,6 +42,10 @@ func (c *Cache) stop(_ context.Context) error {
 	unsubscribeAll(c.variantRemovedUnsubscribe, c.variantGeneratedUnsubscribe)
 	c.variantRemovedUnsubscribe = nil
 	c.variantGeneratedUnsubscribe = nil
+	if c.cache != nil {
+		c.cache.Close()
+		c.cache = nil
+	}
 	return nil
 }
 

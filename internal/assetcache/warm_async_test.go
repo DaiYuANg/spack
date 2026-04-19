@@ -5,15 +5,14 @@ import (
 	"log/slog"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/daiyuang/spack/internal/assetcache"
+	"github.com/daiyuang/spack/internal/asyncx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
-	"github.com/panjf2000/ants/v2"
 )
 
-func TestWarmWithSharedPool(t *testing.T) {
+func TestWarmWithSharedWorkerSettings(t *testing.T) {
 	root := t.TempDir()
 	firstPath := filepath.Join(root, "index.html")
 	secondPath := filepath.Join(root, "about.html")
@@ -32,24 +31,14 @@ func TestWarmWithSharedPool(t *testing.T) {
 		Size:     int64(len("<html>about</html>")),
 	})
 
-	pool, err := ants.NewPool(2)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if cleanupErr := pool.ReleaseTimeout(3 * time.Second); cleanupErr != nil {
-			t.Fatalf("release worker pool: %v", cleanupErr)
-		}
-	})
-
 	obs := &recordingObservability{}
-	cache := assetcache.NewCacheWithPoolForTest(config.MemoryCache{
+	cache := assetcache.NewCacheWithSettingsForTest(config.MemoryCache{
 		Enable:      true,
 		Warmup:      true,
 		MaxEntries:  16,
 		MaxFileSize: 64 * 1024,
 		TTL:         "5m",
-	}, slog.New(slog.DiscardHandler), obs, pool)
+	}, slog.New(slog.DiscardHandler), obs, &asyncx.Settings{Size: 2})
 
 	stats, err := cache.Warm(context.Background(), cat)
 	if err != nil {

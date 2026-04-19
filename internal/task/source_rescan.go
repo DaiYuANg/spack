@@ -48,10 +48,14 @@ func registerSourceRescanTask(ctx context.Context, scheduler gocron.Scheduler, r
 		slog.String("id", job.ID().String()),
 		slog.String("interval", sourceRescanInterval.String()),
 	)
+	runtime.startSourceWatcher()
 	return true, nil
 }
 
 func runSourceRescan(ctx context.Context, runtime *sourceRescanRuntime) {
+	runtime.rescanMu.Lock()
+	defer runtime.rescanMu.Unlock()
+
 	startedAt := time.Now()
 	report, err := syncSourceCatalog(ctx, runtime.scanner, runtime.catalog, runtime.bodyCache)
 	recordTaskRunMetrics(ctx, runtime.obs, "source_rescan", startedAt, err)

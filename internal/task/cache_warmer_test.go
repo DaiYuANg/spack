@@ -5,13 +5,12 @@ import (
 	"log/slog"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/daiyuang/spack/internal/assetcache"
+	"github.com/daiyuang/spack/internal/asyncx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/task"
-	"github.com/panjf2000/ants/v2"
 )
 
 func TestWarmCacheHotsetWarmsConfiguredAssetsAndVariants(t *testing.T) {
@@ -51,23 +50,13 @@ type warmCacheFixture struct {
 func newWarmCacheForTest(t *testing.T) *assetcache.Cache {
 	t.Helper()
 
-	pool, poolErr := ants.NewPool(2)
-	if poolErr != nil {
-		t.Fatal(poolErr)
-	}
-	t.Cleanup(func() {
-		if cleanupErr := pool.ReleaseTimeout(3 * time.Second); cleanupErr != nil {
-			t.Fatalf("release worker pool: %v", cleanupErr)
-		}
-	})
-
-	cache := assetcache.NewCacheWithPoolForTest(config.MemoryCache{
+	cache := assetcache.NewCacheWithSettingsForTest(config.MemoryCache{
 		Enable:      true,
 		Warmup:      true,
 		MaxEntries:  16,
 		MaxFileSize: 64 * 1024,
 		TTL:         "5m",
-	}, slog.New(slog.DiscardHandler), nil, pool)
+	}, slog.New(slog.DiscardHandler), nil, &asyncx.Settings{Size: 2})
 	if startErr := assetcache.StartForTest(cache); startErr != nil {
 		t.Fatal(startErr)
 	}

@@ -78,13 +78,13 @@ flowchart TB
         Lifecycle --> Source["source"]
         Source --> Catalog["catalog"]
         Lifecycle --> Pipeline["pipeline"]
-        Lifecycle --> WorkerPool["shared worker pool"]
+        Lifecycle --> AsyncLimit["async concurrency limit"]
         Lifecycle --> AssetCache["assetcache"]
         Lifecycle --> Scheduler["gocron scheduler"]
         Lifecycle --> HTTP["Fiber HTTP server"]
         Lifecycle --> Debug["debug runtime"]
 
-        Pipeline --> WorkerPool
+        Pipeline --> AsyncLimit
         Pipeline --> ArtifactStore["artifact store"]
         ArtifactStore --> Catalog
 
@@ -120,7 +120,7 @@ flowchart TB
         Resolver --> Metrics
         Pipeline --> Metrics
         Scheduler --> Metrics
-        WorkerPool --> Metrics
+        AsyncLimit --> Metrics
         Debug --> Prometheus["/prometheus"]
         Debug --> Statsviz["/debug/statsviz"]
         Metrics --> Prometheus
@@ -341,6 +341,7 @@ HTTP:
 - `SPACK_HTTP_MEMORY_CACHE_ENABLE=true`
 - `SPACK_HTTP_MEMORY_CACHE_WARMUP=true`
 - `SPACK_HTTP_MEMORY_CACHE_MAX_ENTRIES=1024`
+- `SPACK_HTTP_MEMORY_CACHE_MAX_BYTES=67108864`
 - `SPACK_HTTP_MEMORY_CACHE_MAX_FILE_SIZE=65536`
 - `SPACK_HTTP_MEMORY_CACHE_TTL=5m`
 
@@ -355,7 +356,7 @@ Assets:
 Async:
 
 - `SPACK_ASYNC_WORKERS=<int>` default `runtime.NumCPU()`
-- used by the shared `ants` worker pool module
+- used as the shared async concurrency limit for batch work
 - event bus async dispatch follows the same worker-count setting
 
 Robots:
@@ -420,8 +421,8 @@ Debug and metrics:
 - `/prometheus` includes resolver metrics such as `spack_resolver_resolutions_total`, `spack_resolver_resolution_duration_seconds`, and `spack_resolver_generation_requests_total`
 - `/prometheus` includes background task metrics such as `spack_task_runs_total`, `spack_task_run_duration_seconds`, `spack_source_rescan_*`, `spack_artifact_janitor_*`, and `spack_cache_warmer_*`
 - `/prometheus` includes scheduler runtime metrics such as `spack_task_scheduler_running`, `spack_task_scheduler_events_total`, `spack_task_scheduler_job_events_total`, `spack_task_scheduler_job_execution_seconds`, `spack_task_scheduler_job_scheduling_delay_seconds`, `spack_task_scheduler_concurrency_limit_total`, `spack_task_scheduler_jobs_registered_current`, and `spack_task_scheduler_jobs_running_current`
-- `/prometheus` includes worker pool gauges such as `spack_workerpool_capacity_current`, `spack_workerpool_running_current`, `spack_workerpool_waiting_current`, and `spack_workerpool_free_current`
-- `/prometheus` includes worker pool execution metrics such as `spack_workerpool_batch_runs_total`, `spack_workerpool_batch_duration_seconds`, `spack_workerpool_task_runs_total`, `spack_workerpool_task_duration_seconds`, and `spack_workerpool_task_submissions_total`
+- `/prometheus` includes async concurrency gauges such as `spack_async_capacity_current`
+- `/prometheus` includes async concurrency execution metrics such as `spack_async_batch_runs_total`, `spack_async_batch_duration_seconds`, `spack_async_task_runs_total`, `spack_async_task_duration_seconds`, and `spack_async_task_submissions_total`
 - `/prometheus` includes `dix` runtime lifecycle metrics with the `spack_dix_*` prefix
 - `spack_dix_*` covers app build/start/stop, health checks, and state transitions
 - representative metrics include `spack_dix_build_total`, `spack_dix_start_total`, `spack_dix_health_check_total`, and `spack_dix_state_transition_total`
@@ -443,6 +444,7 @@ Logger:
 Internal scheduled tasks:
 
 - SPACK runs an internal source rescan every 5 minutes
+- local filesystem sources also trigger debounced rescans from `fsnotify` change events
 - the rescan reconciles mounted source files with the in-memory catalog
 - removed or changed source assets cause stale generated variants and cache entries to be invalidated
 - the internal scheduler is instrumented through `gocron`'s `SchedulerMonitor` interface and exports per-job registration, run, failure, execution-time, scheduling-delay, and concurrency-limit metrics

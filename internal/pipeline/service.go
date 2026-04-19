@@ -11,11 +11,10 @@ import (
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/DaiYuANg/arcgo/observabilityx"
+	"github.com/daiyuang/spack/internal/asyncx"
 	"github.com/daiyuang/spack/internal/cachepolicy"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
-	"github.com/daiyuang/spack/internal/workerpool"
-	"github.com/panjf2000/ants/v2"
 	"github.com/samber/oops"
 	"golang.org/x/sync/singleflight"
 )
@@ -40,7 +39,7 @@ type Service struct {
 	cleanupDone chan struct{}
 
 	variantHits collectionx.ConcurrentMap[string, time.Time]
-	warmPool    *ants.Pool
+	warmWorkers *asyncx.Settings
 
 	artifactPolicy cachepolicy.ArtifactPolicy
 
@@ -96,7 +95,7 @@ func (s *Service) Warm(ctx context.Context) error {
 		return nil
 	}
 
-	err := workerpool.RunList[*catalog.Asset](ctx, s.obs, s.warmPool, "pipeline_warm", s.catalog.AllAssets(), func(ctx context.Context, asset *catalog.Asset) error {
+	err := asyncx.RunList[*catalog.Asset](ctx, s.obs, s.warmWorkers, "pipeline_warm", s.catalog.AllAssets(), func(ctx context.Context, asset *catalog.Asset) error {
 		s.process(ctx, Request{AssetPath: asset.Path})
 		return nil
 	})

@@ -6,6 +6,7 @@ import (
 	"context"
 	"log/slog"
 	"strings"
+	"sync"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/dix"
@@ -33,6 +34,7 @@ var Module = dix.NewModule("task",
 	),
 	dix.WithModuleHooks(
 		dix.OnStart2(startTaskRuntime),
+		dix.OnStop(stopSourceRescanRuntime),
 		dix.OnStop(stopTaskRuntime),
 	),
 )
@@ -96,12 +98,15 @@ func newTaskRegistrations(
 }
 
 type sourceRescanRuntime struct {
-	scanner    sourcecatalog.Scanner
-	catalog    catalog.Catalog
-	catMetrics *catalog.RuntimeMetrics
-	bodyCache  *assetcache.Cache
-	logger     *slog.Logger
-	obs        observabilityx.Observability
+	scanner     sourcecatalog.Scanner
+	catalog     catalog.Catalog
+	catMetrics  *catalog.RuntimeMetrics
+	bodyCache   *assetcache.Cache
+	logger      *slog.Logger
+	obs         observabilityx.Observability
+	rescanMu    sync.Mutex
+	watchCancel context.CancelFunc
+	watchDone   chan struct{}
 }
 
 func newSourceRescanRuntime(

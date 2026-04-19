@@ -9,9 +9,9 @@ import (
 	"sync"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/daiyuang/spack/internal/asyncx"
 	"github.com/daiyuang/spack/internal/cachepolicy"
 	"github.com/daiyuang/spack/internal/catalog"
-	"github.com/daiyuang/spack/internal/workerpool"
 )
 
 type WarmStats struct {
@@ -54,20 +54,22 @@ func (c *Cache) GetOrLoadWithRequest(path string, request cachepolicy.MemoryRequ
 		return nil, false, errors.New("memory cache is disabled")
 	}
 
-	if body, found := c.cache.MustGet(path); found {
+	if body, found := c.cache.Get(path); found {
 		c.addCounter(metricAssetCacheHits, 1)
 		return body, true, nil
 	}
 	c.addCounter(metricAssetCacheMisses, 1)
 
-	body, err := c.readAndCachePath(path, request)
+	body, cached, err := c.readAndCachePath(path, request)
 	if err != nil {
 		c.addCounter(metricAssetCacheLoadErrors, 1)
 		return nil, false, err
 	}
 
-	c.addCounter(metricAssetCacheFills, 1)
-	c.addCounter(metricAssetCacheFillBytes, int64(len(body)))
+	if cached {
+		c.addCounter(metricAssetCacheFills, 1)
+		c.addCounter(metricAssetCacheFillBytes, int64(len(body)))
+	}
 	return body, false, nil
 }
 
@@ -75,7 +77,12 @@ func (c *Cache) Delete(path string) bool {
 	if !c.Enabled() {
 		return false
 	}
-	return c.cache.Delete(path)
+	_, found := c.cache.Get(path)
+	if found {
+		c.cache.Del(path)
+		c.cache.Wait()
+	}
+	return found
 }
 
 func (c *Cache) WarmSelected(ctx context.Context, cat catalog.Catalog) (WarmStats, error) {
@@ -107,7 +114,7 @@ func (c *Cache) Warm(ctx context.Context, cat catalog.Catalog) (WarmStats, error
 
 func (c *Cache) warmAssets(ctx context.Context, cat catalog.Catalog, stats *WarmStats) error {
 	var statsMu sync.Mutex
-	err := workerpool.RunList[*catalog.Asset](ctx, c.obs, c.pool, "asset_cache_warm", cat.AllAssets(), func(ctx context.Context, asset *catalog.Asset) error {
+	err := asyncx.RunList[*catalog.Asset](ctx, c.obs, c.workers, "asset_cache_warm", cat.AllAssets(), func(ctx context.Context, asset *catalog.Asset) error {
 		assetStats := WarmStats{}
 		if err := c.warmAsset(ctx, cat, asset, &assetStats); err != nil {
 			return err
@@ -227,16 +234,16 @@ func (c *Cache) preloadPath(path string, request cachepolicy.MemoryRequest, stat
 	if !c.ShouldServeRequest(request) || !c.shouldWarm(request) {
 		return nil
 	}
-	if _, found := c.cache.MustGet(path); found {
+	if _, found := c.cache.Get(path); found {
 		return nil
 	}
 
-	body, err := c.readAndCachePath(path, request)
+	body, cached, err := c.readAndCachePath(path, request)
 	if err != nil {
 		return err
 	}
 
-	if stats != nil {
+	if stats != nil && cached {
 		stats.Entries++
 		stats.Bytes += int64(len(body))
 	}
@@ -247,17 +254,26 @@ func (c *Cache) shouldWarm(request cachepolicy.MemoryRequest) bool {
 	return c.Enabled() && c.policy != nil && c.policy.ShouldWarm(request)
 }
 
-func (c *Cache) readAndCachePath(path string, request cachepolicy.MemoryRequest) ([]byte, error) {
+func (c *Cache) readAndCachePath(path string, request cachepolicy.MemoryRequest) ([]byte, bool, error) {
 	body, err := c.readFile(path)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	ttl := c.policy.TTL(request)
-	if ttl > 0 {
-		c.cache.SetWithTTL(path, body, ttl)
-	} else {
-		c.cache.Set(path, body)
+	cost := int64(len(body))
+	if cost < 1 {
+		cost = 1
 	}
-	return body, nil
+	cached := false
+	if ttl > 0 {
+		cached = c.cache.SetWithTTL(path, body, cost, ttl)
+	} else {
+		cached = c.cache.Set(path, body, cost)
+	}
+	c.cache.Wait()
+	if cached {
+		_, cached = c.cache.Get(path)
+	}
+	return body, cached, nil
 }

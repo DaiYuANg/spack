@@ -1,4 +1,4 @@
-package workerpool_test
+package asyncx_test
 
 import (
 	"context"

@@ -16,6 +16,7 @@ func defaultConfig() Config {
 				Enable:      true,
 				Warmup:      true,
 				MaxEntries:  1024,
+				MaxBytes:    64 * 1024 * 1024,
 				MaxFileSize: 64 * 1024,
 				TTL:         "5m",
 			},

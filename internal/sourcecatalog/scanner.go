@@ -58,6 +58,14 @@ func (s Scanner) Scan(ctx context.Context) (Snapshot, error) {
 	return s.ScanWithCatalog(ctx, nil)
 }
 
+func (s Scanner) Watch(ctx context.Context) (<-chan source.ChangeEvent, error) {
+	watcher, ok := s.src.(source.Watcher)
+	if !ok {
+		return nil, source.ErrWatchUnsupported
+	}
+	return watcher.Watch(ctx)
+}
+
 func (s Scanner) ScanWithCatalog(ctx context.Context, cat catalog.Catalog) (Snapshot, error) {
 	scanErr := oops.In("sourcecatalog").Owner("scan")
 	filesByPath := collectionx.NewMap[string, source.File]()

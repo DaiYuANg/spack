@@ -9,9 +9,9 @@ import (
 	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/DaiYuANg/arcgo/observabilityx"
+	"github.com/daiyuang/spack/internal/asyncx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
-	"github.com/panjf2000/ants/v2"
 )
 
 var Module = dix.NewModule("pipeline",
@@ -48,7 +48,7 @@ type serviceDeps struct {
 	metrics    *Metrics
 	stages     collectionx.List[Stage]
 	bus        eventx.BusRuntime
-	pool       *ants.Pool
+	workers    *asyncx.Settings
 	obs        observabilityx.Observability
 	catMetrics *catalog.RuntimeMetrics
 }
@@ -57,7 +57,7 @@ func newServiceDeps(
 	metrics *Metrics,
 	stages collectionx.List[Stage],
 	bus eventx.BusRuntime,
-	pool *ants.Pool,
+	workers *asyncx.Settings,
 	obs observabilityx.Observability,
 	catMetrics *catalog.RuntimeMetrics,
 ) serviceDeps {
@@ -65,7 +65,7 @@ func newServiceDeps(
 		metrics:    metrics,
 		stages:     stages,
 		bus:        bus,
-		pool:       pool,
+		workers:    workers,
 		obs:        observabilityx.Normalize(obs, nil),
 		catMetrics: catMetrics,
 	}
@@ -80,7 +80,7 @@ func newService(
 	workers := max(cfg.Workers, 1)
 	queueSize := resolveQueueSize(cfg, workers)
 
-	svc := newServiceState(cfg, logger, cat, deps.metrics, deps.stages, deps.bus, deps.pool, deps.obs, deps.catMetrics, queueSize)
+	svc := newServiceState(cfg, logger, cat, deps.metrics, deps.stages, deps.bus, deps.workers, deps.obs, deps.catMetrics, queueSize)
 	svc.initializeMetrics(queueSize)
 	return svc
 }

@@ -12,10 +12,10 @@ import (
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/DaiYuANg/arcgo/observabilityx"
+	"github.com/daiyuang/spack/internal/asyncx"
 	"github.com/daiyuang/spack/internal/cachepolicy"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
-	"github.com/panjf2000/ants/v2"
 )
 
 var (
@@ -58,7 +58,7 @@ func newServiceState(
 	metrics *Metrics,
 	stages collectionx.List[Stage],
 	bus eventx.BusRuntime,
-	pool *ants.Pool,
+	workers *asyncx.Settings,
 	obs observabilityx.Observability,
 	catMetrics *catalog.RuntimeMetrics,
 	queueSize int,
@@ -78,7 +78,7 @@ func newServiceState(
 		tasks:          make(chan Request, queueSize),
 		pending:        collectionx.NewConcurrentSetWithCapacity[string](queueSize),
 		variantHits:    collectionx.NewConcurrentMapWithCapacity[string, time.Time](queueSize),
-		warmPool:       pool,
+		warmWorkers:    workers,
 		artifactPolicy: cachepolicy.NewArtifactPolicy(cfg),
 	}
 }

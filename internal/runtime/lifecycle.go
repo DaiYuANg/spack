@@ -72,7 +72,7 @@ func buildDebugRuntime(
 	registerDebugCollectors(deps.catMetrics)
 	registerDebugCollectors(deps.serverMetrics)
 	registerDebugCollectors(deps.taskMetrics)
-	registerDebugCollectors(deps.workerpoolMetrics)
+	registerDebugCollectors(deps.asyncMetrics)
 	registerDebugCollectors(metrics.NewBuildInfoMetrics("spack"))
 	registerDebugCollectors(metrics.NewRuntimeInfoMetrics("spack", cfg, time.Now().UTC()))
 	if deps.metricsAdapter == nil {

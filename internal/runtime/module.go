@@ -7,13 +7,13 @@ import (
 	"github.com/DaiYuANg/arcgo/dix"
 	obsprom "github.com/DaiYuANg/arcgo/observabilityx/prometheus"
 	"github.com/daiyuang/spack/internal/assetcache"
+	"github.com/daiyuang/spack/internal/asyncx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/pipeline"
 	"github.com/daiyuang/spack/internal/server"
 	"github.com/daiyuang/spack/internal/sourcecatalog"
 	"github.com/daiyuang/spack/internal/task"
-	"github.com/daiyuang/spack/internal/workerpool"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -102,12 +102,12 @@ func newHTTPRuntime(app *fiber.App, cfg *config.Config, cat catalog.Catalog, log
 }
 
 type debugRuntimeDeps struct {
-	pipelineMetrics   *pipeline.Metrics
-	catMetrics        *catalog.RuntimeMetrics
-	serverMetrics     *server.RuntimeMetrics
-	taskMetrics       *task.RuntimeMetrics
-	workerpoolMetrics *workerpool.RuntimeMetrics
-	metricsAdapter    *obsprom.Adapter
+	pipelineMetrics *pipeline.Metrics
+	catMetrics      *catalog.RuntimeMetrics
+	serverMetrics   *server.RuntimeMetrics
+	taskMetrics     *task.RuntimeMetrics
+	asyncMetrics    *asyncx.RuntimeMetrics
+	metricsAdapter  *obsprom.Adapter
 }
 
 func newDebugRuntimeDeps(
@@ -115,16 +115,16 @@ func newDebugRuntimeDeps(
 	catMetrics *catalog.RuntimeMetrics,
 	serverMetrics *server.RuntimeMetrics,
 	taskMetrics *task.RuntimeMetrics,
-	workerpoolMetrics *workerpool.RuntimeMetrics,
+	asyncMetrics *asyncx.RuntimeMetrics,
 	metricsAdapter *obsprom.Adapter,
 ) debugRuntimeDeps {
 	return debugRuntimeDeps{
-		pipelineMetrics:   pipelineMetrics,
-		catMetrics:        catMetrics,
-		serverMetrics:     serverMetrics,
-		taskMetrics:       taskMetrics,
-		workerpoolMetrics: workerpoolMetrics,
-		metricsAdapter:    metricsAdapter,
+		pipelineMetrics: pipelineMetrics,
+		catMetrics:      catMetrics,
+		serverMetrics:   serverMetrics,
+		taskMetrics:     taskMetrics,
+		asyncMetrics:    asyncMetrics,
+		metricsAdapter:  metricsAdapter,
 	}
 }
 

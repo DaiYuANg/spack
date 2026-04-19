@@ -12,6 +12,7 @@ import (
 	"github.com/daiyuang/spack/cmd"
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/assetcache"
+	"github.com/daiyuang/spack/internal/asyncx"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/contentcoding"
 	"github.com/daiyuang/spack/internal/event"
@@ -20,7 +21,6 @@ import (
 	"github.com/daiyuang/spack/internal/server"
 	"github.com/daiyuang/spack/internal/source"
 	"github.com/daiyuang/spack/internal/sourcecatalog"
-	"github.com/daiyuang/spack/internal/workerpool"
 )
 
 func TestCreateContainerBuildPublishesDixMetrics(t *testing.T) {
@@ -29,7 +29,7 @@ func TestCreateContainerBuildPublishesDixMetrics(t *testing.T) {
 
 	app, err := cmd.CreateContainerForTest(
 		config.LoadOptions{},
-		workerpool.Module,
+		asyncx.Module,
 		event.Module,
 		source.Module,
 		sourcecatalog.Module,

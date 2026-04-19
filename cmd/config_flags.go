@@ -51,7 +51,8 @@ func bindHTTPFlags(flags *pflag.FlagSet, defaults config.HTTP) {
 	flags.Bool("http.prefork", defaults.Prefork, "Enable Fiber prefork mode.")
 	flags.Bool("http.memory_cache.enable", defaults.MemoryCache.Enable, "Enable in-memory asset cache.")
 	flags.Bool("http.memory_cache.warmup", defaults.MemoryCache.Warmup, "Preload in-memory asset cache at startup.")
-	flags.Int("http.memory_cache.max_entries", defaults.MemoryCache.MaxEntries, "Maximum number of in-memory asset cache entries.")
+	flags.Int("http.memory_cache.max_entries", defaults.MemoryCache.MaxEntries, "Expected number of in-memory asset cache entries used for admission counters.")
+	flags.Int64("http.memory_cache.max_bytes", defaults.MemoryCache.MaxBytes, "Maximum total byte cost for the in-memory asset cache.")
 	flags.Int64("http.memory_cache.max_file_size", defaults.MemoryCache.MaxFileSize, "Maximum asset size in bytes eligible for in-memory cache.")
 	flags.String("http.memory_cache.ttl", defaults.MemoryCache.TTL, "TTL for in-memory asset cache entries.")
 }
@@ -66,7 +67,7 @@ func bindAssetFlags(flags *pflag.FlagSet, defaults config.Assets) {
 }
 
 func bindAsyncFlags(flags *pflag.FlagSet, defaults config.Async) {
-	flags.Int("async.workers", defaults.NormalizedWorkers(), "Shared async worker pool size.")
+	flags.Int("async.workers", defaults.NormalizedWorkers(), "Shared async concurrency limit.")
 }
 
 func bindDebugFlags(flags *pflag.FlagSet, defaults config.Debug) {

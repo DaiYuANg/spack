@@ -6,6 +6,7 @@ import (
 	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/assetcache"
+	"github.com/daiyuang/spack/internal/asyncx"
 	"github.com/daiyuang/spack/internal/contentcoding"
 	"github.com/daiyuang/spack/internal/event"
 	"github.com/daiyuang/spack/internal/pipeline"
@@ -13,7 +14,6 @@ import (
 	"github.com/daiyuang/spack/internal/server"
 	"github.com/daiyuang/spack/internal/source"
 	"github.com/daiyuang/spack/internal/sourcecatalog"
-	"github.com/daiyuang/spack/internal/workerpool"
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
 )
@@ -25,7 +25,7 @@ var rootCmd = &cobra.Command{
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		dixInstance, err := createContainer(
 			configLoadOptions(),
-			workerpool.Module,
+			asyncx.Module,
 			event.Module,
 			source.Module,
 			sourcecatalog.Module,

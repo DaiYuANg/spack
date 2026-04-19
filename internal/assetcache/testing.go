@@ -6,8 +6,8 @@ import (
 
 	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/DaiYuANg/arcgo/observabilityx"
+	"github.com/daiyuang/spack/internal/asyncx"
 	"github.com/daiyuang/spack/internal/config"
-	"github.com/panjf2000/ants/v2"
 )
 
 // NewCacheForTest exposes cache construction for external tests.
@@ -23,7 +23,11 @@ func NewCacheWithObservabilityForTest(
 ) *Cache {
 	testCfg := config.DefaultConfigForTest()
 	testCfg.HTTP.MemoryCache = cfg
-	return newCache(&testCfg, logger, obs, nil, nil)
+	cache, err := newCache(&testCfg, logger, obs, nil, nil)
+	if err != nil {
+		panic(err)
+	}
+	return cache
 }
 
 // NewCacheWithBusForTest exposes cache construction with an event bus for external tests.
@@ -35,19 +39,27 @@ func NewCacheWithBusForTest(
 ) *Cache {
 	testCfg := config.DefaultConfigForTest()
 	testCfg.HTTP.MemoryCache = cfg
-	return newCache(&testCfg, logger, obs, bus, nil)
+	cache, err := newCache(&testCfg, logger, obs, bus, nil)
+	if err != nil {
+		panic(err)
+	}
+	return cache
 }
 
-// NewCacheWithPoolForTest exposes cache construction with a shared worker pool for external tests.
-func NewCacheWithPoolForTest(
+// NewCacheWithSettingsForTest exposes cache construction with shared worker settings for external tests.
+func NewCacheWithSettingsForTest(
 	cfg config.MemoryCache,
 	logger *slog.Logger,
 	obs observabilityx.Observability,
-	pool *ants.Pool,
+	settings *asyncx.Settings,
 ) *Cache {
 	testCfg := config.DefaultConfigForTest()
 	testCfg.HTTP.MemoryCache = cfg
-	return newCache(&testCfg, logger, obs, nil, pool)
+	cache, err := newCache(&testCfg, logger, obs, nil, settings)
+	if err != nil {
+		panic(err)
+	}
+	return cache
 }
 
 // StartForTest exposes cache lifecycle start for external tests.

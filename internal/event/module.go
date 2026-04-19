@@ -9,7 +9,7 @@ import (
 	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/DaiYuANg/arcgo/observabilityx"
-	"github.com/daiyuang/spack/internal/workerpool"
+	"github.com/daiyuang/spack/internal/asyncx"
 )
 
 var Module = dix.NewModule("event",
@@ -24,7 +24,7 @@ var Module = dix.NewModule("event",
 )
 
 func newBus(
-	settings *workerpool.Settings,
+	settings *asyncx.Settings,
 	logger *slog.Logger,
 	obs observabilityx.Observability,
 ) eventx.BusRuntime {

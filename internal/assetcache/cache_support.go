@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/DaiYuANg/arcgo/observabilityx"
-	"github.com/samber/hot/pkg/base"
+	"github.com/dgraph-io/ristretto/v2"
 )
 
 var assetCacheCounterSpecs = map[string]observabilityx.CounterSpec{
@@ -75,9 +75,11 @@ func (c *Cache) recordWarmStats(ctx context.Context, stats WarmStats) {
 	c.addCounterWithContext(ctx, metricAssetCacheWarmBytes, stats.Bytes)
 }
 
-func (c *Cache) onEviction(_ base.EvictionReason, _ string, body []byte) {
+func (c *Cache) onEviction(item *ristretto.Item[[]byte]) {
 	c.addCounter(metricAssetCacheEvictions, 1)
-	c.addCounter(metricAssetCacheEvictedBytes, int64(len(body)))
+	if item != nil {
+		c.addCounter(metricAssetCacheEvictedBytes, int64(len(item.Value)))
+	}
 }
 
 func (c *Cache) addCounter(name string, value int64) {
