@@ -363,3 +363,117 @@ func TestFindImageVariantFallsBackToMediaTypeWhenFormatEmpty(t *testing.T) {
 		t.Fatalf("expected image variant list to be filtered by derived format, got %#v", variants.Values())
 	}
 }
+
+func TestListAndDeleteVariantsUseExactAssetPathIndex(t *testing.T) {
+	cat := catalog.NewInMemoryCatalog()
+
+	for _, assetPath := range []string{"app", "app.js"} {
+		if err := cat.UpsertAsset(&catalog.Asset{
+			Path:       assetPath,
+			FullPath:   "/assets/" + assetPath,
+			MediaType:  "application/javascript",
+			SourceHash: "hash-" + assetPath,
+			ETag:       "\"hash-" + assetPath + "\"",
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if err := cat.UpsertVariant(&catalog.Variant{
+			ID:           assetPath + "|encoding=br",
+			AssetPath:    assetPath,
+			ArtifactPath: "/artifacts/" + assetPath + ".br",
+			MediaType:    "application/javascript",
+			SourceHash:   "hash-" + assetPath,
+			ETag:         "\"hash-" + assetPath + "-br\"",
+			Encoding:     "br",
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	variants := cat.ListVariants("app")
+	if variants.Len() != 1 {
+		t.Fatalf("expected exact app variants only, got %#v", variants.Values())
+	}
+	first, ok := variants.GetFirst()
+	if !ok || first.AssetPath != "app" {
+		t.Fatalf("expected app variant, got %#v", first)
+	}
+
+	var snapshotEntry *catalog.Entry
+	cat.Snapshot().Assets.Range(func(_ int, entry *catalog.Entry) bool {
+		if entry.Asset != nil && entry.Asset.Path == "app" {
+			snapshotEntry = entry
+			return false
+		}
+		return true
+	})
+	if snapshotEntry == nil || snapshotEntry.Variants.Len() != 1 {
+		t.Fatalf("expected exact app variants in snapshot, got %#v", snapshotEntry)
+	}
+
+	removed := cat.DeleteVariants("app")
+	if removed.Len() != 1 {
+		t.Fatalf("expected one app variant removed, got %d", removed.Len())
+	}
+	if got := cat.ListVariants("app.js"); got.Len() != 1 {
+		t.Fatalf("expected app.js variants to remain, got %#v", got.Values())
+	}
+}
+
+func TestListVariantsByStageAndAllVariants(t *testing.T) {
+	cat := catalog.NewInMemoryCatalog()
+
+	if err := cat.UpsertAsset(&catalog.Asset{
+		Path:       "app.js",
+		FullPath:   "/assets/app.js",
+		MediaType:  "application/javascript",
+		SourceHash: "hash-1",
+		ETag:       "\"hash-1\"",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, variant := range []*catalog.Variant{
+		{
+			ID:           "app.js|encoding=br",
+			AssetPath:    "app.js",
+			ArtifactPath: "/assets/app.js.br",
+			MediaType:    "application/javascript",
+			SourceHash:   "hash-1",
+			ETag:         "\"hash-1-br\"",
+			Encoding:     "br",
+			Metadata: collectionx.NewMapFrom(map[string]string{
+				"stage": "source_sidecar",
+			}),
+		},
+		{
+			ID:           "app.js|encoding=gzip",
+			AssetPath:    "app.js",
+			ArtifactPath: "/artifacts/app.js.gz",
+			MediaType:    "application/javascript",
+			SourceHash:   "hash-1",
+			ETag:         "\"hash-1-gzip\"",
+			Encoding:     "gzip",
+			Metadata: collectionx.NewMapFrom(map[string]string{
+				"stage": "compression",
+			}),
+		},
+	} {
+		if err := cat.UpsertVariant(variant); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	sidecars := cat.ListVariantsByStage("source_sidecar")
+	if sidecars.Len() != 1 {
+		t.Fatalf("expected one source sidecar variant, got %#v", sidecars.Values())
+	}
+	sidecar, ok := sidecars.GetFirst()
+	if !ok || sidecar.ID != "app.js|encoding=br" {
+		t.Fatalf("expected br sidecar variant, got %#v", sidecar)
+	}
+
+	if all := cat.AllVariants(); all.Len() != 2 {
+		t.Fatalf("expected all variants to return two entries, got %#v", all.Values())
+	}
+}

@@ -105,33 +105,15 @@ func collectCatalogArtifactPaths(
 ) (collectionx.Set[string], ArtifactJanitorReport, error) {
 	expected := collectionx.NewSet[string]()
 	report := ArtifactJanitorReport{}
-	for _, entry := range cat.Snapshot().Assets.Values() {
+	for _, variant := range cat.AllVariants().Values() {
 		if err := janitorContextErr(ctx); err != nil {
 			return nil, ArtifactJanitorReport{}, err
 		}
-		if err := collectCatalogEntry(entry, cat, bodyCache, expected, &report); err != nil {
+		if err := collectCatalogVariant(variant, cat, bodyCache, expected, &report); err != nil {
 			return nil, ArtifactJanitorReport{}, err
 		}
 	}
 	return expected, report, nil
-}
-
-func collectCatalogEntry(
-	entry *catalog.Entry,
-	cat catalog.Catalog,
-	bodyCache *assetcache.Cache,
-	expected collectionx.Set[string],
-	report *ArtifactJanitorReport,
-) error {
-	if entry == nil || entry.Asset == nil {
-		return nil
-	}
-	for _, variant := range entry.Variants.Values() {
-		if err := collectCatalogVariant(variant, cat, bodyCache, expected, report); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func collectCatalogVariant(

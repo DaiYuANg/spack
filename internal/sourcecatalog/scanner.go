@@ -108,13 +108,10 @@ func buildExistingScanState(cat catalog.Catalog) existingScanState {
 	state.assets = collectionx.AssociateList(assets, func(_ int, asset *catalog.Asset) (string, *catalog.Asset) {
 		return asset.Path, asset
 	})
-	assets.Range(func(_ int, asset *catalog.Asset) bool {
-		cat.ListVariants(asset.Path).Range(func(_ int, variant *catalog.Variant) bool {
-			if IsSourceSidecarVariant(variant) {
-				state.sidecars.Set(variant.ArtifactPath, variant)
-			}
-			return true
-		})
+	cat.ListVariantsByStage(SourceSidecarStage).Range(func(_ int, variant *catalog.Variant) bool {
+		if IsSourceSidecarVariant(variant) {
+			state.sidecars.Set(variant.ArtifactPath, variant)
+		}
 		return true
 	})
 	return state

@@ -1,24 +1,6 @@
 package catalog
 
-import (
-	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/hashicorp/go-memdb"
-)
-
-type assetRecord struct {
-	Path  string
-	Asset *Asset
-}
-
-type variantRecord struct {
-	AssetPath    string
-	ID           string
-	ArtifactPath string
-	Encoding     string
-	ImageFormat  string
-	Width        int
-	Variant      *Variant
-}
+import "github.com/DaiYuANg/arcgo/collectionx"
 
 type Asset struct {
 	Path       string                          `json:"path"`
@@ -78,12 +60,10 @@ type Catalog interface {
 	FindImageVariant(assetPath, format string, width int) (*Variant, bool)
 	ListVariants(assetPath string) collectionx.List[*Variant]
 	ListImageVariants(assetPath, format string) collectionx.List[*Variant]
+	ListVariantsByStage(stage string) collectionx.List[*Variant]
 	AllAssets() collectionx.List[*Asset]
+	AllVariants() collectionx.List[*Variant]
 	AssetCount() int
 	VariantCount() int
 	Snapshot() *Snapshot
-}
-
-type InMemoryCatalog struct {
-	db *memdb.MemDB
 }

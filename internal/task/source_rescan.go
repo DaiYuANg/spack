@@ -211,13 +211,10 @@ func reconcileSourceSidecars(
 
 func indexSourceSidecarVariants(cat catalog.Catalog) collectionx.Map[string, *catalog.Variant] {
 	variantsByID := collectionx.NewMap[string, *catalog.Variant]()
-	cat.AllAssets().Range(func(_ int, asset *catalog.Asset) bool {
-		cat.ListVariants(asset.Path).Range(func(_ int, variant *catalog.Variant) bool {
-			if sourcecatalog.IsSourceSidecarVariant(variant) {
-				variantsByID.Set(variant.ID, variant)
-			}
-			return true
-		})
+	cat.ListVariantsByStage(sourcecatalog.SourceSidecarStage).Range(func(_ int, variant *catalog.Variant) bool {
+		if sourcecatalog.IsSourceSidecarVariant(variant) {
+			variantsByID.Set(variant.ID, variant)
+		}
 		return true
 	})
 	return variantsByID

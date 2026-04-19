@@ -30,6 +30,13 @@ func newCatalogSchema() *memdb.DBSchema {
 							},
 						},
 					},
+					catalogVariantAssetPathIndex: {
+						Name:   catalogVariantAssetPathIndex,
+						Unique: false,
+						Indexer: &memdb.StringFieldIndex{
+							Field: "AssetPath",
+						},
+					},
 					catalogVariantArtifactPathIndex: {
 						Name:         catalogVariantArtifactPathIndex,
 						Unique:       true,
@@ -47,6 +54,14 @@ func newCatalogSchema() *memdb.DBSchema {
 								&memdb.StringFieldIndex{Field: "AssetPath"},
 								&memdb.StringFieldIndex{Field: "Encoding"},
 							},
+						},
+					},
+					catalogVariantStageIndex: {
+						Name:         catalogVariantStageIndex,
+						Unique:       false,
+						AllowMissing: true,
+						Indexer: &memdb.StringFieldIndex{
+							Field: "Stage",
 						},
 					},
 					catalogVariantAssetFormatWidthIndex: {
