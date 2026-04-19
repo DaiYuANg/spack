@@ -32,38 +32,32 @@ type assetDeliveryRuntime struct {
 	trackDelivery  bool
 }
 
-func registerAssetRoute(
-	app *fiber.App,
-	cfg *config.Config,
-	logger *slog.Logger,
-	assetResolver *resolver.Resolver,
-	pipelineSvc *pipeline.Service,
-	bodyCache *assetcache.Cache,
-	bus eventx.BusRuntime,
-	trackDelivery bool,
-) {
-	runtime := newAssetDeliveryRuntime(cfg, logger, assetResolver, pipelineSvc, bodyCache, bus, trackDelivery)
-	app.Use(routePattern(cfg.Assets.Path), runtime.handle)
+type assetDeliveryRuntimeDeps struct {
+	cfg           *config.Config
+	routeRuntime  assetRouteRuntime
+	assetResolver *resolver.Resolver
+	pipelineSvc   *pipeline.Service
+	bodyCache     *assetcache.Cache
+	bus           eventx.BusRuntime
 }
 
-func newAssetDeliveryRuntime(
-	cfg *config.Config,
-	logger *slog.Logger,
-	assetResolver *resolver.Resolver,
-	pipelineSvc *pipeline.Service,
-	bodyCache *assetcache.Cache,
-	bus eventx.BusRuntime,
-	trackDelivery bool,
-) *assetDeliveryRuntime {
+func registerAssetRoute(app *fiber.App, runtime *assetDeliveryRuntime) {
+	if runtime == nil {
+		return
+	}
+	app.Use(routePattern(runtime.mountPath), runtime.handle)
+}
+
+func newAssetDeliveryRuntime(deps assetDeliveryRuntimeDeps) *assetDeliveryRuntime {
 	return &assetDeliveryRuntime{
-		mountPath:      cfg.Assets.Path,
-		responsePolicy: cachepolicy.NewResponsePolicy(&cfg.Compression),
-		logger:         logger,
-		assetResolver:  assetResolver,
-		pipelineSvc:    pipelineSvc,
-		bodyCache:      bodyCache,
-		bus:            bus,
-		trackDelivery:  trackDelivery,
+		mountPath:      deps.cfg.Assets.Path,
+		responsePolicy: cachepolicy.NewResponsePolicy(&deps.cfg.Compression),
+		logger:         deps.routeRuntime.logger,
+		assetResolver:  deps.assetResolver,
+		pipelineSvc:    deps.pipelineSvc,
+		bodyCache:      deps.bodyCache,
+		bus:            deps.bus,
+		trackDelivery:  deps.routeRuntime.trackDelivery,
 	}
 }
 

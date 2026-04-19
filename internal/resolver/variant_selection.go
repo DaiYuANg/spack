@@ -5,30 +5,26 @@ import (
 	"github.com/daiyuang/spack/internal/catalog"
 )
 
-func pickImageVariantForFormat(
-	variants collectionx.List[*catalog.Variant],
-	usable variantUsabilityCache,
-	sourceHash string,
-	format string,
-	sourceFormat string,
-	width int,
-) *catalog.Variant {
-	if width <= 0 {
-		return findZeroWidthImageVariant(variants, usable, sourceHash, format, sourceFormat)
-	}
-	return findClosestWidthImageVariant(variants, usable, sourceHash, format, sourceFormat, width)
+type imageVariantSelection struct {
+	variants     collectionx.List[*catalog.Variant]
+	usable       variantUsabilityCache
+	sourceHash   string
+	format       string
+	sourceFormat string
+	width        int
 }
 
-func findZeroWidthImageVariant(
-	variants collectionx.List[*catalog.Variant],
-	usable variantUsabilityCache,
-	sourceHash string,
-	format string,
-	sourceFormat string,
-) *catalog.Variant {
+func pickImageVariantForFormat(selection imageVariantSelection) *catalog.Variant {
+	if selection.width <= 0 {
+		return selection.findZeroWidthImageVariant()
+	}
+	return selection.findClosestWidthImageVariant()
+}
+
+func (s imageVariantSelection) findZeroWidthImageVariant() *catalog.Variant {
 	var picked *catalog.Variant
-	variants.Range(func(_ int, candidate *catalog.Variant) bool {
-		if candidate.Width != 0 || !matchesImageVariant(candidate, usable, sourceHash, format, sourceFormat) {
+	s.variants.Range(func(_ int, candidate *catalog.Variant) bool {
+		if candidate.Width != 0 || !s.matches(candidate) {
 			return true
 		}
 		picked = candidate
@@ -37,21 +33,14 @@ func findZeroWidthImageVariant(
 	return picked
 }
 
-func findClosestWidthImageVariant(
-	variants collectionx.List[*catalog.Variant],
-	usable variantUsabilityCache,
-	sourceHash string,
-	format string,
-	sourceFormat string,
-	width int,
-) *catalog.Variant {
+func (s imageVariantSelection) findClosestWidthImageVariant() *catalog.Variant {
 	var smallestAbove *catalog.Variant
 	var largestBelow *catalog.Variant
-	variants.Range(func(_ int, candidate *catalog.Variant) bool {
-		if !matchesImageVariant(candidate, usable, sourceHash, format, sourceFormat) {
+	s.variants.Range(func(_ int, candidate *catalog.Variant) bool {
+		if !s.matches(candidate) {
 			return true
 		}
-		smallestAbove, largestBelow = updateWidthMatches(candidate, width, smallestAbove, largestBelow)
+		smallestAbove, largestBelow = updateWidthMatches(candidate, s.width, smallestAbove, largestBelow)
 		return true
 	})
 	if smallestAbove != nil {
@@ -78,18 +67,12 @@ func updateWidthMatches(
 	return smallestAbove, largestBelow
 }
 
-func matchesImageVariant(
-	candidate *catalog.Variant,
-	usable variantUsabilityCache,
-	sourceHash string,
-	format string,
-	sourceFormat string,
-) bool {
+func (s imageVariantSelection) matches(candidate *catalog.Variant) bool {
 	if candidate == nil || (candidate.Width <= 0 && candidate.Format == "") {
 		return false
 	}
-	if !usable.IsUsable(candidate, sourceHash) {
+	if !s.usable.IsUsable(candidate, s.sourceHash) {
 		return false
 	}
-	return format == "" || variantFormat(candidate, sourceFormat) == format
+	return s.format == "" || variantFormat(candidate, s.sourceFormat) == s.format
 }

@@ -28,20 +28,11 @@ func normalizeRequestStrings(values collectionx.List[string]) collectionx.List[s
 		return nil
 	}
 
-	normalized := collectionx.NewList[string]()
-	seen := collectionx.NewMapWithCapacity[string, struct{}](values.Len())
-	values.Range(func(_ int, value string) bool {
+	normalized := collectionx.FilterMapList(values, func(_ int, value string) (string, bool) {
 		normalizedValue := strings.ToLower(strings.TrimSpace(value))
-		if normalizedValue == "" {
-			return true
-		}
-		if _, ok := seen.Get(normalizedValue); ok {
-			return true
-		}
-		seen.Set(normalizedValue, struct{}{})
-		normalized.Add(normalizedValue)
-		return true
+		return normalizedValue, normalizedValue != ""
 	})
+	normalized = collectionx.NewList(collectionx.NewOrderedSet(normalized.Values()...).Values()...)
 	if normalized.IsEmpty() {
 		return nil
 	}
@@ -53,20 +44,10 @@ func normalizeRequestInts(values collectionx.List[int]) collectionx.List[int] {
 		return nil
 	}
 
-	normalized := collectionx.NewList[int]()
-	seen := collectionx.NewMapWithCapacity[int, struct{}](values.Len())
-	//seen := make(map[int]struct{})
-	values.Range(func(_ int, value int) bool {
-		if value <= 0 {
-			return true
-		}
-		if _, ok := seen.Get(value); ok {
-			return true
-		}
-		seen.Set(value, struct{}{})
-		normalized.Add(value)
-		return true
+	normalized := collectionx.FilterMapList(values, func(_ int, value int) (int, bool) {
+		return value, value > 0
 	})
+	normalized = collectionx.NewList(collectionx.NewOrderedSet(normalized.Values()...).Values()...)
 	if normalized.IsEmpty() {
 		return nil
 	}

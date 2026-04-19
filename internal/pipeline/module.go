@@ -80,7 +80,13 @@ func newService(
 	workers := max(cfg.Workers, 1)
 	queueSize := resolveQueueSize(cfg, workers)
 
-	svc := newServiceState(cfg, logger, cat, deps.metrics, deps.stages, deps.bus, deps.workers, deps.obs, deps.catMetrics, queueSize)
+	svc := newServiceState(serviceStateDeps{
+		cfg:       cfg,
+		logger:    logger,
+		cat:       cat,
+		services:  deps,
+		queueSize: queueSize,
+	})
 	svc.initializeMetrics(queueSize)
 	return svc
 }

@@ -10,9 +10,7 @@ import (
 	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/DaiYuANg/arcgo/observabilityx"
-	"github.com/daiyuang/spack/internal/asyncx"
 	"github.com/daiyuang/spack/internal/cachepolicy"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
@@ -51,35 +49,33 @@ func resolveQueueSize(cfg *config.Compression, workers int) int {
 	return queueSize
 }
 
-func newServiceState(
-	cfg *config.Compression,
-	logger *slog.Logger,
-	cat catalog.Catalog,
-	metrics *Metrics,
-	stages collectionx.List[Stage],
-	bus eventx.BusRuntime,
-	workers *asyncx.Settings,
-	obs observabilityx.Observability,
-	catMetrics *catalog.RuntimeMetrics,
-	queueSize int,
-) *Service {
+type serviceStateDeps struct {
+	cfg       *config.Compression
+	logger    *slog.Logger
+	cat       catalog.Catalog
+	services  serviceDeps
+	queueSize int
+}
+
+func newServiceState(deps serviceStateDeps) *Service {
+	stages := deps.services.stages
 	if stages == nil {
 		stages = collectionx.NewList[Stage]()
 	}
 	return &Service{
-		cfg:            cfg,
-		logger:         logger,
-		catalog:        cat,
-		metrics:        metrics,
-		obs:            observabilityx.Normalize(obs, logger),
-		catMetrics:     catMetrics,
+		cfg:            deps.cfg,
+		logger:         deps.logger,
+		catalog:        deps.cat,
+		metrics:        deps.services.metrics,
+		obs:            observabilityx.Normalize(deps.services.obs, deps.logger),
+		catMetrics:     deps.services.catMetrics,
 		stages:         stages,
-		bus:            bus,
-		tasks:          make(chan Request, queueSize),
-		pending:        collectionx.NewConcurrentSetWithCapacity[string](queueSize),
-		variantHits:    collectionx.NewConcurrentMapWithCapacity[string, time.Time](queueSize),
-		warmWorkers:    workers,
-		artifactPolicy: cachepolicy.NewArtifactPolicy(cfg),
+		bus:            deps.services.bus,
+		tasks:          make(chan Request, deps.queueSize),
+		pending:        collectionx.NewConcurrentSetWithCapacity[string](deps.queueSize),
+		variantHits:    collectionx.NewConcurrentMapWithCapacity[string, time.Time](deps.queueSize),
+		warmWorkers:    deps.services.workers,
+		artifactPolicy: cachepolicy.NewArtifactPolicy(deps.cfg),
 	}
 }
 

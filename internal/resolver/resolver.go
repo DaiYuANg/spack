@@ -256,9 +256,16 @@ func (r *Resolver) pickImageVariant(asset *catalog.Asset, width int, formats col
 	usable := newVariantUsabilityCache()
 	var picked *catalog.Variant
 	formats.Range(func(_ int, format string) bool {
+		selection := imageVariantSelection{
+			usable:       usable,
+			sourceHash:   asset.SourceHash,
+			format:       format,
+			sourceFormat: sourceFormat,
+			width:        width,
+		}
 		if width <= 0 {
 			variant, ok := findImageVariantForRead(r.catalog, asset.Path, format, 0)
-			if ok && matchesImageVariant(variant, usable, asset.SourceHash, format, sourceFormat) {
+			if ok && selection.matches(variant) {
 				picked = variant
 				return false
 			}
@@ -268,7 +275,8 @@ func (r *Resolver) pickImageVariant(asset *catalog.Asset, width int, formats col
 		if variants.IsEmpty() {
 			return true
 		}
-		picked = pickImageVariantForFormat(variants, usable, asset.SourceHash, format, sourceFormat, width)
+		selection.variants = variants
+		picked = pickImageVariantForFormat(selection)
 		return picked == nil
 	})
 	return picked

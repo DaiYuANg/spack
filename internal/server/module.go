@@ -111,7 +111,14 @@ func newAssetRouteRegistration(
 	bus eventx.BusRuntime,
 ) assetRouteRegistration {
 	return assetRouteRegistration{newAppRegistration(300, "asset_route", func(app *fiber.App) {
-		registerAssetRoute(app, cfg, runtime.logger, assetResolver, pipelineSvc, bodyCache, bus, runtime.trackDelivery)
+		registerAssetRoute(app, newAssetDeliveryRuntime(assetDeliveryRuntimeDeps{
+			cfg:           cfg,
+			routeRuntime:  runtime,
+			assetResolver: assetResolver,
+			pipelineSvc:   pipelineSvc,
+			bodyCache:     bodyCache,
+			bus:           bus,
+		}))
 	})}
 }
 
