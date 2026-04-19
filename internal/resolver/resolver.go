@@ -58,11 +58,12 @@ func newResolver(
 	}
 }
 
-func (r *Resolver) Resolve(request Request) (*Result, error) {
+func (r *Resolver) Resolve(ctx context.Context, request Request) (*Result, error) {
+	ctx = normalizeResolveContext(ctx)
 	startedAt := time.Now()
 	asset, fallbackUsed := r.findAsset(request.Path)
 	if asset == nil {
-		r.recordMetrics(startedAt, nil, ErrNotFound)
+		r.recordMetrics(ctx, startedAt, nil, ErrNotFound)
 		return nil, ErrNotFound
 	}
 
@@ -79,7 +80,7 @@ func (r *Resolver) Resolve(request Request) (*Result, error) {
 				ETag:         firstNonEmpty(variant.ETag, asset.ETag),
 				FallbackUsed: fallbackUsed,
 			}
-			r.recordMetrics(startedAt, result, nil)
+			r.recordMetrics(ctx, startedAt, result, nil)
 			return result, nil
 		}
 	}
@@ -95,7 +96,7 @@ func (r *Resolver) Resolve(request Request) (*Result, error) {
 				ETag:            firstNonEmpty(variant.ETag, asset.ETag),
 				FallbackUsed:    fallbackUsed,
 			}
-			r.recordMetrics(startedAt, result, nil)
+			r.recordMetrics(ctx, startedAt, result, nil)
 			return result, nil
 		}
 	}
@@ -110,21 +111,21 @@ func (r *Resolver) Resolve(request Request) (*Result, error) {
 		PreferredFormats:   preferredImageFormats,
 		FallbackUsed:       fallbackUsed,
 	}
-	r.recordMetrics(startedAt, result, nil)
+	r.recordMetrics(ctx, startedAt, result, nil)
 	return result, nil
 }
 
-func (r *Resolver) ResolveAfterVariantArtifactMiss(request Request, variant *catalog.Variant) (*Result, error) {
+func (r *Resolver) ResolveAfterVariantArtifactMiss(ctx context.Context, request Request, variant *catalog.Variant) (*Result, error) {
 	if r == nil {
 		return nil, ErrNotFound
 	}
 	if variant != nil {
 		r.catalog.DeleteVariantByArtifactPath(variant.ArtifactPath)
 	}
-	return r.Resolve(request)
+	return r.Resolve(ctx, request)
 }
 
-func (r *Resolver) recordMetrics(startedAt time.Time, result *Result, err error) {
+func (r *Resolver) recordMetrics(ctx context.Context, startedAt time.Time, result *Result, err error) {
 	if r == nil || r.obs == nil {
 		return
 	}
@@ -132,28 +133,35 @@ func (r *Resolver) recordMetrics(startedAt time.Time, result *Result, err error)
 	attrs := []observabilityx.Attribute{
 		observabilityx.String("result", resolutionResultKind(result, err)),
 	}
-	r.obs.Counter(resolverResolutionsTotalSpec).Add(context.Background(), 1, attrs...)
-	r.obs.Histogram(resolverResolutionDurationSpec).Record(context.Background(), time.Since(startedAt).Seconds(), attrs...)
+	r.obs.Counter(resolverResolutionsTotalSpec).Add(ctx, 1, attrs...)
+	r.obs.Histogram(resolverResolutionDurationSpec).Record(ctx, time.Since(startedAt).Seconds(), attrs...)
 
 	if result == nil {
 		return
 	}
 
 	if count := int64(listLen(result.PreferredEncodings)); count > 0 {
-		r.obs.Counter(resolverGenerationRequestsTotalSpec).Add(context.Background(), count,
+		r.obs.Counter(resolverGenerationRequestsTotalSpec).Add(ctx, count,
 			observabilityx.String("kind", "encoding"),
 		)
 	}
 	if count := int64(listLen(result.PreferredWidths)); count > 0 {
-		r.obs.Counter(resolverGenerationRequestsTotalSpec).Add(context.Background(), count,
+		r.obs.Counter(resolverGenerationRequestsTotalSpec).Add(ctx, count,
 			observabilityx.String("kind", "image_width"),
 		)
 	}
 	if count := int64(listLen(result.PreferredFormats)); count > 0 {
-		r.obs.Counter(resolverGenerationRequestsTotalSpec).Add(context.Background(), count,
+		r.obs.Counter(resolverGenerationRequestsTotalSpec).Add(ctx, count,
 			observabilityx.String("kind", "image_format"),
 		)
 	}
+}
+
+func normalizeResolveContext(ctx context.Context) context.Context {
+	if ctx == nil {
+		return context.Background()
+	}
+	return ctx
 }
 
 func resolutionResultKind(result *Result, err error) string {

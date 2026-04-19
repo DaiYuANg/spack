@@ -12,10 +12,13 @@ import (
 )
 
 type recordedMetric struct {
-	name  string
-	value float64
-	attrs map[string]any
+	name     string
+	value    float64
+	attrs    map[string]any
+	ctxValue any
 }
+
+type metricContextKey struct{}
 
 type recordingObservability struct {
 	counters   []recordedMetric
@@ -55,11 +58,12 @@ type recordingCounter struct {
 	metrics *[]recordedMetric
 }
 
-func (r recordingCounter) Add(_ context.Context, value int64, attrs ...observabilityx.Attribute) {
+func (r recordingCounter) Add(ctx context.Context, value int64, attrs ...observabilityx.Attribute) {
 	*r.metrics = append(*r.metrics, recordedMetric{
-		name:  r.name,
-		value: float64(value),
-		attrs: attrsToMap(attrs),
+		name:     r.name,
+		value:    float64(value),
+		attrs:    attrsToMap(attrs),
+		ctxValue: ctx.Value(metricContextKey{}),
 	})
 }
 
@@ -68,11 +72,12 @@ type recordingHistogram struct {
 	metrics *[]recordedMetric
 }
 
-func (r recordingHistogram) Record(_ context.Context, value float64, attrs ...observabilityx.Attribute) {
+func (r recordingHistogram) Record(ctx context.Context, value float64, attrs ...observabilityx.Attribute) {
 	*r.metrics = append(*r.metrics, recordedMetric{
-		name:  r.name,
-		value: value,
-		attrs: attrsToMap(attrs),
+		name:     r.name,
+		value:    value,
+		attrs:    attrsToMap(attrs),
+		ctxValue: ctx.Value(metricContextKey{}),
 	})
 }
 
@@ -97,7 +102,8 @@ func TestResolverMetricsRecordFallbackResolution(t *testing.T) {
 	sourcePath, cat, _ := newResolverFixture(t, "index.html", "text/html; charset=utf-8", []byte("<html>origin</html>"), spaAssetsConfig())
 	assetResolver := resolver.NewResolverWithObservabilityForTest(spaAssetsConfig(), cat, slog.New(slog.DiscardHandler), obs)
 
-	result, err := assetResolver.Resolve(resolver.Request{Path: "docs"})
+	ctx := context.WithValue(context.Background(), metricContextKey{}, "resolver-request")
+	result, err := assetResolver.Resolve(ctx, resolver.Request{Path: "docs"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,6 +113,7 @@ func TestResolverMetricsRecordFallbackResolution(t *testing.T) {
 
 	assertCounterMetric(t, obs.counters, "resolver_resolutions_total", "result", "fallback_asset")
 	assertHistogramMetric(t, obs.histograms, "resolver_resolution_duration_seconds", "result", "fallback_asset")
+	assertMetricContext(t, obs.counters, "resolver_resolutions_total", "resolver-request")
 }
 
 func TestResolverMetricsRecordGenerationRequests(t *testing.T) {
@@ -116,7 +123,7 @@ func TestResolverMetricsRecordGenerationRequests(t *testing.T) {
 	upsertTestAsset(t, cat, "hero.png", sourcePath, "image/png")
 
 	assetResolver := resolver.NewResolverWithObservabilityForTest(baseAssetsConfig(), cat, slog.New(slog.DiscardHandler), obs)
-	result, err := assetResolver.Resolve(resolver.Request{Path: "hero.png", Width: 640, Format: "jpeg"})
+	result, err := assetResolver.Resolve(context.Background(), resolver.Request{Path: "hero.png", Width: 640, Format: "jpeg"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +140,7 @@ func TestResolverMetricsRecordNotFound(t *testing.T) {
 	obs := &recordingObservability{}
 	assetResolver := resolver.NewResolverWithObservabilityForTest(&config.Assets{Entry: "index.html"}, catalog.NewInMemoryCatalog(), slog.New(slog.DiscardHandler), obs)
 
-	_, err := assetResolver.Resolve(resolver.Request{Path: "missing.txt"})
+	_, err := assetResolver.Resolve(context.Background(), resolver.Request{Path: "missing.txt"})
 	if err == nil {
 		t.Fatal("expected not found error")
 	}
@@ -189,4 +196,15 @@ func assertHistogramMetric(t *testing.T, metrics []recordedMetric, name, key str
 		}
 	}
 	t.Fatalf("expected histogram %s with %s=%v", name, key, want)
+}
+
+func assertMetricContext(t *testing.T, metrics []recordedMetric, name string, want any) {
+	t.Helper()
+
+	for _, metric := range metrics {
+		if metric.name == name && metric.ctxValue == want {
+			return
+		}
+	}
+	t.Fatalf("expected metric %s with context value %v", name, want)
 }

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"strconv"
@@ -69,7 +70,7 @@ func newAssetDeliveryRuntime(
 func (r *assetDeliveryRuntime) handle(c fiber.Ctx) error {
 	requestedFormat := media.NormalizeImageFormat(c.Query("format"))
 	request := buildResolverRequest(c, r.mountPath, requestedFormat)
-	result, err := r.assetResolver.Resolve(request)
+	result, err := r.assetResolver.Resolve(c.Context(), request)
 	if err != nil {
 		return fiber.ErrNotFound
 	}
@@ -115,7 +116,7 @@ func (r *assetDeliveryRuntime) retryResolvedAssetDelivery(
 	missingErr *missingResolvedVariantError,
 ) (string, *resolver.Result, error) {
 	for range maxVariantFallbackAttempts {
-		nextResult, resolveErr := r.resolveAfterVariantArtifactMiss(request, result, missingErr)
+		nextResult, resolveErr := r.resolveAfterVariantArtifactMiss(c.Context(), request, result, missingErr)
 		if resolveErr != nil {
 			return "", result, resolveErr
 		}
@@ -137,6 +138,7 @@ func (r *assetDeliveryRuntime) retryResolvedAssetDelivery(
 }
 
 func (r *assetDeliveryRuntime) resolveAfterVariantArtifactMiss(
+	ctx context.Context,
 	request resolver.Request,
 	result *resolver.Result,
 	missingErr *missingResolvedVariantError,
@@ -145,7 +147,7 @@ func (r *assetDeliveryRuntime) resolveAfterVariantArtifactMiss(
 		r.bodyCache.Delete(missingErr.artifactPath)
 	}
 
-	nextResult, err := r.assetResolver.ResolveAfterVariantArtifactMiss(request, result.Variant)
+	nextResult, err := r.assetResolver.ResolveAfterVariantArtifactMiss(ctx, request, result.Variant)
 	if err != nil {
 		return nil, fiber.ErrNotFound
 	}

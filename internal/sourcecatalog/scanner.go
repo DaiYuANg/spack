@@ -1,19 +1,12 @@
 package sourcecatalog
 
 import (
-	"cmp"
 	"context"
-	"fmt"
-	"path/filepath"
-	"strings"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/contentcoding"
 	"github.com/daiyuang/spack/internal/source"
-	"github.com/daiyuang/spack/pkg"
-	"github.com/samber/lo"
-	"github.com/samber/mo"
 	"github.com/samber/oops"
 )
 
@@ -28,23 +21,6 @@ type Snapshot struct {
 type Scanner struct {
 	src      source.Source
 	matchers collectionx.List[sidecarMatcher]
-}
-
-type existingScanState struct {
-	assets   collectionx.Map[string, *catalog.Asset]
-	sidecars collectionx.Map[string, *catalog.Variant]
-}
-
-type sidecarMatcher struct {
-	encoding string
-	suffix   string
-}
-
-type sidecarFile struct {
-	source.File
-	assetPath string
-	encoding  string
-	suffix    string
 }
 
 func NewScanner(src source.Source, registry contentcoding.Registry) Scanner {
@@ -67,31 +43,20 @@ func (s Scanner) Watch(ctx context.Context) (<-chan source.ChangeEvent, error) {
 }
 
 func (s Scanner) ScanWithCatalog(ctx context.Context, cat catalog.Catalog) (Snapshot, error) {
-	scanErr := oops.In("sourcecatalog").Owner("scan")
-	filesByPath := collectionx.NewMap[string, source.File]()
-	totalBytes := int64(0)
+	ctx = normalizeScanContext(ctx)
 
-	if err := s.src.Walk(func(file source.File) error {
-		if ctx != nil && ctx.Err() != nil {
-			return ctx.Err()
-		}
-		if file.IsDir {
-			return nil
-		}
-		filesByPath.Set(file.Path, file)
-		totalBytes += file.Size
-		return nil
-	}); err != nil {
-		return Snapshot{}, scanErr.Wrap(err)
+	filesByPath, totalBytes, err := s.collectSourceFiles(ctx)
+	if err != nil {
+		return Snapshot{}, err
 	}
 
 	existing := buildExistingScanState(cat)
 	sidecars := recognizeSidecars(filesByPath, s.matchers)
-	assets, err := buildAssets(filesByPath, sidecars, existing.assets)
+	assets, err := buildAssets(ctx, filesByPath, sidecars, existing.assets)
 	if err != nil {
 		return Snapshot{}, err
 	}
-	variants, err := buildSidecarVariants(sidecars, assets, existing.sidecars)
+	variants, err := buildSidecarVariants(ctx, sidecars, assets, existing.sidecars)
 	if err != nil {
 		return Snapshot{}, err
 	}
@@ -103,239 +68,38 @@ func (s Scanner) ScanWithCatalog(ctx context.Context, cat catalog.Catalog) (Snap
 	}, nil
 }
 
-func buildExistingScanState(cat catalog.Catalog) existingScanState {
-	state := existingScanState{
-		assets:   collectionx.NewMap[string, *catalog.Asset](),
-		sidecars: collectionx.NewMap[string, *catalog.Variant](),
-	}
-	if cat == nil {
-		return state
-	}
+func (s Scanner) collectSourceFiles(ctx context.Context) (collectionx.Map[string, source.File], int64, error) {
+	scanErr := oops.In("sourcecatalog").Owner("scan")
+	filesByPath := collectionx.NewMap[string, source.File]()
+	totalBytes := int64(0)
 
-	assets := cat.AllAssets()
-	state.assets = collectionx.AssociateList(assets, func(_ int, asset *catalog.Asset) (string, *catalog.Asset) {
-		return asset.Path, asset
-	})
-	cat.ListVariantsByStage(SourceSidecarStage).Range(func(_ int, variant *catalog.Variant) bool {
-		if IsSourceSidecarVariant(variant) {
-			state.sidecars.Set(variant.ArtifactPath, variant)
+	if err := s.src.Walk(func(file source.File) error {
+		if err := scanContextErr(ctx); err != nil {
+			return err
 		}
-		return true
-	})
-	return state
-}
-
-func BuildAsset(file source.File) (*catalog.Asset, error) {
-	sourceHash, err := pkg.HashFile(file.FullPath)
-	if err != nil {
-		return nil, oops.In("sourcecatalog").Owner("asset").With("asset_path", file.Path).Wrap(err)
-	}
-	return &catalog.Asset{
-		Path:       file.Path,
-		FullPath:   file.FullPath,
-		Size:       file.Size,
-		MediaType:  string(pkg.DetectMIME(file.FullPath)),
-		SourceHash: sourceHash,
-		ETag:       fmt.Sprintf("%q", sourceHash),
-		Metadata:   assetMetadata(file),
-	}, nil
-}
-
-func IsSourceSidecarVariant(variant *catalog.Variant) bool {
-	if variant == nil || variant.Metadata == nil {
-		return false
-	}
-	return strings.TrimSpace(variant.Metadata.GetOrDefault("stage", "")) == SourceSidecarStage
-}
-
-func buildSidecarMatchers(registry contentcoding.Registry) collectionx.List[sidecarMatcher] {
-	return collectionx.NewList(lo.FilterMap(registry.Names().Values(), func(name string, _ int) (sidecarMatcher, bool) {
-		strategy, ok := registry.Lookup(name)
-		if !ok {
-			return sidecarMatcher{}, false
+		if file.IsDir {
+			return nil
 		}
-		return sidecarMatcher{
-			encoding: strategy.Name(),
-			suffix:   strategy.Suffix(),
-		}, true
-	})...).Sort(func(left, right sidecarMatcher) int {
-		if len(left.suffix) == len(right.suffix) {
-			return cmp.Compare(left.encoding, right.encoding)
-		}
-		return cmp.Compare(len(right.suffix), len(left.suffix))
-	})
-}
-
-func recognizeSidecars(filesByPath collectionx.Map[string, source.File], matchers collectionx.List[sidecarMatcher]) collectionx.Map[string, sidecarFile] {
-	sidecars := collectionx.NewMapWithCapacity[string, sidecarFile](filesByPath.Len())
-	sortedKeys(filesByPath).Range(func(_ int, path string) bool {
-		match, ok := matchSidecar(path, filesByPath, matchers).Get()
-		if !ok {
-			return true
-		}
-
-		match.File = filesByPath.GetOrDefault(path, source.File{})
-		sidecars.Set(match.Path, match)
-		return true
-	})
-	return sidecars
-}
-
-func matchSidecar(path string, filesByPath collectionx.Map[string, source.File], matchers collectionx.List[sidecarMatcher]) mo.Option[sidecarFile] {
-	matcher, ok := lo.Find(matchers.Values(), func(matcher sidecarMatcher) bool {
-		if !strings.HasSuffix(path, matcher.suffix) {
-			return false
-		}
-		assetPath := normalizedAssetPath(path, matcher.suffix)
-		if assetPath == "" || assetPath == path {
-			return false
-		}
-		_, exists := filesByPath.Get(assetPath)
-		return exists
-	})
-	if !ok {
-		return mo.None[sidecarFile]()
+		filesByPath.Set(file.Path, file)
+		totalBytes += file.Size
+		return nil
+	}); err != nil {
+		return nil, 0, scanErr.Wrap(err)
 	}
 
-	return mo.Some(sidecarFile{
-		assetPath: normalizedAssetPath(path, matcher.suffix),
-		encoding:  matcher.encoding,
-		suffix:    matcher.suffix,
-	})
+	return filesByPath, totalBytes, nil
 }
 
-func buildAssets(
-	filesByPath collectionx.Map[string, source.File],
-	sidecars collectionx.Map[string, sidecarFile],
-	existingAssets collectionx.Map[string, *catalog.Asset],
-) (collectionx.Map[string, *catalog.Asset], error) {
-	assets := collectionx.NewMapWithCapacity[string, *catalog.Asset](filesByPath.Len())
-	var buildErr error
-	sortedKeys(filesByPath).Range(func(_ int, path string) bool {
-		if _, ok := sidecars.Get(path); ok {
-			return true
-		}
-		file, _ := filesByPath.Get(path)
-		if asset, ok := existingAssets.Get(path); ok && canReuseAsset(asset, file) {
-			asset.Metadata = catalog.MetadataWithModTime(asset.Metadata, file.ModTime)
-			assets.Set(path, asset)
-			return true
-		}
-		asset, err := BuildAsset(file)
-		if err != nil {
-			buildErr = err
-			return false
-		}
-		assets.Set(path, asset)
-		return true
-	})
-	if buildErr != nil {
-		return nil, buildErr
+func normalizeScanContext(ctx context.Context) context.Context {
+	if ctx == nil {
+		return context.Background()
 	}
-	return assets, nil
+	return ctx
 }
 
-func buildSidecarVariants(
-	sidecars collectionx.Map[string, sidecarFile],
-	assets collectionx.Map[string, *catalog.Asset],
-	existingSidecars collectionx.Map[string, *catalog.Variant],
-) (collectionx.Map[string, *catalog.Variant], error) {
-	variants := collectionx.NewMapWithCapacity[string, *catalog.Variant](sidecars.Len())
-	var buildErr error
-	sortedKeys(sidecars).Range(func(_ int, sidecarPath string) bool {
-		sidecar, _ := sidecars.Get(sidecarPath)
-		asset, ok := assets.Get(sidecar.assetPath)
-		if !ok || asset == nil {
-			return true
-		}
-		if variant, ok := existingSidecars.Get(sidecar.FullPath); ok && canReuseSidecarVariant(variant, sidecar, asset) {
-			variant.ID = asset.Path + sidecar.suffix
-			variant.AssetPath = asset.Path
-			variant.ArtifactPath = sidecar.FullPath
-			variant.Size = sidecar.Size
-			variant.Encoding = sidecar.encoding
-			variant.SourceHash = asset.SourceHash
-			variant.MediaType = asset.MediaType
-			variant.Metadata = catalog.MetadataWithModTime(variant.Metadata, sidecar.ModTime)
-			variants.Set(variant.ID, variant)
-			return true
-		}
-		variant, err := buildSidecarVariant(sidecar, asset)
-		if err != nil {
-			buildErr = err
-			return false
-		}
-		variants.Set(variant.ID, variant)
-		return true
-	})
-	if buildErr != nil {
-		return nil, buildErr
+func scanContextErr(ctx context.Context) error {
+	if ctx == nil {
+		return nil
 	}
-	return variants, nil
-}
-
-func canReuseAsset(asset *catalog.Asset, file source.File) bool {
-	if asset == nil {
-		return false
-	}
-	modTime, ok := catalog.MetadataModTime(asset.Metadata).Get()
-	return ok &&
-		asset.Path == file.Path &&
-		asset.FullPath == file.FullPath &&
-		asset.Size == file.Size &&
-		asset.MediaType != "" &&
-		asset.SourceHash != "" &&
-		asset.ETag != "" &&
-		modTime.Equal(file.ModTime)
-}
-
-func canReuseSidecarVariant(variant *catalog.Variant, sidecar sidecarFile, asset *catalog.Asset) bool {
-	if variant == nil || asset == nil || !IsSourceSidecarVariant(variant) {
-		return false
-	}
-	modTime, ok := catalog.MetadataModTime(variant.Metadata).Get()
-	return ok &&
-		variant.ArtifactPath == sidecar.FullPath &&
-		variant.Encoding == sidecar.encoding &&
-		variant.Size == sidecar.Size &&
-		variant.ETag != "" &&
-		modTime.Equal(sidecar.ModTime)
-}
-
-func buildSidecarVariant(sidecar sidecarFile, asset *catalog.Asset) (*catalog.Variant, error) {
-	hash, err := pkg.HashFile(sidecar.FullPath)
-	if err != nil {
-		return nil, oops.In("sourcecatalog").Owner("variant").With("artifact_path", sidecar.FullPath).Wrap(err)
-	}
-
-	return &catalog.Variant{
-		ID:           asset.Path + sidecar.suffix,
-		AssetPath:    asset.Path,
-		ArtifactPath: sidecar.FullPath,
-		Size:         sidecar.Size,
-		MediaType:    asset.MediaType,
-		SourceHash:   asset.SourceHash,
-		ETag:         fmt.Sprintf("%q", hash),
-		Encoding:     sidecar.encoding,
-		Metadata:     sidecarMetadata(sidecar),
-	}, nil
-}
-
-func sortedKeys[T any](values collectionx.Map[string, T]) collectionx.List[string] {
-	return collectionx.NewList(values.Keys()...).Sort(cmp.Compare[string])
-}
-
-func normalizedAssetPath(path, suffix string) string {
-	return strings.TrimSpace(strings.TrimSuffix(path, suffix))
-}
-
-func assetMetadata(file source.File) collectionx.Map[string, string] {
-	return catalog.MetadataWithModTime(collectionx.NewMap[string, string](), file.ModTime)
-}
-
-func sidecarMetadata(sidecar sidecarFile) collectionx.Map[string, string] {
-	return catalog.MetadataWithModTime(collectionx.NewMapFrom(map[string]string{
-		"stage":  SourceSidecarStage,
-		"source": filepath.ToSlash(sidecar.Path),
-	}), sidecar.ModTime)
+	return ctx.Err()
 }

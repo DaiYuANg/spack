@@ -1,6 +1,7 @@
 package resolver_test
 
 import (
+	"context"
 	"log/slog"
 	"path/filepath"
 	"slices"
@@ -46,7 +47,7 @@ func TestResolverSelectsCompressedVariant(t *testing.T) {
 		Encoding:     "br",
 	})
 
-	result, err := assetResolver.Resolve(resolver.Request{
+	result, err := assetResolver.Resolve(context.Background(), resolver.Request{
 		Path:           "index.html",
 		AcceptEncoding: "br,gzip",
 	})
@@ -79,7 +80,7 @@ func TestResolverSkipsDisabledEncoding(t *testing.T) {
 	compression.Encodings = "br,gzip"
 	assetResolver := resolver.NewResolverWithCompressionForTest(spaAssetsConfig(), &compression, cat, slog.New(slog.DiscardHandler))
 
-	result, err := assetResolver.Resolve(resolver.Request{
+	result, err := assetResolver.Resolve(context.Background(), resolver.Request{
 		Path:           "index.html",
 		AcceptEncoding: "zstd,br;q=0.5,gzip;q=0.1",
 	})
@@ -108,7 +109,7 @@ func TestResolverSelectsZstdVariant(t *testing.T) {
 		Encoding:     "zstd",
 	})
 
-	result, err := assetResolver.Resolve(resolver.Request{
+	result, err := assetResolver.Resolve(context.Background(), resolver.Request{
 		Path:           "index.html",
 		AcceptEncoding: "zstd,br;q=0.5,gzip;q=0.1",
 	})
