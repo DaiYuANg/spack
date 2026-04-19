@@ -119,8 +119,8 @@ func resolveTargetFormat(task Task, asset *catalog.Asset) (string, error) {
 	return targetFormat, nil
 }
 
-func shouldSkipImageArtifact(asset *catalog.Asset, srcWidth, outputWidth int, mediaType string, payloadSize int) bool {
-	return outputWidth == srcWidth && mediaType == asset.MediaType && int64(payloadSize) >= asset.Size
+func shouldSkipImageArtifact(asset *catalog.Asset, result imageGenerateResult) bool {
+	return result.Width == result.SourceWidth && result.MediaType == asset.MediaType && int64(len(result.Payload)) >= asset.Size
 }
 
 func hasImageVariant(variant *catalog.Variant, sourceHash string, width int, format string) bool {

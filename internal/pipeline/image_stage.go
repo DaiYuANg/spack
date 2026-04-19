@@ -52,8 +52,14 @@ func (s *imageStage) Execute(task Task, asset *catalog.Asset) (*catalog.Variant,
 		return nil, err
 	}
 
-	result, err := s.engine.Generate(asset.FullPath, asset.MediaType, targetFormat, task.Width, imageEncodeOptions{
-		JPEGQuality: s.cfg.JPEGQuality,
+	result, err := s.engine.Generate(imageGenerateRequest{
+		SourcePath:      asset.FullPath,
+		SourceMediaType: asset.MediaType,
+		TargetFormat:    targetFormat,
+		TargetWidth:     task.Width,
+		Encode: imageEncodeOptions{
+			JPEGQuality: s.cfg.JPEGQuality,
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("generate image artifact: %w", err)
@@ -61,7 +67,7 @@ func (s *imageStage) Execute(task Task, asset *catalog.Asset) (*catalog.Variant,
 	if result.Width <= 0 {
 		return nil, ErrVariantSkipped
 	}
-	if shouldSkipImageArtifact(asset, result.SourceWidth, result.Width, result.MediaType, len(result.Payload)) {
+	if shouldSkipImageArtifact(asset, result) {
 		return nil, ErrVariantSkipped
 	}
 

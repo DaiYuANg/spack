@@ -17,6 +17,14 @@ type imageEncodeOptions struct {
 	JPEGQuality int
 }
 
+type imageGenerateRequest struct {
+	SourcePath      string
+	SourceMediaType string
+	TargetFormat    string
+	TargetWidth     int
+	Encode          imageEncodeOptions
+}
+
 type imageGenerateResult struct {
 	Payload     []byte
 	Width       int
@@ -29,7 +37,7 @@ type imageEngine interface {
 	Name() string
 	SupportsSourceMediaType(mediaType string) bool
 	SupportedTargetFormats() collectionx.List[string]
-	Generate(sourcePath string, sourceMediaType string, targetFormat string, targetWidth int, opts imageEncodeOptions) (imageGenerateResult, error)
+	Generate(request imageGenerateRequest) (imageGenerateResult, error)
 }
 
 func newImageEngine() imageEngine {
@@ -55,8 +63,8 @@ func (builtinImageEngine) SupportedTargetFormats() collectionx.List[string] {
 	return collectionx.NewList("jpeg", "png")
 }
 
-func (builtinImageEngine) Generate(sourcePath, _, targetFormat string, targetWidth int, opts imageEncodeOptions) (imageGenerateResult, error) {
-	srcImage, sourceWidth, sourceHeight, err := loadBuiltinSourceImage(sourcePath)
+func (builtinImageEngine) Generate(request imageGenerateRequest) (imageGenerateResult, error) {
+	srcImage, sourceWidth, sourceHeight, err := loadBuiltinSourceImage(request.SourcePath)
 	if err != nil {
 		return imageGenerateResult{}, err
 	}
@@ -64,8 +72,8 @@ func (builtinImageEngine) Generate(sourcePath, _, targetFormat string, targetWid
 		return imageGenerateResult{}, ErrVariantSkipped
 	}
 
-	outputImage, outputWidth := resizeBuiltinImage(srcImage, sourceWidth, sourceHeight, targetWidth)
-	payload, ext, mediaType, err := encodeBuiltinImage(outputImage, targetFormat, opts)
+	outputImage, outputWidth := resizeBuiltinImage(srcImage, sourceWidth, sourceHeight, request.TargetWidth)
+	payload, ext, mediaType, err := encodeBuiltinImage(outputImage, request.TargetFormat, request.Encode)
 	if err != nil {
 		return imageGenerateResult{}, err
 	}
