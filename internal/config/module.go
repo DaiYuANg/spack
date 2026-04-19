@@ -13,11 +13,12 @@ import (
 	"github.com/samber/oops"
 )
 
-func NewModule(loadOptions LoadOptions, logger *slog.Logger, obs observabilityx.Observability) dix.Module {
+func NewModule(loadOptions LoadOptions) dix.Module {
 	return dix.NewModule("config",
 		dix.WithModuleProviders(
-			dix.ProviderErr1(func(validate *validator.Validate) (*Config, error) {
-				return loadConfig(loadOptions, validate, logger, obs)
+			dix.Value(loadOptions),
+			dix.ProviderErr2(func(loadOptions LoadOptions, validate *validator.Validate) (*Config, error) {
+				return loadConfig(loadOptions, validate, nil, nil)
 			}),
 			dix.Provider1(func(cfg *Config) *Debug { return &cfg.Debug }),
 			dix.Provider1(func(cfg *Config) *Image { return &cfg.Image }),

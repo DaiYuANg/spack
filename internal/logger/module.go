@@ -12,6 +12,9 @@ import (
 )
 
 var Module = dix.NewModule("logger",
+	dix.WithModuleProviders(
+		dix.Provider1(Build),
+	),
 	dix.WithModuleHooks(
 		dix.OnStop(func(ctx context.Context, logger *slog.Logger) error {
 			return logx.Close(logger)
@@ -43,14 +46,4 @@ func Build(cfg *config.Config) *slog.Logger {
 
 	logx.SetDefault(logger)
 	return logger
-}
-
-func Bootstrap(loadOptions config.LoadOptions) *slog.Logger {
-	cfg, err := config.LoadWithOptions(loadOptions)
-	if err != nil {
-		fallback := slog.Default()
-		fallback.Error("config bootstrap failed, fallback to slog default", slog.String("err", err.Error()))
-		return fallback
-	}
-	return Build(cfg)
 }

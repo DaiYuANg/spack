@@ -8,7 +8,7 @@ import (
 	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
-	"github.com/daiyuang/spack/internal/logger"
+	spacklogger "github.com/daiyuang/spack/internal/logger"
 	"github.com/daiyuang/spack/internal/metrics"
 	"github.com/daiyuang/spack/internal/runtime"
 	"github.com/daiyuang/spack/internal/task"
@@ -17,14 +17,13 @@ import (
 )
 
 func createContainer(loadOptions config.LoadOptions, userModules ...dix.Module) (*dix.App, error) {
-	bootstrapLogger := logger.Bootstrap(loadOptions)
-	metricsAdapter := metrics.NewAdapter(bootstrapLogger)
+	dixObserver := metrics.NewDeferredObserver()
 
 	allModules := collectionx.NewListWithCapacity[dix.Module](7 + len(userModules))
 	allModules.Add(validation.Module,
-		config.NewModule(loadOptions, bootstrapLogger, metricsAdapter),
-		logger.Module,
-		metrics.NewModule(metricsAdapter),
+		config.NewModule(loadOptions),
+		spacklogger.Module,
+		metrics.NewModule(dixObserver),
 		catalog.Module,
 		runtime.Module,
 		task.Module,
@@ -38,9 +37,7 @@ func createContainer(loadOptions config.LoadOptions, userModules ...dix.Module) 
 		"spack",
 		dix.WithVersion(info.Main.Version),
 		dix.WithModules(allModules.Values()...),
-		dix.WithLogger(bootstrapLogger),
-		dix.UseEventLogger(dix.NewSlogEventLogger(bootstrapLogger)),
-		metrics.WithObservability(metricsAdapter),
+		dix.WithObserver(dixObserver),
 	)
 	err := instance.Validate()
 	if err != nil {

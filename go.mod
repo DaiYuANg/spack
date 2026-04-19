@@ -3,16 +3,16 @@ module github.com/daiyuang/spack
 go 1.26.2
 
 require (
-	github.com/DaiYuANg/arcgo/collectionx v0.1.5
-	github.com/DaiYuANg/arcgo/configx v0.3.1
-	github.com/DaiYuANg/arcgo/dix v0.5.1
-	github.com/DaiYuANg/arcgo/eventx v0.3.1
-	github.com/DaiYuANg/arcgo/logx v0.1.3
-	github.com/DaiYuANg/arcgo/observabilityx v0.2.1
+	github.com/DaiYuANg/arcgo/collectionx v0.1.6
+	github.com/DaiYuANg/arcgo/configx v0.3.2
+	github.com/DaiYuANg/arcgo/dix v0.5.2
+	github.com/DaiYuANg/arcgo/eventx v0.3.2
+	github.com/DaiYuANg/arcgo/logx v0.1.4
+	github.com/DaiYuANg/arcgo/observabilityx v0.2.2
 	github.com/andybalholm/brotli v1.2.1
 	github.com/anthonynsimon/bild v0.15.0
 	github.com/arl/statsviz v0.8.0
-	github.com/dgraph-io/ristretto/v2 v2.3.0
+	github.com/dgraph-io/ristretto/v2 v2.4.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/gabriel-vasile/mimetype v1.4.13
 	github.com/go-co-op/gocron/v2 v2.21.0
@@ -51,12 +51,12 @@ require (
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
-	github.com/gofiber/schema v1.7.0 // indirect
-	github.com/gofiber/utils/v2 v2.0.2 // indirect
+	github.com/gofiber/schema v1.7.1 // indirect
+	github.com/gofiber/utils/v2 v2.0.3 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
-	github.com/hashicorp/golang-lru v0.5.4 // indirect
+	github.com/hashicorp/golang-lru v1.0.2 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/jonboulle/clockwork v0.5.0 // indirect
