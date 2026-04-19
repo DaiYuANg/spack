@@ -17,13 +17,11 @@ import (
 )
 
 func createContainer(loadOptions config.LoadOptions, userModules ...dix.Module) (*dix.App, error) {
-	dixObserver := metrics.NewDeferredObserver()
-
 	allModules := collectionx.NewListWithCapacity[dix.Module](7 + len(userModules))
 	allModules.Add(validation.Module,
 		config.NewModule(loadOptions),
 		spacklogger.Module,
-		metrics.NewModule(dixObserver),
+		metrics.Module,
 		catalog.Module,
 		runtime.Module,
 		task.Module,
@@ -37,7 +35,6 @@ func createContainer(loadOptions config.LoadOptions, userModules ...dix.Module) 
 		"spack",
 		dix.WithVersion(info.Main.Version),
 		dix.WithModules(allModules.Values()...),
-		dix.WithObserver(dixObserver),
 	)
 	err := instance.Validate()
 	if err != nil {

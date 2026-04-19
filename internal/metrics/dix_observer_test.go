@@ -36,34 +36,6 @@ func TestObserverCachesInstruments(t *testing.T) {
 	}
 }
 
-func TestDeferredObserverReplaysPendingEvents(t *testing.T) {
-	obs := &countingObservability{}
-	observer := metrics.NewDeferredObserver()
-	buildEvent := dix.BuildEvent{
-		Meta:     dix.AppMeta{Name: "spack", Version: "test"},
-		Profile:  dix.ProfileProd,
-		Duration: 10 * time.Millisecond,
-	}
-
-	observer.OnBuild(context.Background(), buildEvent)
-
-	if got := obs.counterCallsFor("dix_build_total"); got != 0 {
-		t.Fatalf("expected no metric before attach, got %d", got)
-	}
-
-	observer.Attach(obs)
-
-	if got := obs.counterCallsFor("dix_build_total"); got != 1 {
-		t.Fatalf("expected pending build event to be replayed once, got %d", got)
-	}
-
-	observer.Attach(obs)
-
-	if got := obs.counterCallsFor("dix_build_total"); got != 1 {
-		t.Fatalf("expected second attach to avoid replaying stale events, got %d", got)
-	}
-}
-
 type countingObservability struct {
 	mu             sync.Mutex
 	counterCalls   map[string]int
