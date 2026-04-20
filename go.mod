@@ -16,7 +16,7 @@ require (
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/gabriel-vasile/mimetype v1.4.13
 	github.com/go-co-op/gocron/v2 v2.21.0
-	github.com/go-git/go-git/v5 v5.17.2
+	github.com/go-git/go-git/v5 v5.18.0
 	github.com/go-playground/validator/v10 v10.30.2
 	github.com/gofiber/fiber/v3 v3.1.0
 	github.com/google/uuid v1.6.0
