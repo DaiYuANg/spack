@@ -104,30 +104,7 @@ func buildSidecarVariants(
 	assets collectionx.Map[string, *catalog.Asset],
 	existingSidecars collectionx.Map[string, *catalog.Variant],
 ) (collectionx.Map[string, *catalog.Variant], error) {
-	variants := collectionx.NewMapWithCapacity[string, *catalog.Variant](sidecars.Len())
-	candidates := collectionx.NewList[sidecarVariantBuildCandidate]()
-
-	sortedKeys(sidecars).Range(func(_ int, sidecarPath string) bool {
-		sidecar, _ := sidecars.Get(sidecarPath)
-		asset, ok := assets.Get(sidecar.assetPath)
-		if !ok || asset == nil {
-			return true
-		}
-		if variant, ok := existingSidecars.Get(sidecar.FullPath); ok && canReuseSidecarVariant(variant, sidecar, asset) {
-			variant.ID = asset.Path + sidecar.suffix
-			variant.AssetPath = asset.Path
-			variant.ArtifactPath = sidecar.FullPath
-			variant.Size = sidecar.Size
-			variant.Encoding = sidecar.encoding
-			variant.SourceHash = asset.SourceHash
-			variant.MediaType = asset.MediaType
-			variant.Metadata = catalog.MetadataWithModTime(variant.Metadata, sidecar.ModTime)
-			variants.Set(variant.ID, variant)
-			return true
-		}
-		candidates.Add(sidecarVariantBuildCandidate{sidecar: sidecar, asset: asset})
-		return true
-	})
+	variants, candidates := collectSidecarVariantBuildCandidates(sidecars, assets, existingSidecars)
 	if candidates.IsEmpty() {
 		return variants, nil
 	}
@@ -135,7 +112,9 @@ func buildSidecarVariants(
 	results := make([]*catalog.Variant, candidates.Len())
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.SetLimit(sourceScanBuildParallelism(candidates.Len()))
-	for index, candidate := range candidates.Values() {
+	candidateValues := candidates.Values()
+	for index := range candidateValues {
+		candidate := candidateValues[index]
 		group.Go(func() error {
 			if err := scanContextErr(groupCtx); err != nil {
 				return err
@@ -149,13 +128,61 @@ func buildSidecarVariants(
 		})
 	}
 	if err := group.Wait(); err != nil {
-		return nil, err
+		return nil, oops.In("sourcecatalog").Owner("sidecar build").Wrap(err)
 	}
 
 	for _, variant := range results {
 		variants.Set(variant.ID, variant)
 	}
 	return variants, nil
+}
+
+func collectSidecarVariantBuildCandidates(
+	sidecars collectionx.Map[string, sidecarFile],
+	assets collectionx.Map[string, *catalog.Asset],
+	existingSidecars collectionx.Map[string, *catalog.Variant],
+) (collectionx.Map[string, *catalog.Variant], collectionx.List[sidecarVariantBuildCandidate]) {
+	variants := collectionx.NewMapWithCapacity[string, *catalog.Variant](sidecars.Len())
+	candidates := collectionx.NewList[sidecarVariantBuildCandidate]()
+
+	sortedKeys(sidecars).Range(func(_ int, sidecarPath string) bool {
+		sidecar, _ := sidecars.Get(sidecarPath)
+		asset, ok := assets.Get(sidecar.assetPath)
+		if !ok || asset == nil {
+			return true
+		}
+		if variant, ok := reusableSidecarVariant(existingSidecars, sidecar, asset).Get(); ok {
+			variants.Set(variant.ID, variant)
+			return true
+		}
+		candidates.Add(sidecarVariantBuildCandidate{sidecar: sidecar, asset: asset})
+		return true
+	})
+	return variants, candidates
+}
+
+func reusableSidecarVariant(
+	existingSidecars collectionx.Map[string, *catalog.Variant],
+	sidecar sidecarFile,
+	asset *catalog.Asset,
+) mo.Option[*catalog.Variant] {
+	variant, ok := existingSidecars.Get(sidecar.FullPath)
+	if !ok || !canReuseSidecarVariant(variant, sidecar, asset) {
+		return mo.None[*catalog.Variant]()
+	}
+	updateReusableSidecarVariant(variant, sidecar, asset)
+	return mo.Some(variant)
+}
+
+func updateReusableSidecarVariant(variant *catalog.Variant, sidecar sidecarFile, asset *catalog.Asset) {
+	variant.ID = asset.Path + sidecar.suffix
+	variant.AssetPath = asset.Path
+	variant.ArtifactPath = sidecar.FullPath
+	variant.Size = sidecar.Size
+	variant.Encoding = sidecar.encoding
+	variant.SourceHash = asset.SourceHash
+	variant.MediaType = asset.MediaType
+	variant.Metadata = catalog.MetadataWithModTime(variant.Metadata, sidecar.ModTime)
 }
 
 func canReuseSidecarVariant(variant *catalog.Variant, sidecar sidecarFile, asset *catalog.Asset) bool {

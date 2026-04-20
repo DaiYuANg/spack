@@ -7,6 +7,7 @@ import (
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/media"
 	"github.com/samber/lo"
+	"github.com/samber/oops"
 )
 
 var supportedImageFormats = media.SupportedImageFormats()
@@ -15,41 +16,83 @@ type encodingVariantViewCatalog interface {
 	FindEncodingVariantView(assetPath, encoding string) (*catalog.Variant, bool)
 }
 
+type encodingVariantViewResultCatalog interface {
+	FindEncodingVariantViewResult(assetPath, encoding string) (*catalog.Variant, bool, error)
+}
+
 type imageVariantViewCatalog interface {
 	FindImageVariantView(assetPath, format string, width int) (*catalog.Variant, bool)
 	ListImageVariantsView(assetPath, format string) collectionx.List[*catalog.Variant]
+}
+
+type imageVariantViewResultCatalog interface {
+	FindImageVariantViewResult(assetPath, format string, width int) (*catalog.Variant, bool, error)
+	ListImageVariantsViewResult(assetPath, format string) (collectionx.List[*catalog.Variant], error)
 }
 
 type assetViewCatalog interface {
 	FindAssetView(assetPath string) (*catalog.Asset, bool)
 }
 
-func findAssetForRead(cat catalog.Catalog, assetPath string) (*catalog.Asset, bool) {
+type assetViewResultCatalog interface {
+	FindAssetViewResult(assetPath string) (*catalog.Asset, bool, error)
+}
+
+func findAssetForRead(cat catalog.Catalog, assetPath string) (*catalog.Asset, bool, error) {
+	if checkedCat, ok := cat.(assetViewResultCatalog); ok {
+		asset, ok, err := checkedCat.FindAssetViewResult(assetPath)
+		return asset, ok, wrapCatalogReadErr(err)
+	}
 	if fastCat, ok := cat.(assetViewCatalog); ok {
-		return fastCat.FindAssetView(assetPath)
+		asset, ok := fastCat.FindAssetView(assetPath)
+		return asset, ok, nil
 	}
-	return cat.FindAsset(assetPath)
+	asset, ok := cat.FindAsset(assetPath)
+	return asset, ok, nil
 }
 
-func findEncodingVariantForRead(cat catalog.Catalog, assetPath, encoding string) (*catalog.Variant, bool) {
+func findEncodingVariantForRead(cat catalog.Catalog, assetPath, encoding string) (*catalog.Variant, bool, error) {
+	if checkedCat, ok := cat.(encodingVariantViewResultCatalog); ok {
+		variant, ok, err := checkedCat.FindEncodingVariantViewResult(assetPath, encoding)
+		return variant, ok, wrapCatalogReadErr(err)
+	}
 	if fastCat, ok := cat.(encodingVariantViewCatalog); ok {
-		return fastCat.FindEncodingVariantView(assetPath, encoding)
+		variant, ok := fastCat.FindEncodingVariantView(assetPath, encoding)
+		return variant, ok, nil
 	}
-	return cat.FindEncodingVariant(assetPath, encoding)
+	variant, ok := cat.FindEncodingVariant(assetPath, encoding)
+	return variant, ok, nil
 }
 
-func findImageVariantForRead(cat catalog.Catalog, assetPath, format string, width int) (*catalog.Variant, bool) {
-	if fastCat, ok := cat.(imageVariantViewCatalog); ok {
-		return fastCat.FindImageVariantView(assetPath, format, width)
+func findImageVariantForRead(cat catalog.Catalog, assetPath, format string, width int) (*catalog.Variant, bool, error) {
+	if checkedCat, ok := cat.(imageVariantViewResultCatalog); ok {
+		variant, ok, err := checkedCat.FindImageVariantViewResult(assetPath, format, width)
+		return variant, ok, wrapCatalogReadErr(err)
 	}
-	return cat.FindImageVariant(assetPath, format, width)
+	if fastCat, ok := cat.(imageVariantViewCatalog); ok {
+		variant, ok := fastCat.FindImageVariantView(assetPath, format, width)
+		return variant, ok, nil
+	}
+	variant, ok := cat.FindImageVariant(assetPath, format, width)
+	return variant, ok, nil
 }
 
-func listImageVariantsForRead(cat catalog.Catalog, assetPath, format string) collectionx.List[*catalog.Variant] {
-	if fastCat, ok := cat.(imageVariantViewCatalog); ok {
-		return fastCat.ListImageVariantsView(assetPath, format)
+func listImageVariantsForRead(cat catalog.Catalog, assetPath, format string) (collectionx.List[*catalog.Variant], error) {
+	if checkedCat, ok := cat.(imageVariantViewResultCatalog); ok {
+		variants, err := checkedCat.ListImageVariantsViewResult(assetPath, format)
+		return variants, wrapCatalogReadErr(err)
 	}
-	return cat.ListImageVariants(assetPath, format)
+	if fastCat, ok := cat.(imageVariantViewCatalog); ok {
+		return fastCat.ListImageVariantsView(assetPath, format), nil
+	}
+	return cat.ListImageVariants(assetPath, format), nil
+}
+
+func wrapCatalogReadErr(err error) error {
+	if err == nil {
+		return nil
+	}
+	return oops.In("resolver").Owner("catalog").Wrap(err)
 }
 
 type variantUsabilityCache map[string]bool

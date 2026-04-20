@@ -5,6 +5,7 @@ import (
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/hashicorp/go-memdb"
+	"github.com/samber/oops"
 )
 
 func (c *MemDBCatalog) UpsertAsset(asset *Asset) error {
@@ -14,7 +15,7 @@ func (c *MemDBCatalog) UpsertAsset(asset *Asset) error {
 	defer txn.Abort()
 
 	if err := txn.Insert(catalogAssetsTable, record); err != nil {
-		return err
+		return oops.In("catalog").Owner("asset upsert").Wrap(err)
 	}
 	txn.Commit()
 	return nil
@@ -30,29 +31,26 @@ func (c *MemDBCatalog) UpsertVariant(variant *Variant) error {
 	txn := c.db.Txn(true)
 	defer txn.Abort()
 
-	if !assetExists(txn, record.AssetPath) {
+	exists, err := assetExists(txn, record.AssetPath)
+	if err != nil {
+		return err
+	}
+	if !exists {
 		return ErrAssetNotFound
 	}
 
-	pendingDeletes := make(map[string]*variantRecord, 4)
-	collectVariantDelete(txn, pendingDeletes, "id", record.AssetPath, record.ID)
-	if record.ArtifactPath != "" {
-		collectVariantDelete(txn, pendingDeletes, catalogVariantArtifactPathIndex, record.ArtifactPath)
-	}
-	if record.Encoding != "" {
-		collectVariantDelete(txn, pendingDeletes, catalogVariantAssetEncodingIndex, record.AssetPath, record.Encoding)
-	}
-	if record.ImageFormat != "" {
-		collectVariantDelete(txn, pendingDeletes, catalogVariantAssetFormatWidthIndex, record.AssetPath, record.ImageFormat, record.Width)
+	pendingDeletes, err := collectPendingVariantDeletes(txn, record)
+	if err != nil {
+		return err
 	}
 
 	for _, existing := range pendingDeletes {
 		if err := txn.Delete(catalogVariantsTable, existing); err != nil && !errors.Is(err, memdb.ErrNotFound) {
-			return err
+			return oops.In("catalog").Owner("variant upsert").Wrap(err)
 		}
 	}
 	if err := txn.Insert(catalogVariantsTable, record); err != nil {
-		return err
+		return oops.In("catalog").Owner("variant upsert").Wrap(err)
 	}
 	txn.Commit()
 	return nil
@@ -62,7 +60,10 @@ func (c *MemDBCatalog) DeleteAsset(assetPath string) collectionx.List[*Variant] 
 	txn := c.db.Txn(true)
 	defer txn.Abort()
 
-	record, ok := findAssetRecord(txn, assetPath)
+	record, ok, err := findAssetRecord(txn, assetPath)
+	if err != nil {
+		return collectionx.NewList[*Variant]()
+	}
 	if ok {
 		if err := txn.Delete(catalogAssetsTable, record); err != nil && !errors.Is(err, memdb.ErrNotFound) {
 			panic(err)
@@ -87,8 +88,8 @@ func (c *MemDBCatalog) DeleteVariantByArtifactPath(artifactPath string) bool {
 	txn := c.db.Txn(true)
 	defer txn.Abort()
 
-	record, ok := findVariantRecord(txn, catalogVariantArtifactPathIndex, artifactPath)
-	if !ok {
+	record, ok, err := findVariantRecord(txn, catalogVariantArtifactPathIndex, artifactPath)
+	if err != nil || !ok {
 		return false
 	}
 	if err := txn.Delete(catalogVariantsTable, record); err != nil {
@@ -101,12 +102,45 @@ func (c *MemDBCatalog) DeleteVariantByArtifactPath(artifactPath string) bool {
 	return true
 }
 
-func collectVariantDelete(txn *memdb.Txn, pending map[string]*variantRecord, index string, args ...interface{}) {
-	record, ok := findVariantRecord(txn, index, args...)
-	if !ok {
-		return
+func collectPendingVariantDeletes(txn *memdb.Txn, record *variantRecord) (map[string]*variantRecord, error) {
+	pendingDeletes := make(map[string]*variantRecord, 4)
+	lookups := variantDeleteLookups(record)
+	for _, lookup := range lookups {
+		if err := collectVariantDelete(txn, pendingDeletes, lookup.index, lookup.args...); err != nil {
+			return nil, err
+		}
+	}
+	return pendingDeletes, nil
+}
+
+type variantDeleteLookup struct {
+	index string
+	args  []any
+}
+
+func variantDeleteLookups(record *variantRecord) []variantDeleteLookup {
+	lookups := []variantDeleteLookup{
+		{index: "id", args: []any{record.AssetPath, record.ID}},
+	}
+	if record.ArtifactPath != "" {
+		lookups = append(lookups, variantDeleteLookup{index: catalogVariantArtifactPathIndex, args: []any{record.ArtifactPath}})
+	}
+	if record.Encoding != "" {
+		lookups = append(lookups, variantDeleteLookup{index: catalogVariantAssetEncodingIndex, args: []any{record.AssetPath, record.Encoding}})
+	}
+	if record.ImageFormat != "" {
+		lookups = append(lookups, variantDeleteLookup{index: catalogVariantAssetFormatWidthIndex, args: []any{record.AssetPath, record.ImageFormat, record.Width}})
+	}
+	return lookups
+}
+
+func collectVariantDelete(txn *memdb.Txn, pending map[string]*variantRecord, index string, args ...any) error {
+	record, ok, err := findVariantRecord(txn, index, args...)
+	if err != nil || !ok {
+		return err
 	}
 	pending[variantRecordKey(record)] = record
+	return nil
 }
 
 func deleteVariantsByAssetPath(txn *memdb.Txn, assetPath string) collectionx.List[*Variant] {

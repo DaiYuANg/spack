@@ -27,6 +27,7 @@ var Module = dix.NewModule("task",
 		dix.Provider6(newSourceRescanRuntime),
 		dix.Provider6(newArtifactJanitorRuntime),
 		dix.Provider5(newCacheWarmerRuntime),
+		dix.Provider1(newSourceRescanWatcher),
 		dix.Provider1(newSourceRescanTaskRegistration),
 		dix.Provider1(newArtifactJanitorTaskRegistration),
 		dix.Provider1(newCacheWarmerTaskRegistration),
@@ -34,7 +35,8 @@ var Module = dix.NewModule("task",
 	),
 	dix.WithModuleHooks(
 		dix.OnStart2(startTaskRuntime),
-		dix.OnStop(stopSourceRescanRuntime),
+		dix.OnStart(startSourceRescanWatcher),
+		dix.OnStop(stopSourceRescanWatcher),
 		dix.OnStop(stopTaskRuntime),
 	),
 )
@@ -98,15 +100,13 @@ func newTaskRegistrations(
 }
 
 type sourceRescanRuntime struct {
-	scanner     sourcecatalog.Scanner
-	catalog     catalog.Catalog
-	catMetrics  *catalog.RuntimeMetrics
-	bodyCache   *assetcache.Cache
-	logger      *slog.Logger
-	obs         observabilityx.Observability
-	rescanMu    sync.Mutex
-	watchCancel context.CancelFunc
-	watchDone   chan struct{}
+	scanner    sourcecatalog.Scanner
+	catalog    catalog.Catalog
+	catMetrics *catalog.RuntimeMetrics
+	bodyCache  *assetcache.Cache
+	logger     *slog.Logger
+	obs        observabilityx.Observability
+	rescanMu   sync.Mutex
 }
 
 func newSourceRescanRuntime(
@@ -131,6 +131,16 @@ func newSourceRescanTaskRegistration(runtime *sourceRescanRuntime) sourceRescanT
 	return sourceRescanTaskRegistration{newTaskRegistration(100, "source_rescan", func(ctx context.Context, scheduler gocron.Scheduler) (bool, error) {
 		return registerSourceRescanTask(ctx, scheduler, runtime)
 	})}
+}
+
+type sourceRescanWatcher struct {
+	runtime *sourceRescanRuntime
+	cancel  context.CancelFunc
+	done    chan struct{}
+}
+
+func newSourceRescanWatcher(runtime *sourceRescanRuntime) *sourceRescanWatcher {
+	return &sourceRescanWatcher{runtime: runtime}
 }
 
 type artifactJanitorRuntime struct {

@@ -47,22 +47,7 @@ func buildAssets(
 	sidecars collectionx.Map[string, sidecarFile],
 	existingAssets collectionx.Map[string, *catalog.Asset],
 ) (collectionx.Map[string, *catalog.Asset], error) {
-	assets := collectionx.NewMapWithCapacity[string, *catalog.Asset](filesByPath.Len())
-	candidates := collectionx.NewList[assetBuildCandidate]()
-
-	sortedKeys(filesByPath).Range(func(_ int, path string) bool {
-		if _, ok := sidecars.Get(path); ok {
-			return true
-		}
-		file, _ := filesByPath.Get(path)
-		if asset, ok := existingAssets.Get(path); ok && canReuseAsset(asset, file) {
-			asset.Metadata = catalog.MetadataWithModTime(asset.Metadata, file.ModTime)
-			assets.Set(path, asset)
-			return true
-		}
-		candidates.Add(assetBuildCandidate{path: path, file: file})
-		return true
-	})
+	assets, candidates := collectAssetBuildCandidates(filesByPath, sidecars, existingAssets)
 	if candidates.IsEmpty() {
 		return assets, nil
 	}
@@ -84,13 +69,37 @@ func buildAssets(
 		})
 	}
 	if err := group.Wait(); err != nil {
-		return nil, err
+		return nil, oops.In("sourcecatalog").Owner("asset build").Wrap(err)
 	}
 
 	for _, result := range results {
 		assets.Set(result.path, result.asset)
 	}
 	return assets, nil
+}
+
+func collectAssetBuildCandidates(
+	filesByPath collectionx.Map[string, source.File],
+	sidecars collectionx.Map[string, sidecarFile],
+	existingAssets collectionx.Map[string, *catalog.Asset],
+) (collectionx.Map[string, *catalog.Asset], collectionx.List[assetBuildCandidate]) {
+	assets := collectionx.NewMapWithCapacity[string, *catalog.Asset](filesByPath.Len())
+	candidates := collectionx.NewList[assetBuildCandidate]()
+
+	sortedKeys(filesByPath).Range(func(_ int, path string) bool {
+		if _, ok := sidecars.Get(path); ok {
+			return true
+		}
+		file, _ := filesByPath.Get(path)
+		if asset, ok := existingAssets.Get(path); ok && canReuseAsset(asset, file) {
+			asset.Metadata = catalog.MetadataWithModTime(asset.Metadata, file.ModTime)
+			assets.Set(path, asset)
+			return true
+		}
+		candidates.Add(assetBuildCandidate{path: path, file: file})
+		return true
+	})
+	return assets, candidates
 }
 
 func canReuseAsset(asset *catalog.Asset, file source.File) bool {

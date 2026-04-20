@@ -47,7 +47,7 @@ func TestLocalFSWatchReportsFileChanges(t *testing.T) {
 		t.Fatal("expected local filesystem source to support watching")
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	changes, err := watcher.Watch(ctx)

@@ -1,3 +1,4 @@
+// Package appmeta wires application metadata into the DI container.
 package appmeta
 
 import (

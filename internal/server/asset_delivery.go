@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/daiyuang/spack/internal/cachepolicy"
 	"github.com/daiyuang/spack/internal/catalog"
@@ -100,20 +99,6 @@ func resolvedAssetSize(result *resolver.Result) (int64, bool) {
 		return size, true
 	}
 	return assetSize(result.Asset)
-}
-
-func logRequest(logger *slog.Logger, c fiber.Ctx, startedAt time.Time) {
-	attrs := []slog.Attr{
-		slog.String("method", c.Method()),
-		slog.String("path", c.Path()),
-		slog.Int("status", c.Response().StatusCode()),
-		slog.Duration("duration", time.Since(startedAt)),
-		slog.String("request_id", c.GetRespHeader(RequestIDHeader)),
-	}
-	if delivery := getAssetDelivery(c); delivery != "" {
-		attrs = append(attrs, slog.String("delivery", delivery))
-	}
-	logger.LogAttrs(c.RequestCtx(), slog.LevelInfo, "HTTP request", attrs...)
 }
 
 func buildMemoryCacheRequest(result *resolver.Result, request resolver.Request) cachepolicy.MemoryRequest {

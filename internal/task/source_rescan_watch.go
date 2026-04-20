@@ -12,39 +12,35 @@ import (
 
 const sourceRescanDebounce = 300 * time.Millisecond
 
-func (r *sourceRescanRuntime) startSourceWatcher() {
-	if r == nil || r.watchCancel != nil {
-		return
+func startSourceRescanWatcher(ctx context.Context, watcher *sourceRescanWatcher) error {
+	if watcher == nil || watcher.runtime == nil || watcher.cancel != nil {
+		return nil
 	}
 
-	watchCtx, cancel := context.WithCancel(context.Background())
-	changes, err := r.scanner.Watch(watchCtx)
+	watchCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	changes, err := watcher.runtime.scanner.Watch(watchCtx)
 	if errors.Is(err, source.ErrWatchUnsupported) {
 		cancel()
-		return
+		return nil
 	}
 	if err != nil {
 		cancel()
-		r.logger.Warn("Task source rescan watcher unavailable", slog.String("err", err.Error()))
-		return
+		watcher.runtime.logger.Warn("Task source rescan watcher unavailable", slog.String("err", err.Error()))
+		return nil
 	}
 
-	r.watchCancel = cancel
-	r.watchDone = make(chan struct{})
-	go r.watchSourceChanges(watchCtx, changes)
-	r.logger.Info("Task source rescan watcher enabled", slog.Duration("debounce", sourceRescanDebounce))
+	watcher.cancel = cancel
+	watcher.done = make(chan struct{})
+	go watcher.watchSourceChanges(watchCtx, changes)
+	watcher.runtime.logger.Info("Task source rescan watcher enabled", slog.Duration("debounce", sourceRescanDebounce))
+	return nil
 }
 
-func (r *sourceRescanRuntime) watchSourceChanges(ctx context.Context, changes <-chan source.ChangeEvent) {
-	defer close(r.watchDone)
+func (w *sourceRescanWatcher) watchSourceChanges(ctx context.Context, changes <-chan source.ChangeEvent) {
+	defer close(w.done)
 
 	timer := time.NewTimer(sourceRescanDebounce)
-	if !timer.Stop() {
-		select {
-		case <-timer.C:
-		default:
-		}
-	}
+	stopTimer(timer)
 	defer timer.Stop()
 	pending := false
 
@@ -56,7 +52,7 @@ func (r *sourceRescanRuntime) watchSourceChanges(ctx context.Context, changes <-
 			if !ok {
 				return
 			}
-			r.logger.Debug("Source change detected",
+			w.runtime.logger.Debug("Source change detected",
 				slog.String("path", change.Path),
 				slog.String("op", change.Op),
 			)
@@ -65,22 +61,22 @@ func (r *sourceRescanRuntime) watchSourceChanges(ctx context.Context, changes <-
 		case <-timer.C:
 			if pending {
 				pending = false
-				runSourceRescan(context.Background(), r)
+				runSourceRescan(ctx, w.runtime)
 			}
 		}
 	}
 }
 
-func stopSourceRescanRuntime(ctx context.Context, runtime *sourceRescanRuntime) error {
-	if runtime == nil || runtime.watchCancel == nil {
+func stopSourceRescanWatcher(ctx context.Context, watcher *sourceRescanWatcher) error {
+	if watcher == nil || watcher.cancel == nil {
 		return nil
 	}
 
-	runtime.watchCancel()
+	watcher.cancel()
 	select {
-	case <-runtime.watchDone:
-		runtime.watchCancel = nil
-		runtime.watchDone = nil
+	case <-watcher.done:
+		watcher.cancel = nil
+		watcher.done = nil
 		return nil
 	case <-ctx.Done():
 		return fmt.Errorf("stop source watcher: %w", ctx.Err())
@@ -88,11 +84,15 @@ func stopSourceRescanRuntime(ctx context.Context, runtime *sourceRescanRuntime) 
 }
 
 func resetTimer(timer *time.Timer, delay time.Duration) {
+	stopTimer(timer)
+	timer.Reset(delay)
+}
+
+func stopTimer(timer *time.Timer) {
 	if !timer.Stop() {
 		select {
 		case <-timer.C:
 		default:
 		}
 	}
-	timer.Reset(delay)
 }

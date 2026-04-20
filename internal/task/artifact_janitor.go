@@ -167,7 +167,7 @@ func (r *artifactJanitorRun) removeOrphanArtifacts() error {
 	return closeErr
 }
 
-func (r *artifactJanitorRun) removeOrphanArtifact(relativePath string, artifactPath string) error {
+func (r *artifactJanitorRun) removeOrphanArtifact(relativePath, artifactPath string) error {
 	if removeErr := r.rootHandle.Remove(filepath.ToSlash(relativePath)); removeErr != nil && !os.IsNotExist(removeErr) {
 		return oops.In("task").Owner("artifact janitor").With("artifact_path", artifactPath).Wrap(removeErr)
 	}

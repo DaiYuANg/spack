@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -52,7 +53,7 @@ func loadConfig(
 		if fileConfig.Exists("assets.fallback.target") &&
 			strings.TrimSpace(fileConfig.GetString("assets.fallback.target")) == "" &&
 			strings.TrimSpace(fileConfig.GetString("assets.fallback.on")) != "" {
-			return nil, oops.In("config").Wrap(fmt.Errorf("load config: assets.fallback.target failed validation: required_with"))
+			return nil, oops.In("config").Wrap(errors.New("load config: assets.fallback.target failed validation: required_with"))
 		}
 	}
 

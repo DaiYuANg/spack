@@ -39,7 +39,11 @@ func (s Scanner) Watch(ctx context.Context) (<-chan source.ChangeEvent, error) {
 	if !ok {
 		return nil, source.ErrWatchUnsupported
 	}
-	return watcher.Watch(ctx)
+	changes, err := watcher.Watch(ctx)
+	if err != nil {
+		return nil, oops.In("sourcecatalog").Owner("watch").Wrap(err)
+	}
+	return changes, nil
 }
 
 func (s Scanner) ScanWithCatalog(ctx context.Context, cat catalog.Catalog) (Snapshot, error) {
@@ -101,5 +105,5 @@ func scanContextErr(ctx context.Context) error {
 	if ctx == nil {
 		return nil
 	}
-	return ctx.Err()
+	return oops.In("sourcecatalog").Owner("scan context").Wrap(ctx.Err())
 }

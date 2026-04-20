@@ -13,16 +13,12 @@ import (
 )
 
 func (s *localFS) Watch(ctx context.Context) (<-chan ChangeEvent, error) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, oops.Wrap(err)
 	}
 	if err := s.addWatchDirs(watcher); err != nil {
-		_ = watcher.Close()
+		s.closeWatcher(watcher)
 		return nil, err
 	}
 
@@ -48,11 +44,7 @@ func (s *localFS) addWatchDirs(watcher *fsnotify.Watcher) error {
 
 func (s *localFS) watchLoop(ctx context.Context, watcher *fsnotify.Watcher, changes chan<- ChangeEvent) {
 	defer close(changes)
-	defer func() {
-		if err := watcher.Close(); err != nil && s.logger != nil {
-			s.logger.Debug("Close source watcher failed", slog.String("err", err.Error()))
-		}
-	}()
+	defer s.closeWatcher(watcher)
 
 	for {
 		select {
@@ -64,14 +56,27 @@ func (s *localFS) watchLoop(ctx context.Context, watcher *fsnotify.Watcher, chan
 			}
 			s.handleWatchEvent(watcher, changes, event)
 		case err, ok := <-watcher.Errors:
-			if !ok {
+			if !s.handleWatchError(err, ok) {
 				return
-			}
-			if err != nil && s.logger != nil {
-				s.logger.Warn("Source watcher error", slog.String("err", err.Error()))
 			}
 		}
 	}
+}
+
+func (s *localFS) closeWatcher(watcher *fsnotify.Watcher) {
+	if err := watcher.Close(); err != nil && s.logger != nil {
+		s.logger.Debug("Close source watcher failed", slog.String("err", err.Error()))
+	}
+}
+
+func (s *localFS) handleWatchError(err error, ok bool) bool {
+	if !ok {
+		return false
+	}
+	if err != nil && s.logger != nil {
+		s.logger.Warn("Source watcher error", slog.String("err", err.Error()))
+	}
+	return true
 }
 
 func (s *localFS) handleWatchEvent(watcher *fsnotify.Watcher, changes chan<- ChangeEvent, event fsnotify.Event) {

@@ -261,18 +261,16 @@ func (c *Cache) readAndCachePath(path string, request cachepolicy.MemoryRequest)
 	}
 
 	ttl := c.policy.TTL(request)
-	cost := int64(len(body))
-	if cost < 1 {
-		cost = 1
-	}
-	cached := false
+	cost := max(int64(len(body)), 1)
+	var stored bool
 	if ttl > 0 {
-		cached = c.cache.SetWithTTL(path, body, cost, ttl)
+		stored = c.cache.SetWithTTL(path, body, cost, ttl)
 	} else {
-		cached = c.cache.Set(path, body, cost)
+		stored = c.cache.Set(path, body, cost)
 	}
 	c.cache.Wait()
-	if cached {
+	cached := false
+	if stored {
 		_, cached = c.cache.Get(path)
 	}
 	return body, cached, nil

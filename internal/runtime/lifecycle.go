@@ -113,7 +113,8 @@ func registerDebugCollectors(provider debugCollectorProvider) {
 	}
 	for _, collector := range collectors {
 		if err := prometheus.Register(collector); err != nil {
-			if _, ok := errors.AsType[prometheus.AlreadyRegisteredError](err); ok {
+			var alreadyRegistered prometheus.AlreadyRegisteredError
+			if errors.As(err, &alreadyRegistered) {
 				continue
 			}
 			panic(err)

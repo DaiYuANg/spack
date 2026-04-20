@@ -5,7 +5,7 @@ go 1.26.2
 require (
 	github.com/DaiYuANg/arcgo/collectionx v0.1.6
 	github.com/DaiYuANg/arcgo/configx v0.3.2
-	github.com/DaiYuANg/arcgo/dix v0.6.0
+	github.com/DaiYuANg/arcgo/dix v0.6.1
 	github.com/DaiYuANg/arcgo/eventx v0.3.2
 	github.com/DaiYuANg/arcgo/logx v0.1.4
 	github.com/DaiYuANg/arcgo/observabilityx v0.2.2

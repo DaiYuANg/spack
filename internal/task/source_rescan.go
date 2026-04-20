@@ -48,7 +48,6 @@ func registerSourceRescanTask(ctx context.Context, scheduler gocron.Scheduler, r
 		slog.String("id", job.ID().String()),
 		slog.String("interval", sourceRescanInterval.String()),
 	)
-	runtime.startSourceWatcher()
 	return true, nil
 }
 

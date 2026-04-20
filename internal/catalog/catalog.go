@@ -13,4 +13,8 @@ const (
 	catalogVariantStageIndex            = "stage"
 )
 
-var ErrAssetNotFound = errors.New("asset not found")
+var (
+	ErrAssetNotFound       = errors.New("asset not found")
+	ErrRecordTypeMismatch  = errors.New("catalog record type mismatch")
+	ErrCatalogQueryFailure = errors.New("catalog query failed")
+)

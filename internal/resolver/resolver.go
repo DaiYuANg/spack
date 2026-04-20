@@ -61,7 +61,11 @@ func newResolver(
 func (r *Resolver) Resolve(ctx context.Context, request Request) (*Result, error) {
 	ctx = normalizeResolveContext(ctx)
 	startedAt := time.Now()
-	asset, fallbackUsed := r.findAsset(request.Path)
+	asset, fallbackUsed, err := r.findAsset(request.Path)
+	if err != nil {
+		r.recordMetrics(ctx, startedAt, nil, err)
+		return nil, err
+	}
 	if asset == nil {
 		r.recordMetrics(ctx, startedAt, nil, ErrNotFound)
 		return nil, ErrNotFound
@@ -70,35 +74,16 @@ func (r *Resolver) Resolve(ctx context.Context, request Request) (*Result, error
 	encodings := parseAcceptEncoding(request.AcceptEncoding, r.supportedEncodings)
 	requestedFormat := media.NormalizeImageFormat(request.Format)
 	preferredImageFormats := preferredImageFormats(request.Accept, requestedFormat, asset.MediaType)
-	if request.Width > 0 || listLen(preferredImageFormats) > 0 {
-		if variant := r.pickImageVariant(asset, request.Width, preferredImageFormats); variant != nil {
-			result := &Result{
-				Asset:        asset,
-				Variant:      variant,
-				FilePath:     variant.ArtifactPath,
-				MediaType:    firstNonEmpty(variant.MediaType, asset.MediaType),
-				ETag:         firstNonEmpty(variant.ETag, asset.ETag),
-				FallbackUsed: fallbackUsed,
-			}
-			r.recordMetrics(ctx, startedAt, result, nil)
-			return result, nil
-		}
-	}
-
-	if !request.RangeRequested && listLen(encodings) > 0 {
-		if variant := r.pickVariant(asset, encodings); variant != nil {
-			result := &Result{
-				Asset:           asset,
-				Variant:         variant,
-				FilePath:        variant.ArtifactPath,
-				MediaType:       asset.MediaType,
-				ContentEncoding: variant.Encoding,
-				ETag:            firstNonEmpty(variant.ETag, asset.ETag),
-				FallbackUsed:    fallbackUsed,
-			}
-			r.recordMetrics(ctx, startedAt, result, nil)
-			return result, nil
-		}
+	if result, ok, err := r.resolvePreferredVariant(
+		ctx,
+		startedAt,
+		asset,
+		fallbackUsed,
+		request,
+		encodings,
+		preferredImageFormats,
+	); err != nil || ok {
+		return result, err
 	}
 
 	result := &Result{
@@ -113,6 +98,83 @@ func (r *Resolver) Resolve(ctx context.Context, request Request) (*Result, error
 	}
 	r.recordMetrics(ctx, startedAt, result, nil)
 	return result, nil
+}
+
+func (r *Resolver) resolvePreferredVariant(
+	ctx context.Context,
+	startedAt time.Time,
+	asset *catalog.Asset,
+	fallbackUsed bool,
+	request Request,
+	encodings collectionx.List[string],
+	preferredImageFormats collectionx.List[string],
+) (*Result, bool, error) {
+	if request.Width > 0 || listLen(preferredImageFormats) > 0 {
+		result, ok, err := r.resolveImageVariant(ctx, startedAt, asset, fallbackUsed, request.Width, preferredImageFormats)
+		if ok || err != nil {
+			return result, ok, err
+		}
+	}
+	if request.RangeRequested || listLen(encodings) == 0 {
+		return nil, false, nil
+	}
+	return r.resolveEncodingVariant(ctx, startedAt, asset, fallbackUsed, encodings)
+}
+
+func (r *Resolver) resolveImageVariant(
+	ctx context.Context,
+	startedAt time.Time,
+	asset *catalog.Asset,
+	fallbackUsed bool,
+	width int,
+	formats collectionx.List[string],
+) (*Result, bool, error) {
+	variant, err := r.pickImageVariant(asset, width, formats)
+	if err != nil {
+		r.recordMetrics(ctx, startedAt, nil, err)
+		return nil, false, err
+	}
+	if variant == nil {
+		return nil, false, nil
+	}
+	result := &Result{
+		Asset:        asset,
+		Variant:      variant,
+		FilePath:     variant.ArtifactPath,
+		MediaType:    firstNonEmpty(variant.MediaType, asset.MediaType),
+		ETag:         firstNonEmpty(variant.ETag, asset.ETag),
+		FallbackUsed: fallbackUsed,
+	}
+	r.recordMetrics(ctx, startedAt, result, nil)
+	return result, true, nil
+}
+
+func (r *Resolver) resolveEncodingVariant(
+	ctx context.Context,
+	startedAt time.Time,
+	asset *catalog.Asset,
+	fallbackUsed bool,
+	encodings collectionx.List[string],
+) (*Result, bool, error) {
+	variant, err := r.pickVariant(asset, encodings)
+	if err != nil {
+		r.recordMetrics(ctx, startedAt, nil, err)
+		return nil, false, err
+	}
+	if variant == nil {
+		return nil, false, nil
+	}
+	result := &Result{
+		Asset:           asset,
+		Variant:         variant,
+		FilePath:        variant.ArtifactPath,
+		MediaType:       asset.MediaType,
+		ContentEncoding: variant.Encoding,
+		ETag:            firstNonEmpty(variant.ETag, asset.ETag),
+		FallbackUsed:    fallbackUsed,
+	}
+	r.recordMetrics(ctx, startedAt, result, nil)
+	return result, true, nil
 }
 
 func (r *Resolver) ResolveAfterVariantArtifactMiss(ctx context.Context, request Request, variant *catalog.Variant) (*Result, error) {
@@ -196,88 +258,39 @@ func resolutionVariantKind(variant *catalog.Variant) (string, bool) {
 	return "variant", true
 }
 
-func (r *Resolver) findAsset(requestPath string) (*catalog.Asset, bool) {
+func (r *Resolver) findAsset(requestPath string) (*catalog.Asset, bool, error) {
 	resolvedPath := requestpath.Clean(requestPath)
-	if asset, ok := r.findPrimaryAsset(resolvedPath); ok {
-		return asset, false
+	if asset, ok, err := r.findPrimaryAsset(resolvedPath); ok || err != nil {
+		return asset, false, err
 	}
 
 	if r.cfg.Fallback.On == config.FallbackOnNotFound && resolvedPath.AllowsEntryFallback {
 		target := requestpath.Clean(r.cfg.Fallback.Target).Value
 		if target != "" {
-			if asset, ok := findAssetForRead(r.catalog, target); ok {
-				return asset, true
+			asset, ok, err := findAssetForRead(r.catalog, target)
+			if ok || err != nil {
+				return asset, true, err
 			}
 		}
 	}
-	return nil, false
+	return nil, false, nil
 }
 
-func (r *Resolver) findPrimaryAsset(requestPath requestpath.Cleaned) (*catalog.Asset, bool) {
+func (r *Resolver) findPrimaryAsset(requestPath requestpath.Cleaned) (*catalog.Asset, bool, error) {
 	if requestPath.Value == "" {
 		return findAssetForRead(r.catalog, r.cfg.Entry)
 	}
 
-	if asset, ok := findAssetForRead(r.catalog, requestPath.Value); ok {
-		return asset, true
+	if asset, ok, err := findAssetForRead(r.catalog, requestPath.Value); ok || err != nil {
+		return asset, ok, err
 	}
 	if !requestPath.AllowsEntryFallback {
-		return nil, false
+		return nil, false, nil
 	}
 
 	candidate := path.Join(requestPath.Value, r.cfg.Entry)
 	if candidate == requestPath.Value {
-		return nil, false
+		return nil, false, nil
 	}
 	return findAssetForRead(r.catalog, candidate)
-}
-
-func (r *Resolver) pickVariant(asset *catalog.Asset, encodings collectionx.List[string]) *catalog.Variant {
-	usable := newVariantUsabilityCache()
-
-	var picked *catalog.Variant
-	encodings.Range(func(_ int, encoding string) bool {
-		variant, ok := findEncodingVariantForRead(r.catalog, asset.Path, encoding)
-		if !ok || !usable.IsUsable(variant, asset.SourceHash) {
-			return true
-		}
-		picked = variant
-		return false
-	})
-	return picked
-}
-
-func (r *Resolver) pickImageVariant(asset *catalog.Asset, width int, formats collectionx.List[string]) *catalog.Variant {
-	sourceFormat := media.ImageFormat(asset.MediaType)
-	if formats.IsEmpty() {
-		formats = collectionx.NewList(sourceFormat)
-	}
-
-	usable := newVariantUsabilityCache()
-	var picked *catalog.Variant
-	formats.Range(func(_ int, format string) bool {
-		selection := imageVariantSelection{
-			usable:       usable,
-			sourceHash:   asset.SourceHash,
-			format:       format,
-			sourceFormat: sourceFormat,
-			width:        width,
-		}
-		if width <= 0 {
-			variant, ok := findImageVariantForRead(r.catalog, asset.Path, format, 0)
-			if ok && selection.matches(variant) {
-				picked = variant
-				return false
-			}
-			return true
-		}
-		variants := listImageVariantsForRead(r.catalog, asset.Path, format)
-		if variants.IsEmpty() {
-			return true
-		}
-		selection.variants = variants
-		picked = pickImageVariantForFormat(selection)
-		return picked == nil
-	})
-	return picked
 }
