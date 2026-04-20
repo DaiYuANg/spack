@@ -18,6 +18,7 @@ Current scope:
 - request-path normalization for mounted, encoded, and SPA-style routes
 - `gzip`, `brotli`, and `zstd` variant generation
 - on-demand image width/format variants via query or `Accept` negotiation
+- frontend resource hints for HTML entry responses
 - in-memory hot asset cache for small files with optional startup warmup
 - `sendfile` delivery for disk-backed assets and range requests
 - conditional HTTP caching with `ETag`, `Last-Modified`, `Cache-Control`, `Expires`, and `304 Not Modified`
@@ -402,6 +403,18 @@ Images:
 - combine both as `?w=640&format=jpeg`
 - when `SPACK_IMAGE_FORMATS` is set, warmup/default image planning can pre-generate those formats
 - when `SPACK_IMAGE_FORMATS` is empty, request-time `Accept` negotiation can still ask for any supported output format
+
+Frontend hints and cache:
+
+- `SPACK_FRONTEND_RESOURCE_HINTS_ENABLE=true`
+- `SPACK_FRONTEND_RESOURCE_HINTS_EARLY_HINTS=false`
+- `SPACK_FRONTEND_RESOURCE_HINTS_MAX_LINKS=16`
+- `SPACK_FRONTEND_RESOURCE_HINTS_MAX_HEADER_BYTES=4096`
+- `SPACK_FRONTEND_IMMUTABLE_CACHE_ENABLE=true`
+- `SPACK_FRONTEND_IMMUTABLE_CACHE_MAX_AGE=8760h`
+- HTML responses can emit `Link` hints for module scripts, styles, fonts, prefetches, preconnects, and dns-prefetch entries found in the served HTML
+- HTTP `103 Early Hints` can be enabled separately for clients and proxies that handle informational responses safely
+- fingerprinted assets such as `app-deadbeef.js` or `app-DiwrgTda.css` can receive long-lived immutable cache headers while `index.html` stays revalidated
 
 Debug and metrics:
 

@@ -57,6 +57,18 @@ func defaultConfig() Config {
 			Formats:     "",
 			JPEGQuality: 78,
 		},
+		Frontend: Frontend{
+			ResourceHints: ResourceHints{
+				Enable:         true,
+				EarlyHints:     false,
+				MaxLinks:       16,
+				MaxHeaderBytes: 4096,
+			},
+			ImmutableCache: ImmutableCache{
+				Enable: true,
+				MaxAge: "8760h",
+			},
+		},
 		Compression: Compression{
 			Mode:           CompressionModeLazy,
 			Enable:         true,

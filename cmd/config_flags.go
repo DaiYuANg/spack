@@ -37,6 +37,7 @@ func newConfigFlagSet() *pflag.FlagSet {
 	bindAsyncFlags(flags, defaults.Async)
 	bindDebugFlags(flags, defaults.Debug)
 	bindImageFlags(flags, defaults.Image)
+	bindFrontendFlags(flags, defaults.Frontend)
 	bindMetricsFlags(flags, defaults.Metrics)
 	bindLoggerFlags(flags, defaults.Logger)
 	bindRobotsFlags(flags, defaults.Robots)
@@ -81,6 +82,15 @@ func bindImageFlags(flags *pflag.FlagSet, defaults config.Image) {
 	flags.String("image.widths", defaults.Widths, "Comma-separated responsive image widths.")
 	flags.String("image.formats", defaults.Formats, "Comma-separated additional image output formats for warmup and default generation.")
 	flags.Int("image.jpeg_quality", defaults.JPEGQuality, "JPEG encoding quality for generated variants.")
+}
+
+func bindFrontendFlags(flags *pflag.FlagSet, defaults config.Frontend) {
+	flags.Bool("frontend.resource_hints.enable", defaults.ResourceHints.Enable, "Emit Link resource hints for HTML responses.")
+	flags.Bool("frontend.resource_hints.early_hints", defaults.ResourceHints.EarlyHints, "Send HTTP 103 Early Hints before HTML responses.")
+	flags.Int("frontend.resource_hints.max_links", defaults.ResourceHints.MaxLinks, "Maximum resource hint links per HTML response.")
+	flags.Int("frontend.resource_hints.max_header_bytes", defaults.ResourceHints.MaxHeaderBytes, "Maximum Link header bytes for resource hints.")
+	flags.Bool("frontend.immutable_cache.enable", defaults.ImmutableCache.Enable, "Enable immutable cache headers for fingerprinted static assets.")
+	flags.String("frontend.immutable_cache.max_age", defaults.ImmutableCache.MaxAge, "Cache max-age for fingerprinted static assets.")
 }
 
 func bindMetricsFlags(flags *pflag.FlagSet, defaults config.Metrics) {

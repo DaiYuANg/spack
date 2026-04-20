@@ -6,6 +6,7 @@ type Config struct {
 	Async       Async       `koanf:"async"       validate:"required"`
 	Debug       Debug       `koanf:"debug"       validate:"required"`
 	Image       Image       `koanf:"image"       validate:"required"`
+	Frontend    Frontend    `koanf:"frontend"    validate:"required"`
 	Metrics     Metrics     `koanf:"metrics"     validate:"required"`
 	Logger      Logger      `koanf:"logger"      validate:"required"`
 	Robots      Robots      `koanf:"robots"      validate:"required"`

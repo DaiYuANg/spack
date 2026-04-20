@@ -2,9 +2,11 @@ package cachepolicy
 
 import (
 	"fmt"
+	"path"
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/daiyuang/spack/internal/catalog"
@@ -25,22 +27,48 @@ type ResponsePolicy interface {
 type StaticResponsePolicy struct {
 	defaultMaxAge   time.Duration
 	namespaceMaxAge collectionx.Map[string, time.Duration]
+	immutable       immutableAssetPolicy
+}
+
+type immutableAssetPolicy struct {
+	enabled bool
+	maxAge  time.Duration
 }
 
 // NewResponsePolicy builds a response cache policy from compression config.
 func NewResponsePolicy(cfg *config.Compression) ResponsePolicy {
+	return newStaticResponsePolicy(cfg, immutableAssetPolicy{})
+}
+
+func newStaticResponsePolicy(cfg *config.Compression, immutable immutableAssetPolicy) StaticResponsePolicy {
 	if cfg == nil {
-		return StaticResponsePolicy{namespaceMaxAge: emptyNamespaceMaxAges()}
+		return StaticResponsePolicy{namespaceMaxAge: emptyNamespaceMaxAges(), immutable: immutable}
 	}
 	return StaticResponsePolicy{
 		defaultMaxAge:   cfg.ParsedMaxAge(),
 		namespaceMaxAge: cfg.NamespaceMaxAges(),
+		immutable:       immutable,
 	}
 }
 
+// NewResponsePolicyFromConfig builds a response cache policy from full runtime config.
+func NewResponsePolicyFromConfig(cfg *config.Config) ResponsePolicy {
+	if cfg == nil {
+		return StaticResponsePolicy{namespaceMaxAge: emptyNamespaceMaxAges()}
+	}
+
+	return newStaticResponsePolicy(&cfg.Compression, immutableAssetPolicy{
+		enabled: cfg.Frontend.ImmutableCache.Enable,
+		maxAge:  cfg.Frontend.ImmutableCache.ParsedMaxAge(),
+	})
+}
+
 func (p StaticResponsePolicy) CacheControl(result *resolver.Result) string {
-	if result == nil || result.Variant == nil {
+	if result == nil {
 		return RevalidateCacheControl
+	}
+	if result.Variant == nil {
+		return p.assetCacheControl(result)
 	}
 
 	maxAge := p.variantMaxAge(result.Variant)
@@ -48,6 +76,16 @@ func (p StaticResponsePolicy) CacheControl(result *resolver.Result) string {
 		return RevalidateCacheControl
 	}
 	return fmt.Sprintf("public, max-age=%d, immutable", int(maxAge.Seconds()))
+}
+
+func (p StaticResponsePolicy) assetCacheControl(result *resolver.Result) string {
+	if !p.immutable.enabled || p.immutable.maxAge <= 0 || result.Asset == nil {
+		return RevalidateCacheControl
+	}
+	if !isFingerprintAssetPath(result.Asset.Path) {
+		return RevalidateCacheControl
+	}
+	return fmt.Sprintf("public, max-age=%d, immutable", int(p.immutable.maxAge.Seconds()))
 }
 
 func (p StaticResponsePolicy) ExpiresAt(cacheControl string, lastModified time.Time, hasLastModified bool) (time.Time, bool) {
@@ -89,5 +127,61 @@ func cacheControlMaxAge(cacheControl string) (time.Duration, bool) {
 			return 0, false
 		}
 		remaining = rest
+	}
+}
+
+func isFingerprintAssetPath(assetPath string) bool {
+	base := path.Base(strings.TrimSpace(assetPath))
+	ext := path.Ext(base)
+	if base == "." || ext == "" {
+		return false
+	}
+
+	stem := strings.TrimSuffix(base, ext)
+	if ext == ".map" {
+		ext = path.Ext(stem)
+		if ext == "" {
+			return false
+		}
+		stem = strings.TrimSuffix(stem, ext)
+	}
+	index := strings.LastIndexAny(stem, ".-_")
+	if index < 0 || index == len(stem)-1 {
+		return false
+	}
+	return isFingerprintSegment(stem[index+1:])
+}
+
+func isFingerprintSegment(segment string) bool {
+	if len(segment) < 8 {
+		return false
+	}
+
+	hasSignal := false
+	hexOnly := true
+	for _, char := range segment {
+		if !unicode.IsLetter(char) && !unicode.IsDigit(char) {
+			return false
+		}
+		if !isHexDigit(char) {
+			hexOnly = false
+		}
+		if unicode.IsUpper(char) || unicode.IsDigit(char) {
+			hasSignal = true
+		}
+	}
+	return hasSignal || hexOnly
+}
+
+func isHexDigit(char rune) bool {
+	switch {
+	case char >= '0' && char <= '9':
+		return true
+	case char >= 'a' && char <= 'f':
+		return true
+	case char >= 'A' && char <= 'F':
+		return true
+	default:
+		return false
 	}
 }

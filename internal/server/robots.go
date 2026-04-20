@@ -43,7 +43,7 @@ func registerRobotsRoute(
 	}
 
 	deliveryRuntime := &assetDeliveryRuntime{
-		responsePolicy: cachepolicy.NewResponsePolicy(&cfg.Compression),
+		responsePolicy: cachepolicy.NewResponsePolicyFromConfig(cfg),
 		logger:         logger,
 		bodyCache:      bodyCache,
 	}

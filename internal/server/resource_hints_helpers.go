@@ -1,0 +1,247 @@
+package server
+
+import (
+	"fmt"
+	"io"
+	"os"
+	"path"
+	"strings"
+
+	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/daiyuang/spack/internal/catalog"
+	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/media"
+	"golang.org/x/net/html"
+)
+
+func parseHTMLResourceHints(filePath string, cfg config.ResourceHints) (collectionx.List[string], error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("open HTML asset: %w", err)
+	}
+	defer file.Close()
+
+	tokenizer := html.NewTokenizer(io.LimitReader(file, maxResourceHintScanBytes))
+	links := collectionx.NewList[string]()
+	seen := collectionx.NewOrderedSet[string]()
+	headerBytes := 0
+
+	for {
+		switch tokenizer.Next() {
+		case html.ErrorToken:
+			if err := tokenizer.Err(); err != nil && err != io.EOF {
+				return links, fmt.Errorf("parse HTML asset: %w", err)
+			}
+			return links, nil
+		case html.StartTagToken, html.SelfClosingTagToken:
+			name, _ := tokenizer.TagName()
+			hint, ok := resourceHintFromTag(string(name), htmlTagAttrs(tokenizer))
+			if !ok {
+				continue
+			}
+			if !appendResourceHint(links, seen, hint, cfg, &headerBytes) {
+				return links, nil
+			}
+		}
+	}
+}
+
+func appendResourceHint(
+	links collectionx.List[string],
+	seen collectionx.OrderedSet[string],
+	hint resourceHint,
+	cfg config.ResourceHints,
+	headerBytes *int,
+) bool {
+	header, ok := hint.Header()
+	if !ok || seen.Contains(header) {
+		return true
+	}
+	if links.Len() >= cfg.LinkLimit() {
+		return false
+	}
+
+	nextBytes := *headerBytes + len(header)
+	if links.Len() > 0 {
+		nextBytes += len(", ")
+	}
+	if nextBytes > cfg.HeaderByteLimit() {
+		return false
+	}
+
+	seen.Add(header)
+	links.Add(header)
+	*headerBytes = nextBytes
+	return true
+}
+
+func resourceHintFromTag(tag string, attrs collectionx.Map[string, string]) (resourceHint, bool) {
+	switch strings.ToLower(tag) {
+	case "script":
+		return scriptResourceHint(attrs)
+	case "link":
+		return linkResourceHint(attrs)
+	default:
+		return resourceHint{}, false
+	}
+}
+
+func scriptResourceHint(attrs collectionx.Map[string, string]) (resourceHint, bool) {
+	src := attrs.GetOrDefault("src", "")
+	if !isValidResourceHintURL(src) {
+		return resourceHint{}, false
+	}
+
+	scriptType := strings.ToLower(strings.TrimSpace(attrs.GetOrDefault("type", "")))
+	if scriptType == "module" {
+		return resourceHint{url: src, rel: "modulepreload", crossorigin: attrs.GetOrDefault("crossorigin", "")}, true
+	}
+	if scriptType == "" || strings.Contains(scriptType, "javascript") {
+		return resourceHint{url: src, rel: "preload", as: "script", crossorigin: attrs.GetOrDefault("crossorigin", "")}, true
+	}
+	return resourceHint{}, false
+}
+
+func linkResourceHint(attrs collectionx.Map[string, string]) (resourceHint, bool) {
+	href := attrs.GetOrDefault("href", "")
+	if !isValidResourceHintURL(href) {
+		return resourceHint{}, false
+	}
+
+	relValues := splitRelValues(attrs.GetOrDefault("rel", ""))
+	switch {
+	case relValues.Contains("stylesheet"):
+		return resourceHint{url: href, rel: "preload", as: "style", crossorigin: attrs.GetOrDefault("crossorigin", "")}, true
+	case relValues.Contains("modulepreload"):
+		return resourceHint{url: href, rel: "modulepreload", crossorigin: attrs.GetOrDefault("crossorigin", "")}, true
+	case relValues.Contains("preload"):
+		return preloadResourceHint(href, attrs)
+	case relValues.Contains("prefetch"):
+		return resourceHint{url: href, rel: "prefetch", as: attrs.GetOrDefault("as", ""), crossorigin: attrs.GetOrDefault("crossorigin", "")}, true
+	case relValues.Contains("preconnect"):
+		return resourceHint{url: href, rel: "preconnect", crossorigin: attrs.GetOrDefault("crossorigin", "")}, true
+	case relValues.Contains("dns-prefetch"):
+		return resourceHint{url: href, rel: "dns-prefetch"}, true
+	default:
+		return resourceHint{}, false
+	}
+}
+
+func preloadResourceHint(href string, attrs collectionx.Map[string, string]) (resourceHint, bool) {
+	as := strings.ToLower(strings.TrimSpace(attrs.GetOrDefault("as", "")))
+	if as == "" {
+		as = inferResourceHintAs(href)
+	}
+	if as == "" {
+		return resourceHint{}, false
+	}
+	crossorigin := attrs.GetOrDefault("crossorigin", "")
+	if as == "font" && crossorigin == "" {
+		crossorigin = "anonymous"
+	}
+	return resourceHint{url: href, rel: "preload", as: as, crossorigin: crossorigin}, true
+}
+
+func (h resourceHint) Header() (string, bool) {
+	if !isValidResourceHintURL(h.url) || h.rel == "" {
+		return "", false
+	}
+
+	parts := collectionx.NewList[string]("<"+h.url+">", "rel="+h.rel)
+	if h.as != "" {
+		parts.Add("as=" + h.as)
+	}
+	switch strings.ToLower(strings.TrimSpace(h.crossorigin)) {
+	case "":
+	case "anonymous":
+		parts.Add("crossorigin")
+	default:
+		parts.Add("crossorigin=" + h.crossorigin)
+	}
+	return parts.Join("; "), true
+}
+
+func htmlTagAttrs(tokenizer *html.Tokenizer) collectionx.Map[string, string] {
+	attrs := collectionx.NewMap[string, string]()
+	for {
+		key, value, more := tokenizer.TagAttr()
+		attrs.Set(strings.ToLower(string(key)), string(value))
+		if !more {
+			return attrs
+		}
+	}
+}
+
+func splitRelValues(raw string) collectionx.OrderedSet[string] {
+	values := collectionx.NewOrderedSet[string]()
+	for _, rel := range strings.Fields(strings.ToLower(raw)) {
+		values.Add(rel)
+	}
+	return values
+}
+
+func inferResourceHintAs(rawURL string) string {
+	switch strings.ToLower(path.Ext(resourceHintURLPath(rawURL))) {
+	case ".js", ".mjs":
+		return "script"
+	case ".css":
+		return "style"
+	case ".woff", ".woff2", ".ttf", ".otf":
+		return "font"
+	case ".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif", ".svg":
+		return "image"
+	default:
+		return ""
+	}
+}
+
+func resourceHintURLPath(rawURL string) string {
+	value := rawURL
+	if before, _, found := strings.Cut(value, "?"); found {
+		value = before
+	}
+	if before, _, found := strings.Cut(value, "#"); found {
+		value = before
+	}
+	return value
+}
+
+func isResourceHintHTML(mediaType string) bool {
+	normalized := media.NormalizeMediaType(mediaType)
+	return strings.HasPrefix(normalized, "text/html") || strings.Contains(normalized, "application/xhtml")
+}
+
+func isValidResourceHintURL(raw string) bool {
+	value := strings.TrimSpace(raw)
+	if value == "" || strings.HasPrefix(value, "#") {
+		return false
+	}
+	if strings.ContainsAny(value, "\r\n<>") || strings.ContainsAny(value, " \t") {
+		return false
+	}
+
+	lower := strings.ToLower(value)
+	switch {
+	case strings.HasPrefix(lower, "data:"):
+		return false
+	case strings.HasPrefix(lower, "javascript:"):
+		return false
+	case strings.HasPrefix(lower, "mailto:"):
+		return false
+	default:
+		return true
+	}
+}
+
+func resourceHintCacheKey(asset *catalog.Asset) string {
+	if asset == nil {
+		return ""
+	}
+	if hash := strings.TrimSpace(asset.SourceHash); hash != "" {
+		return asset.FullPath + "|" + hash
+	}
+	if etag := strings.TrimSpace(asset.ETag); etag != "" {
+		return asset.FullPath + "|" + etag
+	}
+	return asset.FullPath
+}

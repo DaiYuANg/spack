@@ -30,6 +30,7 @@ type assetDeliveryRuntime struct {
 	bodyCache      *assetcache.Cache
 	bus            eventx.BusRuntime
 	trackDelivery  bool
+	resourceHints  *resourceHintService
 }
 
 type assetDeliveryRuntimeDeps struct {
@@ -51,13 +52,14 @@ func registerAssetRoute(app *fiber.App, runtime *assetDeliveryRuntime) {
 func newAssetDeliveryRuntime(deps assetDeliveryRuntimeDeps) *assetDeliveryRuntime {
 	return &assetDeliveryRuntime{
 		mountPath:      deps.cfg.Assets.Path,
-		responsePolicy: cachepolicy.NewResponsePolicy(&deps.cfg.Compression),
+		responsePolicy: cachepolicy.NewResponsePolicyFromConfig(deps.cfg),
 		logger:         deps.routeRuntime.logger,
 		assetResolver:  deps.assetResolver,
 		pipelineSvc:    deps.pipelineSvc,
 		bodyCache:      deps.bodyCache,
 		bus:            deps.bus,
 		trackDelivery:  deps.routeRuntime.trackDelivery,
+		resourceHints:  deps.routeRuntime.resourceHints,
 	}
 }
 

@@ -1,0 +1,87 @@
+package server
+
+import (
+	"log/slog"
+
+	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/resolver"
+	"github.com/gofiber/fiber/v3"
+)
+
+const maxResourceHintScanBytes = 512 * 1024
+
+type resourceHintService struct {
+	cfg    config.ResourceHints
+	logger *slog.Logger
+	cache  collectionx.ConcurrentMultiMap[string, string]
+}
+
+type resourceHint struct {
+	url         string
+	rel         string
+	as          string
+	crossorigin string
+}
+
+func newResourceHintService(cfg *config.Frontend, logger *slog.Logger) *resourceHintService {
+	var hints config.ResourceHints
+	if cfg != nil {
+		hints = cfg.ResourceHints
+	}
+	return &resourceHintService{
+		cfg:    hints,
+		logger: logger,
+		cache:  collectionx.NewConcurrentMultiMap[string, string](),
+	}
+}
+
+func (s *resourceHintService) Links(result *resolver.Result) collectionx.List[string] {
+	if s == nil || !s.cfg.Enabled() || result == nil || result.Asset == nil {
+		return nil
+	}
+	if !isResourceHintHTML(result.Asset.MediaType) {
+		return nil
+	}
+
+	key := resourceHintCacheKey(result.Asset)
+	if cached, ok := s.cached(key); ok {
+		return cached
+	}
+
+	links, err := parseHTMLResourceHints(result.Asset.FullPath, s.cfg)
+	if err != nil && s.logger != nil {
+		s.logger.Debug("Parse HTML resource hints failed",
+			slog.String("path", result.Asset.FullPath),
+			slog.String("err", err.Error()),
+		)
+	}
+	s.store(key, links)
+	return links
+}
+
+func (s *resourceHintService) EarlyHintsEnabled() bool {
+	return s != nil && s.cfg.Enabled() && s.cfg.EarlyHints
+}
+
+func (s *resourceHintService) cached(key string) (collectionx.List[string], bool) {
+	return collectionx.NewList(s.cache.Get(key)...), true
+}
+
+func (s *resourceHintService) store(key string, links collectionx.List[string]) {
+	s.cache.Set(key, links.Values()...)
+}
+
+func applyResourceHints(c fiber.Ctx, links collectionx.List[string]) {
+	if links == nil || links.IsEmpty() {
+		return
+	}
+	c.Set(fiber.HeaderLink, links.Join(", "))
+}
+
+func (r *assetDeliveryRuntime) sendEarlyResourceHints(c fiber.Ctx, links collectionx.List[string]) error {
+	if links == nil || links.IsEmpty() {
+		return nil
+	}
+	return c.SendEarlyHints(links.Values())
+}

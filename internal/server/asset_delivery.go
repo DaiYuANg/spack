@@ -25,6 +25,7 @@ func (r *assetDeliveryRuntime) sendResolvedAsset(
 	if handled := handleConditionalAssetRequest(c, request); handled {
 		return "", nil
 	}
+	r.applyResourceHints(c, request, result)
 
 	cacheRequest := buildMemoryCacheRequest(result, request)
 	if r.bodyCache.ShouldServeRequest(cacheRequest) {
@@ -32,6 +33,23 @@ func (r *assetDeliveryRuntime) sendResolvedAsset(
 	}
 
 	return r.sendResolvedAssetFile(c, request, result, headerPlan)
+}
+
+func (r *assetDeliveryRuntime) applyResourceHints(c fiber.Ctx, request resolver.Request, result *resolver.Result) {
+	if r == nil || r.resourceHints == nil || c.Method() != fiber.MethodGet || request.RangeRequested {
+		return
+	}
+
+	links := r.resourceHints.Links(result)
+	if links == nil || links.IsEmpty() {
+		return
+	}
+	if r.resourceHints.EarlyHintsEnabled() {
+		if err := r.sendEarlyResourceHints(c, links); err != nil && r.logger != nil {
+			r.logger.Debug("Send early resource hints failed", slog.String("err", err.Error()))
+		}
+	}
+	applyResourceHints(c, links)
 }
 
 func handleConditionalAssetRequest(c fiber.Ctx, request resolver.Request) bool {

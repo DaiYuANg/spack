@@ -20,8 +20,9 @@ import (
 var Module = dix.NewModule("server",
 	dix.WithModuleProviders(
 		dix.Provider0(NewRuntimeMetrics),
+		dix.Provider2(newResourceHintService),
 		dix.Provider4(newMiddlewareRegistration),
-		dix.Provider2(newAssetRouteRuntime),
+		dix.Provider3(newAssetRouteRuntime),
 		dix.Provider2(newHealthCheckDefinitions),
 		dix.Provider3(newHealthRoutesRegistration),
 		dix.Provider4(newRobotsRouteRegistration),
@@ -60,6 +61,7 @@ type assetRouteRegistration struct {
 type assetRouteRuntime struct {
 	logger        *slog.Logger
 	trackDelivery bool
+	resourceHints *resourceHintService
 }
 
 func newAppRegistration(order int, name string, apply func(*fiber.App)) appRegistration {
@@ -122,10 +124,11 @@ func newAssetRouteRegistration(
 	})}
 }
 
-func newAssetRouteRuntime(logger *slog.Logger, obs observabilityx.Observability) assetRouteRuntime {
+func newAssetRouteRuntime(logger *slog.Logger, obs observabilityx.Observability, resourceHints *resourceHintService) assetRouteRuntime {
 	return assetRouteRuntime{
 		logger:        logger,
 		trackDelivery: shouldTrackAssetDelivery(logger, obs),
+		resourceHints: resourceHints,
 	}
 }
 

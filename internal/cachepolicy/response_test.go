@@ -50,6 +50,44 @@ func TestResponsePolicyUsesImageNamespaceMaxAgeForImageVariants(t *testing.T) {
 	}
 }
 
+func TestResponsePolicyUsesImmutableCacheForFingerprintedAssets(t *testing.T) {
+	cfg := config.DefaultConfigForTest()
+	cfg.Frontend.ImmutableCache.MaxAge = "24h"
+	policy := cachepolicy.NewResponsePolicyFromConfig(&cfg)
+
+	cacheControl := policy.CacheControl(&resolver.Result{
+		Asset: &catalog.Asset{Path: "assets/app-deadbeef.js"},
+	})
+	if cacheControl != "public, max-age=86400, immutable" {
+		t.Fatalf("unexpected cache-control %q", cacheControl)
+	}
+}
+
+func TestResponsePolicyKeepsEntryAssetsRevalidated(t *testing.T) {
+	cfg := config.DefaultConfigForTest()
+	policy := cachepolicy.NewResponsePolicyFromConfig(&cfg)
+
+	cacheControl := policy.CacheControl(&resolver.Result{
+		Asset: &catalog.Asset{Path: "index.html"},
+	})
+	if cacheControl != cachepolicy.RevalidateCacheControl {
+		t.Fatalf("expected revalidate cache-control, got %q", cacheControl)
+	}
+}
+
+func TestResponsePolicyUsesImmutableCacheForFingerprintedSourceMaps(t *testing.T) {
+	cfg := config.DefaultConfigForTest()
+	cfg.Frontend.ImmutableCache.MaxAge = "24h"
+	policy := cachepolicy.NewResponsePolicyFromConfig(&cfg)
+
+	cacheControl := policy.CacheControl(&resolver.Result{
+		Asset: &catalog.Asset{Path: "assets/app-deadbeef.js.map"},
+	})
+	if cacheControl != "public, max-age=86400, immutable" {
+		t.Fatalf("unexpected cache-control %q", cacheControl)
+	}
+}
+
 func TestResponsePolicyExpiresAtUsesMaxAge(t *testing.T) {
 	policy := cachepolicy.NewResponsePolicy(&config.Compression{})
 

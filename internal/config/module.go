@@ -23,6 +23,7 @@ func NewModule(loadOptions LoadOptions) dix.Module {
 			}),
 			dix.Provider1(func(cfg *Config) *Debug { return &cfg.Debug }),
 			dix.Provider1(func(cfg *Config) *Image { return &cfg.Image }),
+			dix.Provider1(func(cfg *Config) *Frontend { return &cfg.Frontend }),
 			dix.Provider1(func(cfg *Config) *Metrics { return &cfg.Metrics }),
 			dix.Provider1(func(cfg *Config) *Logger { return &cfg.Logger }),
 			dix.Provider1(func(cfg *Config) *Robots { return &cfg.Robots }),
