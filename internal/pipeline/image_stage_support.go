@@ -7,7 +7,6 @@ import (
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/media"
-	"github.com/samber/lo"
 )
 
 func (s *imageStage) planFormats(asset *catalog.Asset, request Request) collectionx.List[string] {
@@ -37,10 +36,10 @@ func (s *imageStage) planWidths(asset *catalog.Asset, request Request, formats c
 		return request.PreferredWidths
 	}
 	if request.PreferredFormats != nil && request.PreferredFormats.Len() > 0 {
-		return collectionx.NewList(0)
+		return collectionx.NewList[int](0)
 	}
 
-	widths := collectionx.NewList(s.cfg.ParsedWidths().Values()...)
+	widths := collectionx.NewList[int](s.cfg.ParsedWidths().Values()...)
 	if shouldPlanOriginalFormatVariants(formats, media.ImageFormat(asset.MediaType)) {
 		widths.Add(0)
 	}
@@ -51,7 +50,7 @@ func (s *imageStage) planWidths(asset *catalog.Asset, request Request, formats c
 	widths.Sort(func(left, right int) int {
 		return left - right
 	})
-	return collectionx.NewList(collectionx.NewOrderedSet(widths.Values()...).Values()...)
+	return collectionx.NewList[int](collectionx.NewOrderedSet[int](widths.Values()...).Values()...)
 }
 
 func shouldPlanOriginalFormatVariants(formats collectionx.List[string], sourceFormat string) bool {
@@ -74,8 +73,8 @@ func (s *imageStage) planTasks(asset *catalog.Asset, formats collectionx.List[st
 	if formats == nil || widths == nil {
 		return nil
 	}
-	return collectionx.NewList(lo.FlatMap(formats.Values(), func(format string, _ int) []Task {
-		return lo.FilterMap(widths.Values(), func(width int, _ int) (Task, bool) {
+	return collectionx.FlatMapList[string, Task](formats, func(_ int, format string) []Task {
+		return collectionx.FilterMapList[int, Task](widths, func(_ int, width int) (Task, bool) {
 			if !shouldCreateImageTask(asset, s.catalog, width, format) {
 				return Task{}, false
 			}
@@ -84,8 +83,8 @@ func (s *imageStage) planTasks(asset *catalog.Asset, formats collectionx.List[st
 				Format:    format,
 				Width:     width,
 			}, true
-		})
-	})...)
+		}).Values()
+	})
 }
 
 func shouldCreateImageTask(asset *catalog.Asset, cat catalog.Catalog, width int, format string) bool {
@@ -150,7 +149,7 @@ func filterSupportedImageFormats(formats, supported collectionx.List[string]) co
 		return normalized
 	}
 
-	return collectionx.FilterMapList(normalized, func(_ int, format string) (string, bool) {
+	return collectionx.FilterMapList[string, string](normalized, func(_ int, format string) (string, bool) {
 		_, ok := supported.FirstWhere(func(_ int, candidate string) bool {
 			return candidate == format
 		}).Get()

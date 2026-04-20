@@ -22,7 +22,7 @@ func buildExistingScanState(cat catalog.Catalog) existingScanState {
 	}
 
 	assets := cat.AllAssets()
-	state.assets = collectionx.AssociateList(assets, func(_ int, asset *catalog.Asset) (string, *catalog.Asset) {
+	state.assets = collectionx.AssociateList[*catalog.Asset, string, *catalog.Asset](assets, func(_ int, asset *catalog.Asset) (string, *catalog.Asset) {
 		return asset.Path, asset
 	})
 	cat.ListVariantsByStage(SourceSidecarStage).Range(func(_ int, variant *catalog.Variant) bool {
@@ -35,5 +35,5 @@ func buildExistingScanState(cat catalog.Catalog) existingScanState {
 }
 
 func sortedKeys[T any](values collectionx.Map[string, T]) collectionx.List[string] {
-	return collectionx.NewList(values.Keys()...).Sort(cmp.Compare[string])
+	return collectionx.NewList[string](values.Keys()...).Sort(cmp.Compare[string])
 }

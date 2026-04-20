@@ -113,7 +113,7 @@ func collectScannedSnapshot(ctx context.Context, scanner sourcecatalog.Scanner, 
 }
 
 func indexAssetsByPath(assets collectionx.List[*catalog.Asset]) collectionx.Map[string, *catalog.Asset] {
-	return collectionx.AssociateList(assets, func(_ int, asset *catalog.Asset) (string, *catalog.Asset) {
+	return collectionx.AssociateList[*catalog.Asset, string, *catalog.Asset](assets, func(_ int, asset *catalog.Asset) (string, *catalog.Asset) {
 		return asset.Path, asset
 	})
 }
@@ -126,7 +126,7 @@ func reconcileScannedAssets(
 	bodyCache *assetcache.Cache,
 ) error {
 	var syncErr error
-	collectionx.NewList(scannedAssets.Keys()...).Sort(cmp.Compare[string]).Range(func(_ int, assetPath string) bool {
+	collectionx.NewList[string](scannedAssets.Keys()...).Sort(cmp.Compare[string]).Range(func(_ int, assetPath string) bool {
 		asset, _ := scannedAssets.Get(assetPath)
 		if err := syncScannedAsset(report, assetPath, asset, existingByPath, cat, bodyCache); err != nil {
 			syncErr = err
@@ -169,7 +169,7 @@ func reconcileRemovedAssets(
 	cat catalog.Catalog,
 	bodyCache *assetcache.Cache,
 ) {
-	collectionx.NewList(existingByPath.Values()...).Sort(func(left, right *catalog.Asset) int {
+	collectionx.NewList[*catalog.Asset](existingByPath.Values()...).Sort(func(left, right *catalog.Asset) int {
 		return cmp.Compare(left.Path, right.Path)
 	}).Range(func(_ int, asset *catalog.Asset) bool {
 		report.Removed++
@@ -186,7 +186,7 @@ func reconcileSourceSidecars(
 ) error {
 	existingByID := indexSourceSidecarVariants(cat)
 	var syncErr error
-	collectionx.NewList(scannedVariants.Keys()...).Sort(cmp.Compare[string]).Range(func(_ int, variantID string) bool {
+	collectionx.NewList[string](scannedVariants.Keys()...).Sort(cmp.Compare[string]).Range(func(_ int, variantID string) bool {
 		variant, _ := scannedVariants.Get(variantID)
 		if err := cat.UpsertVariant(variant); err != nil {
 			syncErr = oops.In("task").Owner("source rescan").With("variant_id", variantID).With("asset_path", variant.AssetPath).Wrap(err)
@@ -199,7 +199,7 @@ func reconcileSourceSidecars(
 		return syncErr
 	}
 
-	collectionx.NewList(existingByID.Values()...).Sort(func(left, right *catalog.Variant) int {
+	collectionx.NewList[*catalog.Variant](existingByID.Values()...).Sort(func(left, right *catalog.Variant) int {
 		return cmp.Compare(left.ID, right.ID)
 	}).Range(func(_ int, variant *catalog.Variant) bool {
 		if !cat.DeleteVariantByArtifactPath(variant.ArtifactPath) {

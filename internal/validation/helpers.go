@@ -34,7 +34,7 @@ func ParseWidths(raw string) collectionx.List[int] {
 		return collectionx.NewList[int]()
 	}
 
-	widths := collectionx.FilterMapList(collectionx.NewList(strings.Split(raw, ",")...), func(_ int, part string) (int, bool) {
+	widths := collectionx.FilterMapList[string, int](collectionx.NewList[string](strings.Split(raw, ",")...), func(_ int, part string) (int, bool) {
 		width, err := strconv.Atoi(strings.TrimSpace(part))
 		if err != nil || width <= 0 {
 			return 0, false
@@ -46,5 +46,5 @@ func ParseWidths(raw string) collectionx.List[int] {
 	}
 
 	widths.Sort(cmp.Compare[int])
-	return collectionx.NewList(collectionx.NewOrderedSet(widths.Values()...).Values()...)
+	return collectionx.NewList[int](collectionx.NewOrderedSet[int](widths.Values()...).Values()...)
 }

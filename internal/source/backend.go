@@ -10,7 +10,7 @@ import (
 
 type sourceFactory func(*config.Assets, *slog.Logger) (Source, error)
 
-var sourceFactories = collectionx.NewMapFrom(map[config.SourceBackend]sourceFactory{
+var sourceFactories = collectionx.NewMapFrom[config.SourceBackend, sourceFactory](map[config.SourceBackend]sourceFactory{
 	config.SourceBackendLocal: newLocalFS,
 })
 

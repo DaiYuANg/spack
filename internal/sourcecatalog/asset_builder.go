@@ -86,7 +86,7 @@ func collectAssetBuildCandidates(
 	assets := collectionx.NewMapWithCapacity[string, *catalog.Asset](filesByPath.Len())
 	candidates := collectionx.NewList[assetBuildCandidate]()
 
-	sortedKeys(filesByPath).Range(func(_ int, path string) bool {
+	sortedKeys[source.File](filesByPath).Range(func(_ int, path string) bool {
 		if _, ok := sidecars.Get(path); ok {
 			return true
 		}

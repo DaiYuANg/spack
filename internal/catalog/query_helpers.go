@@ -53,7 +53,7 @@ func variantViews(txn *memdb.Txn, index string, args ...any) collectionx.List[*V
 	if err != nil {
 		return collectionx.NewList[*Variant]()
 	}
-	return collectionx.MapList(records, func(_ int, record *variantRecord) *Variant {
+	return collectionx.MapList[*variantRecord, *Variant](records, func(_ int, record *variantRecord) *Variant {
 		return record.Variant
 	})
 }
@@ -71,7 +71,7 @@ func variantViewsResult(txn *memdb.Txn, index string, args ...any) (collectionx.
 	if err != nil {
 		return collectionx.NewList[*Variant](), err
 	}
-	return collectionx.MapList(records, func(_ int, record *variantRecord) *Variant {
+	return collectionx.MapList[*variantRecord, *Variant](records, func(_ int, record *variantRecord) *Variant {
 		return record.Variant
 	}), nil
 }

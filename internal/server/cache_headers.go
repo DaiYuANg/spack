@@ -32,15 +32,10 @@ func newResolvedHeaderPlan(
 ) resolvedHeaderPlan {
 	lastModified := resolvedLastModified(result)
 	cacheControl := policy.CacheControl(result)
-	contentLength := mo.None[string]()
-	if size, ok := resolvedAssetSize(result); ok {
-		contentLength = mo.Some(strconv.FormatInt(size, 10))
-	}
-	expires := mo.None[string]()
-
-	if expiresAt, ok := policy.ExpiresAt(cacheControl, lastModified.modTime.OrEmpty(), lastModified.modTime.IsPresent()); ok {
-		expires = mo.Some(expiresAt.UTC().Format(http.TimeFormat))
-	}
+	size, hasSize := resolvedAssetSize(result)
+	contentLength := mo.TupleToOption[string](strconv.FormatInt(size, 10), hasSize)
+	expiresAt, hasExpires := policy.ExpiresAt(cacheControl, lastModified.modTime.OrEmpty(), lastModified.modTime.IsPresent())
+	expires := mo.TupleToOption[string](expiresAt.UTC().Format(http.TimeFormat), hasExpires)
 
 	sourceMediaType := ""
 	if result != nil && result.Asset != nil {

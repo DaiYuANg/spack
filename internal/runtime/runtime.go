@@ -53,10 +53,11 @@ func scanCatalogAssets(ctx context.Context, scanner sourcecatalog.Scanner, cat c
 	}
 
 	var upsertErr error
-	collectionx.NewList(snapshot.Assets.Keys()...).Sort(cmp.Compare[string]).Range(func(_ int, assetPath string) bool {
-		asset, _ := snapshot.Assets.Get(assetPath)
+	collectionx.NewList[*catalog.Asset](snapshot.Assets.Values()...).Sort(func(left, right *catalog.Asset) int {
+		return cmp.Compare(left.Path, right.Path)
+	}).Range(func(_ int, asset *catalog.Asset) bool {
 		if err := cat.UpsertAsset(asset); err != nil {
-			upsertErr = scanErr.With("asset_path", assetPath).Wrap(err)
+			upsertErr = scanErr.With("asset_path", asset.Path).Wrap(err)
 			return false
 		}
 		return true
@@ -65,10 +66,11 @@ func scanCatalogAssets(ctx context.Context, scanner sourcecatalog.Scanner, cat c
 		return 0, upsertErr
 	}
 
-	collectionx.NewList(snapshot.Variants.Keys()...).Sort(cmp.Compare[string]).Range(func(_ int, variantID string) bool {
-		variant, _ := snapshot.Variants.Get(variantID)
+	collectionx.NewList[*catalog.Variant](snapshot.Variants.Values()...).Sort(func(left, right *catalog.Variant) int {
+		return cmp.Compare(left.ID, right.ID)
+	}).Range(func(_ int, variant *catalog.Variant) bool {
 		if err := cat.UpsertVariant(variant); err != nil {
-			upsertErr = scanErr.With("variant_id", variantID).With("asset_path", variant.AssetPath).Wrap(err)
+			upsertErr = scanErr.With("variant_id", variant.ID).With("asset_path", variant.AssetPath).Wrap(err)
 			return false
 		}
 		return true

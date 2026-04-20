@@ -14,7 +14,6 @@ import (
 	"github.com/daiyuang/spack/internal/contentcoding"
 	contentcodingspec "github.com/daiyuang/spack/internal/contentcoding/spec"
 	"github.com/daiyuang/spack/internal/media"
-	"github.com/samber/lo"
 	"github.com/samber/oops"
 )
 
@@ -54,7 +53,7 @@ func (s *compressionStage) Plan(asset *catalog.Asset, request Request) collectio
 		encodings = supportedEncodings
 	}
 
-	return collectionx.NewList(lo.FilterMap(encodings.Values(), func(encoding string, _ int) (Task, bool) {
+	return collectionx.FilterMapList[string, Task](encodings, func(_ int, encoding string) (Task, bool) {
 		variant, ok := s.catalog.FindEncodingVariant(asset.Path, encoding)
 		if ok && hasEncodingVariant(variant, asset.SourceHash, encoding) {
 			return Task{}, false
@@ -63,7 +62,7 @@ func (s *compressionStage) Plan(asset *catalog.Asset, request Request) collectio
 			AssetPath: asset.Path,
 			Encoding:  encoding,
 		}, true
-	})...)
+	})
 }
 
 func (s *compressionStage) Execute(task Task, asset *catalog.Asset) (*catalog.Variant, error) {
@@ -152,7 +151,8 @@ func filterConfiguredEncodings(encodings, supported collectionx.List[string]) co
 	if encodings == nil || supported == nil {
 		return nil
 	}
-	return collectionx.FilterMapList(encodings, func(_ int, encoding string) (string, bool) {
-		return encoding, lo.Contains(supported.Values(), encoding)
+	supportedSet := collectionx.NewOrderedSet[string](supported.Values()...)
+	return collectionx.FilterMapList[string, string](encodings, func(_ int, encoding string) (string, bool) {
+		return encoding, supportedSet.Contains(encoding)
 	})
 }

@@ -130,11 +130,14 @@ func isUsableVariant(variant *catalog.Variant, assetSourceHash string) bool {
 }
 
 func variantFormat(variant *catalog.Variant, sourceFormat string) string {
-	return firstNonEmpty(lo.Ternary(variant != nil, variant.Format, ""), sourceFormat)
+	if variant == nil {
+		return sourceFormat
+	}
+	return firstNonEmpty(variant.Format, sourceFormat)
 }
 
 func firstNonEmpty(values ...string) string {
-	return lo.FindOrElse(values, "", func(value string) bool {
+	return lo.FindOrElse[string](values, "", func(value string) bool {
 		return strings.TrimSpace(value) != ""
 	})
 }
@@ -143,7 +146,7 @@ func preferredWidths(width int) collectionx.List[int] {
 	if width <= 0 {
 		return nil
 	}
-	return collectionx.NewList(width)
+	return collectionx.NewList[int](width)
 }
 
 func preferredImageFormats(
@@ -152,7 +155,7 @@ func preferredImageFormats(
 	sourceMediaType string,
 ) collectionx.List[string] {
 	if explicitFormat != "" {
-		return collectionx.NewList(explicitFormat)
+		return collectionx.NewList[string](explicitFormat)
 	}
 	if !media.IsImageMediaType(sourceMediaType) {
 		return nil

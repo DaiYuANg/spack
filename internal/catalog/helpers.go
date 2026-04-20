@@ -27,7 +27,7 @@ func cloneVariant(variant *Variant) *Variant {
 }
 
 func cloneVariants(variants collectionx.List[*Variant]) collectionx.List[*Variant] {
-	return collectionx.MapList(variants, func(_ int, variant *Variant) *Variant {
+	return collectionx.MapList[*Variant, *Variant](variants, func(_ int, variant *Variant) *Variant {
 		return cloneVariant(variant)
 	})
 }
@@ -65,7 +65,7 @@ func defaultVariantID(variant *Variant) string {
 }
 
 func cloneVariantRecords(records collectionx.List[*variantRecord]) collectionx.List[*Variant] {
-	return collectionx.MapList(records, func(_ int, record *variantRecord) *Variant {
+	return collectionx.MapList[*variantRecord, *Variant](records, func(_ int, record *variantRecord) *Variant {
 		return cloneVariant(record.Variant)
 	})
 }

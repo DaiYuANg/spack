@@ -34,7 +34,7 @@ var Module = dix.NewModule("pipeline",
 )
 
 func newStageRegistrations(image *imageStage, compression *compressionStage) collectionx.List[stageRegistration] {
-	return collectionx.NewList(
+	return collectionx.NewList[stageRegistration](
 		newStageRegistration(100, image),
 		newStageRegistration(200, compression),
 	)

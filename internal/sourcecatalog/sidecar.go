@@ -12,7 +12,6 @@ import (
 	"github.com/daiyuang/spack/internal/contentcoding"
 	"github.com/daiyuang/spack/internal/source"
 	"github.com/daiyuang/spack/pkg"
-	"github.com/samber/lo"
 	"github.com/samber/mo"
 	"github.com/samber/oops"
 	"golang.org/x/sync/errgroup"
@@ -43,7 +42,7 @@ func IsSourceSidecarVariant(variant *catalog.Variant) bool {
 }
 
 func buildSidecarMatchers(registry contentcoding.Registry) collectionx.List[sidecarMatcher] {
-	return collectionx.NewList(lo.FilterMap(registry.Names().Values(), func(name string, _ int) (sidecarMatcher, bool) {
+	return collectionx.FilterMapList[string, sidecarMatcher](registry.Names(), func(_ int, name string) (sidecarMatcher, bool) {
 		strategy, ok := registry.Lookup(name)
 		if !ok {
 			return sidecarMatcher{}, false
@@ -52,7 +51,7 @@ func buildSidecarMatchers(registry contentcoding.Registry) collectionx.List[side
 			encoding: strategy.Name(),
 			suffix:   strategy.Suffix(),
 		}, true
-	})...).Sort(func(left, right sidecarMatcher) int {
+	}).Sort(func(left, right sidecarMatcher) int {
 		if len(left.suffix) == len(right.suffix) {
 			return cmp.Compare(left.encoding, right.encoding)
 		}
@@ -62,7 +61,7 @@ func buildSidecarMatchers(registry contentcoding.Registry) collectionx.List[side
 
 func recognizeSidecars(filesByPath collectionx.Map[string, source.File], matchers collectionx.List[sidecarMatcher]) collectionx.Map[string, sidecarFile] {
 	sidecars := collectionx.NewMapWithCapacity[string, sidecarFile](filesByPath.Len())
-	sortedKeys(filesByPath).Range(func(_ int, path string) bool {
+	sortedKeys[source.File](filesByPath).Range(func(_ int, path string) bool {
 		match, ok := matchSidecar(path, filesByPath, matchers).Get()
 		if !ok {
 			return true
@@ -76,7 +75,7 @@ func recognizeSidecars(filesByPath collectionx.Map[string, source.File], matcher
 }
 
 func matchSidecar(path string, filesByPath collectionx.Map[string, source.File], matchers collectionx.List[sidecarMatcher]) mo.Option[sidecarFile] {
-	matcher, ok := lo.Find(matchers.Values(), func(matcher sidecarMatcher) bool {
+	matcher, ok := collectionx.FindList[sidecarMatcher](matchers, func(_ int, matcher sidecarMatcher) bool {
 		if !strings.HasSuffix(path, matcher.suffix) {
 			return false
 		}
@@ -145,7 +144,7 @@ func collectSidecarVariantBuildCandidates(
 	variants := collectionx.NewMapWithCapacity[string, *catalog.Variant](sidecars.Len())
 	candidates := collectionx.NewList[sidecarVariantBuildCandidate]()
 
-	sortedKeys(sidecars).Range(func(_ int, sidecarPath string) bool {
+	sortedKeys[sidecarFile](sidecars).Range(func(_ int, sidecarPath string) bool {
 		sidecar, _ := sidecars.Get(sidecarPath)
 		asset, ok := assets.Get(sidecar.assetPath)
 		if !ok || asset == nil {

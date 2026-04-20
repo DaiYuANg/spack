@@ -2,11 +2,9 @@
 package media
 
 import (
-	"slices"
 	"strings"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/samber/lo"
 )
 
 type ImageFormatDescriptor struct {
@@ -16,46 +14,55 @@ type ImageFormatDescriptor struct {
 	AcceptTokens collectionx.List[string]
 }
 
-var imageFormatDescriptors = []ImageFormatDescriptor{
-	{
-		Name:         "jpeg",
-		MediaType:    "image/jpeg",
-		Extension:    ".jpg",
-		AcceptTokens: collectionx.NewList("image/jpeg", "image/jpg"),
-	},
-	{
-		Name:         "png",
-		MediaType:    "image/png",
-		Extension:    ".png",
-		AcceptTokens: collectionx.NewList("image/png"),
-	},
-}
+var (
+	imageFormatDescriptors = collectionx.NewList[ImageFormatDescriptor](
+		ImageFormatDescriptor{
+			Name:         "jpeg",
+			MediaType:    "image/jpeg",
+			Extension:    ".jpg",
+			AcceptTokens: collectionx.NewList[string]("image/jpeg", "image/jpg"),
+		},
+		ImageFormatDescriptor{
+			Name:         "png",
+			MediaType:    "image/png",
+			Extension:    ".png",
+			AcceptTokens: collectionx.NewList[string]("image/png"),
+		},
+	)
+	imageDescriptorsByName = collectionx.AssociateList[ImageFormatDescriptor, string, ImageFormatDescriptor](
+		imageFormatDescriptors,
+		func(_ int, descriptor ImageFormatDescriptor) (string, ImageFormatDescriptor) {
+			return descriptor.Name, descriptor
+		},
+	)
+	imageDescriptorsByMediaType = collectionx.AssociateList[ImageFormatDescriptor, string, ImageFormatDescriptor](
+		imageFormatDescriptors,
+		func(_ int, descriptor ImageFormatDescriptor) (string, ImageFormatDescriptor) {
+			return descriptor.MediaType, descriptor
+		},
+	)
+	imageDescriptorsByAcceptToken = buildImageDescriptorsByAcceptToken(imageFormatDescriptors)
+)
 
 func SupportedImageFormats() collectionx.List[string] {
-	return collectionx.NewList(lo.Map(imageFormatDescriptors, func(descriptor ImageFormatDescriptor, _ int) string {
+	return collectionx.MapList[ImageFormatDescriptor, string](imageFormatDescriptors, func(_ int, descriptor ImageFormatDescriptor) string {
 		return descriptor.Name
-	})...)
+	})
 }
 
 func LookupImageDescriptor(format string) (ImageFormatDescriptor, bool) {
 	normalized := strings.ToLower(strings.TrimSpace(format))
-	return findImageDescriptor(func(descriptor ImageFormatDescriptor) bool {
-		return descriptor.Name == normalized
-	})
+	return imageDescriptorsByName.Get(normalized)
 }
 
 func LookupImageDescriptorByMediaType(mediaType string) (ImageFormatDescriptor, bool) {
 	normalized := strings.ToLower(strings.TrimSpace(mediaType))
-	return findImageDescriptor(func(descriptor ImageFormatDescriptor) bool {
-		return descriptor.MediaType == normalized
-	})
+	return imageDescriptorsByMediaType.Get(normalized)
 }
 
 func LookupImageDescriptorByAcceptToken(token string) (ImageFormatDescriptor, bool) {
 	normalized := strings.ToLower(strings.TrimSpace(token))
-	return findImageDescriptor(func(descriptor ImageFormatDescriptor) bool {
-		return slices.Contains(descriptor.AcceptTokens.Values(), normalized)
-	})
+	return imageDescriptorsByAcceptToken.Get(normalized)
 }
 
 func NormalizeImageFormat(format string) string {
@@ -87,13 +94,26 @@ func NormalizeImageFormats(formats collectionx.List[string]) collectionx.List[st
 		return nil
 	}
 
-	normalized := collectionx.FilterMapList(formats, func(_ int, format string) (string, bool) {
+	normalized := collectionx.FilterMapList[string, string](formats, func(_ int, format string) (string, bool) {
 		value := NormalizeImageFormat(format)
 		return value, value != ""
 	})
-	return collectionx.NewList(collectionx.NewOrderedSet(normalized.Values()...).Values()...)
+	return collectionx.NewList[string](collectionx.NewOrderedSet[string](normalized.Values()...).Values()...)
 }
 
-func findImageDescriptor(match func(ImageFormatDescriptor) bool) (ImageFormatDescriptor, bool) {
-	return lo.Find(imageFormatDescriptors, match)
+func buildImageDescriptorsByAcceptToken(
+	descriptors collectionx.List[ImageFormatDescriptor],
+) collectionx.Map[string, ImageFormatDescriptor] {
+	out := collectionx.NewMap[string, ImageFormatDescriptor]()
+	descriptors.Range(func(_ int, descriptor ImageFormatDescriptor) bool {
+		descriptor.AcceptTokens.Range(func(_ int, token string) bool {
+			normalized := strings.ToLower(strings.TrimSpace(token))
+			if normalized != "" {
+				out.Set(normalized, descriptor)
+			}
+			return true
+		})
+		return true
+	})
+	return out
 }

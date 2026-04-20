@@ -154,20 +154,9 @@ func (c *Cache) warmVariants(
 	variants collectionx.List[*catalog.Variant],
 	stats *WarmStats,
 ) error {
-	return warmListSerial[*catalog.Variant](ctx, variants, stats, func(ctx context.Context, variant *catalog.Variant, stats *WarmStats) error {
-		return c.warmVariant(ctx, variant, stats)
-	})
-}
-
-func warmListSerial[T any](
-	ctx context.Context,
-	values collectionx.List[T],
-	stats *WarmStats,
-	warm func(context.Context, T, *WarmStats) error,
-) error {
 	var warmErr error
-	values.Range(func(_ int, value T) bool {
-		warmErr = warm(ctx, value, stats)
+	variants.Range(func(_ int, variant *catalog.Variant) bool {
+		warmErr = c.warmVariant(ctx, variant, stats)
 		return warmErr == nil
 	})
 	return pickWarmError(ctx, warmErr)

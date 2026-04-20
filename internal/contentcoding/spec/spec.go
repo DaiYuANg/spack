@@ -5,22 +5,26 @@ import (
 	"strings"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/samber/lo"
 )
 
 func DefaultNames() collectionx.List[string] {
-	return collectionx.NewList("br", "zstd", "gzip")
+	return collectionx.NewList[string]("br", "zstd", "gzip")
 }
 
 func IsSupported(name string) bool {
-	return lo.Contains(DefaultNames().Values(), strings.ToLower(strings.TrimSpace(name)))
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "br", "zstd", "gzip":
+		return true
+	default:
+		return false
+	}
 }
 
 func ParseNames(raw string) collectionx.List[string] {
 	if strings.TrimSpace(raw) == "" {
 		return collectionx.NewList[string]()
 	}
-	return NormalizeNames(collectionx.NewList(strings.Split(raw, ",")...))
+	return NormalizeNames(collectionx.NewList[string](strings.Split(raw, ",")...))
 }
 
 func ResolveNames(raw string) collectionx.List[string] {
@@ -36,12 +40,12 @@ func NormalizeNames(values collectionx.List[string]) collectionx.List[string] {
 		return nil
 	}
 
-	normalized := lo.FilterMap(values.Values(), func(raw string, _ int) (string, bool) {
+	normalized := collectionx.FilterMapList[string, string](values, func(_ int, raw string) (string, bool) {
 		name := strings.ToLower(strings.TrimSpace(raw))
 		return name, IsSupported(name)
 	})
-	if len(normalized) == 0 {
+	if normalized.IsEmpty() {
 		return nil
 	}
-	return collectionx.NewList(collectionx.NewOrderedSet(normalized...).Values()...)
+	return collectionx.NewList[string](collectionx.NewOrderedSet[string](normalized.Values()...).Values()...)
 }

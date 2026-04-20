@@ -7,7 +7,7 @@ import (
 	"github.com/daiyuang/spack/internal/constant"
 )
 
-var textLikeMediaTypes = collectionx.NewOrderedSet(
+var textLikeMediaTypes = collectionx.NewOrderedSet[string](
 	string(constant.ApplicationJavascript),
 	string(constant.XJavascript),
 	string(constant.JSON),
@@ -17,7 +17,7 @@ var textLikeMediaTypes = collectionx.NewOrderedSet(
 	string(constant.Svg),
 )
 
-var compressibleNonTextMediaTypes = collectionx.NewOrderedSet(
+var compressibleNonTextMediaTypes = collectionx.NewOrderedSet[string](
 	string(constant.Wasm),
 )
 

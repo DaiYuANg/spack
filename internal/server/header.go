@@ -9,5 +9,5 @@ import (
 const RequestIDHeader = "X-Request-ID"
 
 func buildServerHeader(meta dix.AppMeta) string {
-	return collectionx.NewList(constant.ServerHeaderPrefix, meta.Version).Join("/")
+	return collectionx.NewList[string](constant.ServerHeaderPrefix, meta.Version).Join("/")
 }

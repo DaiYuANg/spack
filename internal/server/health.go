@@ -54,7 +54,7 @@ type healthCheckDefinition struct {
 }
 
 func newHealthCheckDefinitions(cfg *config.Config, cat catalog.Catalog) collectionx.List[healthCheckDefinition] {
-	return collectionx.NewList(
+	return collectionx.NewList[healthCheckDefinition](
 		newHealthCheckDefinition(dix.HealthKindGeneral, "catalog", func(context.Context) error {
 			return checkCatalog(cat)
 		}),

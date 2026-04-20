@@ -60,7 +60,7 @@ func (builtinImageEngine) SupportsSourceMediaType(mediaType string) bool {
 }
 
 func (builtinImageEngine) SupportedTargetFormats() collectionx.List[string] {
-	return collectionx.NewList("jpeg", "png")
+	return collectionx.NewList[string]("jpeg", "png")
 }
 
 func (builtinImageEngine) Generate(request imageGenerateRequest) (imageGenerateResult, error) {

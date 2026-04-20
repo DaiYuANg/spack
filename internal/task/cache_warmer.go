@@ -11,6 +11,7 @@ import (
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/go-co-op/gocron/v2"
+	"github.com/samber/lo"
 	"github.com/samber/oops"
 )
 
@@ -100,15 +101,16 @@ func warmCacheHotset(
 }
 
 func collectWarmAssets(cfg *config.Config, cat catalog.Catalog) collectionx.List[*catalog.Asset] {
-	assetPaths := collectionx.NewOrderedSet[string]()
-	assetPaths.Add(strings.TrimSpace(cfg.Assets.Entry))
-	assetPaths.Add(strings.TrimSpace(cfg.Assets.Fallback.Target))
+	assetPaths := collectionx.NewOrderedSet[string](
+		strings.TrimSpace(cfg.Assets.Entry),
+		strings.TrimSpace(cfg.Assets.Fallback.Target),
+	)
 	if cfg.Robots.Enable {
 		assetPaths.Add(staticRobotsAssetPath)
 	}
 
-	return collectionx.FilterMapList(collectionx.NewList(assetPaths.Values()...), func(_ int, assetPath string) (*catalog.Asset, bool) {
-		if strings.TrimSpace(assetPath) == "" {
+	return collectionx.FilterMapList[string, *catalog.Asset](collectionx.NewList[string](assetPaths.Values()...), func(_ int, assetPath string) (*catalog.Asset, bool) {
+		if assetPath == "" {
 			return nil, false
 		}
 		asset, ok := cat.FindAsset(assetPath)
@@ -168,14 +170,15 @@ func copyHotsetVariants(
 }
 
 func buildCacheWarmerReport(cat catalog.Catalog, assets collectionx.List[*catalog.Asset]) CacheWarmerReport {
-	report := CacheWarmerReport{Assets: assets.Len()}
-	assets.Range(func(_ int, asset *catalog.Asset) bool {
-		if asset != nil {
-			report.Variants += cat.ListVariants(asset.Path).Len()
-		}
-		return true
-	})
-	return report
+	return CacheWarmerReport{
+		Assets: assets.Len(),
+		Variants: lo.SumBy[*catalog.Asset, int](assets.Values(), func(asset *catalog.Asset) int {
+			if asset == nil {
+				return 0
+			}
+			return cat.ListVariants(asset.Path).Len()
+		}),
+	}
 }
 
 func cacheWarmerInterval(cfg *config.Config) time.Duration {

@@ -84,7 +84,7 @@ func (c *Cache) subscribeVariantGenerated() (func(), error) {
 }
 
 func unsubscribeAll(unsubscribes ...func()) {
-	collectionx.NewList(unsubscribes...).Range(func(_ int, unsubscribe func()) bool {
+	collectionx.NewList[func()](unsubscribes...).Range(func(_ int, unsubscribe func()) bool {
 		if unsubscribe != nil {
 			unsubscribe()
 		}

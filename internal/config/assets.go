@@ -18,7 +18,7 @@ const (
 	SourceBackendLocal SourceBackend = "local"
 )
 
-var supportedSourceBackends = collectionx.NewList(SourceBackendLocal)
+var supportedSourceBackends = collectionx.NewList[SourceBackend](SourceBackendLocal)
 
 const (
 	// FallbackOnNotFound indicates that the fallback target
@@ -101,11 +101,11 @@ func NormalizeSourceBackend(raw SourceBackend) SourceBackend {
 }
 
 func SupportedSourceBackends() collectionx.List[SourceBackend] {
-	return collectionx.NewList(supportedSourceBackends.Values()...)
+	return collectionx.NewList[SourceBackend](supportedSourceBackends.Values()...)
 }
 
 func SupportedSourceBackendNames() collectionx.List[string] {
-	return collectionx.MapList(SupportedSourceBackends(), func(_ int, backend SourceBackend) string {
+	return collectionx.MapList[SourceBackend, string](SupportedSourceBackends(), func(_ int, backend SourceBackend) string {
 		return string(backend)
 	})
 }

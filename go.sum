@@ -4,8 +4,6 @@ github.com/DaiYuANg/arcgo/collectionx v0.1.6 h1:WLBxO2udJCqBFhf6oK2NXidrGqqgkj2k
 github.com/DaiYuANg/arcgo/collectionx v0.1.6/go.mod h1:AAHaii2DatgOorje4yWxlzQBRYNebschZBK82FfjDIs=
 github.com/DaiYuANg/arcgo/configx v0.3.2 h1:XYiupHojMuqHhdsWKJ96FMTEohY5Of2dq7+aosugCA4=
 github.com/DaiYuANg/arcgo/configx v0.3.2/go.mod h1:MYuhrGf0j3dk9esW8vp/nrvnXqPr32CLM6xVPXEkJJI=
-github.com/DaiYuANg/arcgo/dix v0.6.0 h1:pRft/li59aEhr6WPwuPsQEyuvUrW8A/lSyYTWO5HGmc=
-github.com/DaiYuANg/arcgo/dix v0.6.0/go.mod h1:OvxyI4TvIiQTYxRCJpohxHS2F4PkIltmGLCoSFs34mU=
 github.com/DaiYuANg/arcgo/dix v0.6.1 h1:ASc4YJwL9YC31AdppK9zmVBuVCzltQFzjTQk2hCHkWQ=
 github.com/DaiYuANg/arcgo/dix v0.6.1/go.mod h1:OvxyI4TvIiQTYxRCJpohxHS2F4PkIltmGLCoSFs34mU=
 github.com/DaiYuANg/arcgo/eventx v0.3.2 h1:Cch4pkBj5HdI+bdKPgvNRGlbEj+Br5ut5idJNMfiCwY=

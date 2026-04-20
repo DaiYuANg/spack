@@ -139,7 +139,7 @@ func newServerRegistrations(
 	robotsRoute robotsRouteRegistration,
 	assetRoute assetRouteRegistration,
 ) collectionx.List[appRegistration] {
-	return collectionx.NewList(
+	return collectionx.NewList[appRegistration](
 		middleware.appRegistration,
 		healthRoutes.appRegistration,
 		robotsRoute.appRegistration,

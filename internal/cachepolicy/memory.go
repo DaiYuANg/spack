@@ -127,7 +127,7 @@ func memoryPriorityPaths(cfg *config.Config) collectionx.OrderedSet[string] {
 	if cfg == nil {
 		return collectionx.NewOrderedSet[string]()
 	}
-	return collectionx.NewOrderedSet(
+	return collectionx.NewOrderedSet[string](
 		strings.TrimSpace(cfg.Assets.Entry),
 		strings.TrimSpace(cfg.Assets.Fallback.Target),
 		robotsAssetPath,

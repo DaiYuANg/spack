@@ -2,10 +2,8 @@ package pipeline
 
 import (
 	"cmp"
-	"slices"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/samber/lo"
 )
 
 type stageRegistration struct {
@@ -25,8 +23,7 @@ func buildStages(registrations collectionx.List[stageRegistration]) collectionx.
 		return collectionx.NewList[Stage]()
 	}
 
-	sorted := registrations.Values()
-	slices.SortFunc(sorted, func(left, right stageRegistration) int {
+	sorted := registrations.Clone().Sort(func(left, right stageRegistration) int {
 		if left.Order != right.Order {
 			return cmp.Compare(left.Order, right.Order)
 		}
@@ -42,9 +39,9 @@ func buildStages(registrations collectionx.List[stageRegistration]) collectionx.
 		}
 	})
 
-	return collectionx.NewList(lo.FilterMap(sorted, func(registration stageRegistration, _ int) (Stage, bool) {
+	return collectionx.FilterMapList[stageRegistration, Stage](sorted, func(_ int, registration stageRegistration) (Stage, bool) {
 		return registration.Stage, registration.Stage != nil
-	})...)
+	})
 }
 
 func compareStageNames(left, right Stage) int {

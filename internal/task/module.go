@@ -87,7 +87,7 @@ func newTaskRegistrations(
 	artifactJanitor artifactJanitorTaskRegistration,
 	cacheWarmer cacheWarmerTaskRegistration,
 ) collectionx.List[taskRegistration] {
-	return collectionx.NewList(
+	return collectionx.NewList[taskRegistration](
 		sourceRescan.taskRegistration,
 		artifactJanitor.taskRegistration,
 		cacheWarmer.taskRegistration,
@@ -211,7 +211,7 @@ func startScheduledTasks(
 	scheduler gocron.Scheduler,
 	registrations collectionx.List[taskRegistration],
 ) error {
-	registered := collectionx.FilterMapList(registrations, func(_ int, registration taskRegistration) (taskRegistration, bool) {
+	registered := collectionx.FilterMapList[taskRegistration, taskRegistration](registrations, func(_ int, registration taskRegistration) (taskRegistration, bool) {
 		if registration.Register == nil {
 			return taskRegistration{}, false
 		}

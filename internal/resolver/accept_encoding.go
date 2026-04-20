@@ -51,7 +51,7 @@ func buildEncodingCandidates(prefs encodingPreferences, supported collectionx.Li
 	if supported.IsEmpty() {
 		supported = contentcodingspec.DefaultNames()
 	}
-	choices := collectionx.FilterMapList(supported, func(index int, encoding string) (candidate, bool) {
+	choices := collectionx.FilterMapList[string, candidate](supported, func(index int, encoding string) (candidate, bool) {
 		q, ok := encodingQuality(prefs, encoding)
 		if !ok {
 			return candidate{}, false
@@ -76,7 +76,7 @@ func buildEncodingCandidates(prefs encodingPreferences, supported collectionx.Li
 	if choices.IsEmpty() {
 		return nil
 	}
-	return collectionx.MapList(choices, func(_ int, choice candidate) string {
+	return collectionx.MapList[candidate, string](choices, func(_ int, choice candidate) string {
 		return choice.encoding
 	})
 }

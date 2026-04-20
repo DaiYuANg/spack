@@ -75,7 +75,7 @@ func buildImageCandidates(prefs imagePreferences, sourceFormat string, supported
 	}
 
 	supported = imageFormatCandidates(supported, sourceFormat)
-	candidates := collectionx.FilterMapList(supported, func(index int, format string) (candidate, bool) {
+	candidates := collectionx.FilterMapList[string, candidate](supported, func(index int, format string) (candidate, bool) {
 		q, match := imageQualityForFormat(prefs, format)
 		if q <= 0 || match == imagePreferenceNone {
 			return candidate{}, false
@@ -104,7 +104,7 @@ func buildImageCandidates(prefs imagePreferences, sourceFormat string, supported
 	if candidates.IsEmpty() {
 		return nil
 	}
-	return collectionx.MapList(candidates, func(_ int, candidate candidate) string {
+	return collectionx.MapList[candidate, string](candidates, func(_ int, candidate candidate) string {
 		return candidate.format
 	})
 }

@@ -22,5 +22,5 @@ func (i Image) ParsedFormats() collectionx.List[string] {
 	if strings.TrimSpace(i.Formats) == "" {
 		return collectionx.NewList[string]()
 	}
-	return collectionx.NewList(strings.Split(i.Formats, ",")...)
+	return collectionx.NewList[string](strings.Split(i.Formats, ",")...)
 }

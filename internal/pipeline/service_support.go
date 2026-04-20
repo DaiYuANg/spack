@@ -28,11 +28,11 @@ func normalizeRequestStrings(values collectionx.List[string]) collectionx.List[s
 		return nil
 	}
 
-	normalized := collectionx.FilterMapList(values, func(_ int, value string) (string, bool) {
+	normalized := collectionx.FilterMapList[string, string](values, func(_ int, value string) (string, bool) {
 		normalizedValue := strings.ToLower(strings.TrimSpace(value))
 		return normalizedValue, normalizedValue != ""
 	})
-	normalized = collectionx.NewList(collectionx.NewOrderedSet(normalized.Values()...).Values()...)
+	normalized = collectionx.NewList[string](collectionx.NewOrderedSet[string](normalized.Values()...).Values()...)
 	if normalized.IsEmpty() {
 		return nil
 	}
@@ -44,10 +44,10 @@ func normalizeRequestInts(values collectionx.List[int]) collectionx.List[int] {
 		return nil
 	}
 
-	normalized := collectionx.FilterMapList(values, func(_ int, value int) (int, bool) {
+	normalized := collectionx.FilterMapList[int, int](values, func(_ int, value int) (int, bool) {
 		return value, value > 0
 	})
-	normalized = collectionx.NewList(collectionx.NewOrderedSet(normalized.Values()...).Values()...)
+	normalized = collectionx.NewList[int](collectionx.NewOrderedSet[int](normalized.Values()...).Values()...)
 	if normalized.IsEmpty() {
 		return nil
 	}
@@ -189,7 +189,7 @@ func (s *Service) enforceCleanupCacheLimit(ctx context.Context, files []cleanupF
 }
 
 func sortCleanupFilesByLastUsed(files []cleanupFile) []cleanupFile {
-	return collectionx.NewList(files...).Sort(func(left, right cleanupFile) int {
+	return collectionx.NewList[cleanupFile](files...).Sort(func(left, right cleanupFile) int {
 		return left.lastUsed.Compare(right.lastUsed)
 	}).Values()
 }
