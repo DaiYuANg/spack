@@ -14,11 +14,12 @@ Current scope:
 - SPA/static asset serving
 - `index.html` fallback for client-side routing
 - built-in `robots.txt` fallback generation with static-file precedence
-- runtime asset catalog
+- MemDB-backed runtime asset catalog
 - request-path normalization for mounted, encoded, and SPA-style routes
 - `gzip`, `brotli`, and `zstd` variant generation
+- scanned precompressed sidecar files such as `app.js.br`, `app.js.zst`, and `app.js.gz`
 - on-demand image width/format variants via query or `Accept` negotiation
-- frontend resource hints for HTML entry responses
+- frontend resource hints and immutable cache policy for fingerprinted assets
 - in-memory hot asset cache for small files with optional startup warmup
 - `sendfile` delivery for disk-backed assets and range requests
 - conditional HTTP caching with `ETag`, `Last-Modified`, `Cache-Control`, `Expires`, and `304 Not Modified`
@@ -43,7 +44,7 @@ The current runtime is composed of:
 2. `source`
    Reads files from the configured asset backend, currently local filesystem.
 3. `catalog`
-   Stores scanned source assets and generated variants as runtime metadata.
+   Stores scanned source assets, source sidecars, and generated variants in a MemDB-backed in-memory index.
 4. `requestpath`
    Normalizes mounted paths, percent-encoded asset paths, and SPA route-like requests before resolution.
 5. `resolver`
@@ -135,18 +136,20 @@ Request flow at a high level:
 2. An internal scheduler periodically rescans the source tree and removes stale generated artifacts.
 3. The pipeline optionally warms compressed/image variants.
 4. The memory cache can optionally preload small hot assets and generated variants.
-5. Each request path is normalized by `requestpath` before route resolution so mounted, encoded, and SPA-style paths follow the same matching rules.
-6. The resolver chooses the best asset or variant, including content-coding and image-format negotiation.
-7. Delivery uses memory cache for eligible small files, otherwise Fiber `SendFile`.
-8. Cache and validator headers are applied from resolved metadata and response policy rules.
-9. Served/generated/removed variants are propagated through the event bus for decoupled cache and pipeline updates.
+5. Precompressed source sidecars are indexed as variants without treating them as plain source assets.
+6. Each request path is normalized by `requestpath` before route resolution so mounted, encoded, and SPA-style paths follow the same matching rules.
+7. The resolver chooses the best asset or variant, including content-coding and image-format negotiation.
+8. Delivery uses memory cache for eligible small files, otherwise Fiber `SendFile`.
+9. Cache and validator headers are applied from resolved metadata and response policy rules.
+10. HTML responses can emit resource hints, and fingerprinted static assets can receive immutable cache headers.
+11. Served/generated/removed variants are propagated through the event bus for decoupled cache and pipeline updates.
 
 Hot paths that are intentionally optimized:
 
 - request-path cleaning for already-canonical asset paths
 - resolver negotiation for direct assets, encoding variants, and image variants
 - HTTP middleware short-circuiting when request logging or metrics are disabled
-- response-header calculation for `Vary`, `Content-Length`, `Last-Modified`, and cache-policy emission
+- response-header calculation for `Vary`, `Content-Length`, `Last-Modified`, resource hints, and cache-policy emission
 
 ## Quick Start
 
@@ -278,6 +281,8 @@ Response behavior:
 - responses include `ETag`, `Last-Modified`, `Cache-Control`, and `Expires`
 - conditional requests support `304 Not Modified`
 - `HEAD` requests reuse the same header selection logic without sending a response body
+- HTML responses can include `Link` resource hints derived from the served HTML
+- fingerprinted static assets can use long-lived immutable cache headers while HTML stays revalidated
 
 ## Observability
 
@@ -290,9 +295,14 @@ SPACK is designed to be operated as an application runtime, not just a static fi
 - scheduler telemetry through `gocron`'s `SchedulerMonitor`
 - `dix` lifecycle telemetry through the `spack_dix_*` metric family
 
-The bundled Grafana dashboard lives at [`deploy/grafana/spack-overview-dashboard.json`](C:/Users/12783/Projects/GitHub/spack/deploy/grafana/spack-overview-dashboard.json). It includes:
+Bundled Grafana dashboards:
 
-- application request, resolver, pipeline, cache, worker-pool, and scheduler panels
+- [`deploy/grafana/spack-overview-dashboard.json`](./deploy/grafana/spack-overview-dashboard.json) for a full single-dashboard service overview with an `instance` variable.
+- [`deploy/grafana/spack-fleet-instance-dashboard.json`](./deploy/grafana/spack-fleet-instance-dashboard.json) for a more fleet-oriented multi-instance view.
+
+They include:
+
+- application request, resolver, pipeline, cache, async concurrency, and scheduler panels
 - Go runtime and process overview panels for startup time, uptime, RSS, heap, goroutines, OS threads, GOMAXPROCS, open FDs, and GC behavior
 - build and runtime config tables derived from `spack_build_info` and `spack_config_info`
 
@@ -333,6 +343,8 @@ You can pass `--config` multiple times. Later files override earlier ones.
 Required:
 
 - `SPACK_ASSETS_ROOT`
+
+There is intentionally no reverse-proxy configuration. SPACK stays focused on static asset runtime behavior: source scanning, catalog lookup, generated variants, HTTP caching, and observability.
 
 HTTP:
 
@@ -389,12 +401,14 @@ Compression:
 - `SPACK_COMPRESSION_BROTLI_QUALITY=5`
 - `SPACK_COMPRESSION_ZSTD_LEVEL=3`
 - `SPACK_COMPRESSION_GZIP_LEVEL=5`
+- scanned sidecars are recognized when their original asset exists, for example `app.js.br`, `app.js.zst`, and `app.js.gz`
+- sidecar variants keep their source files in place and are not removed as generated artifacts
 
 Images:
 
 - `SPACK_IMAGE_ENABLE=true`
 - `SPACK_IMAGE_WIDTHS=640,1280,1920`
-- `SPACK_IMAGE_FORMATS=jpeg,png`
+- `SPACK_IMAGE_FORMATS=`
 - `SPACK_IMAGE_JPEG_QUALITY=78`
 - request width variants with `?w=<width>`
 - image processing uses the builtin Go image pipeline and supports `jpeg` and `png`
@@ -414,7 +428,7 @@ Frontend hints and cache:
 - `SPACK_FRONTEND_IMMUTABLE_CACHE_MAX_AGE=8760h`
 - HTML responses can emit `Link` hints for module scripts, styles, fonts, prefetches, preconnects, and dns-prefetch entries found in the served HTML
 - HTTP `103 Early Hints` can be enabled separately for clients and proxies that handle informational responses safely
-- fingerprinted assets such as `app-deadbeef.js` or `app-DiwrgTda.css` can receive long-lived immutable cache headers while `index.html` stays revalidated
+- fingerprinted assets such as `app-deadbeef.js`, `app.DiwrgTda.css`, or `app-deadbeef.js.map` can receive long-lived immutable cache headers while `index.html` stays revalidated
 
 Debug and metrics:
 
@@ -441,7 +455,7 @@ Debug and metrics:
 - representative metrics include `spack_dix_build_total`, `spack_dix_start_total`, `spack_dix_health_check_total`, and `spack_dix_state_transition_total`
 - `/prometheus` includes static runtime metadata gauges such as `spack_build_info`, `spack_config_info`, and `spack_runtime_start_time_seconds`
 - `spack_build_info` exposes low-cardinality build labels such as app version, Go version, and VCS revision
-- `spack_config_info` exposes low-cardinality runtime mode labels such as asset backend, compression mode, memory-cache state, and logger level
+- `spack_config_info` exposes low-cardinality runtime mode labels such as asset backend, compression mode, memory-cache state, frontend hint/cache state, robots state, image state, and logger level
 - `spack_runtime_start_time_seconds` exposes the current process start timestamp for restart and uptime correlation
 
 Logger:
