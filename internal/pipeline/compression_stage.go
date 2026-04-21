@@ -152,7 +152,7 @@ func filterConfiguredEncodings(encodings, supported collectionx.List[string]) co
 		return nil
 	}
 	supportedSet := collectionx.NewOrderedSet[string](supported.Values()...)
-	return collectionx.FilterMapList[string, string](encodings, func(_ int, encoding string) (string, bool) {
-		return encoding, supportedSet.Contains(encoding)
+	return collectionx.FilterList[string](encodings, func(_ int, encoding string) bool {
+		return supportedSet.Contains(encoding)
 	})
 }

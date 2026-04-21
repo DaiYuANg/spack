@@ -115,13 +115,20 @@ func syncArtifactCatalog(
 }
 
 func (r *artifactJanitorRun) collectCatalogArtifactPaths() error {
-	for _, variant := range r.cat.AllVariants().Values() {
+	var collectErr error
+	r.cat.AllVariants().Range(func(_ int, variant *catalog.Variant) bool {
 		if err := r.contextErr(); err != nil {
-			return err
+			collectErr = err
+			return false
 		}
 		if err := r.collectCatalogVariant(variant); err != nil {
-			return err
+			collectErr = err
+			return false
 		}
+		return true
+	})
+	if collectErr != nil {
+		return collectErr
 	}
 	return nil
 }

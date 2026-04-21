@@ -29,9 +29,8 @@ type Registry struct {
 }
 
 func NewRegistry(opts Options, enabled collectionx.List[string]) Registry {
-	all := collectionx.NewMapWithCapacity[string, Strategy](3)
-	newBuiltinStrategies(opts).Each(func(_ int, strategy Strategy) {
-		all.Set(strategy.Name(), strategy)
+	all := collectionx.AssociateList[Strategy, string, Strategy](newBuiltinStrategies(opts), func(_ int, strategy Strategy) (string, Strategy) {
+		return strategy.Name(), strategy
 	})
 
 	enabled = spec.NormalizeNames(enabled)

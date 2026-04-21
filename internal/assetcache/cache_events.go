@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/daiyuang/spack/internal/cachepolicy"
 	appEvent "github.com/daiyuang/spack/internal/event"
+	"github.com/samber/lo"
 )
 
 func (c *Cache) start(_ context.Context) error {
@@ -84,10 +84,9 @@ func (c *Cache) subscribeVariantGenerated() (func(), error) {
 }
 
 func unsubscribeAll(unsubscribes ...func()) {
-	collectionx.NewList[func()](unsubscribes...).Range(func(_ int, unsubscribe func()) bool {
+	lo.ForEach(unsubscribes, func(unsubscribe func(), _ int) {
 		if unsubscribe != nil {
 			unsubscribe()
 		}
-		return true
 	})
 }

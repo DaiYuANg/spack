@@ -111,9 +111,7 @@ func buildSidecarVariants(
 	results := make([]*catalog.Variant, candidates.Len())
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.SetLimit(sourceScanBuildParallelism(candidates.Len()))
-	candidateValues := candidates.Values()
-	for index := range candidateValues {
-		candidate := candidateValues[index]
+	candidates.Range(func(index int, candidate sidecarVariantBuildCandidate) bool {
 		group.Go(func() error {
 			if err := scanContextErr(groupCtx); err != nil {
 				return err
@@ -125,7 +123,8 @@ func buildSidecarVariants(
 			results[index] = variant
 			return nil
 		})
-	}
+		return true
+	})
 	if err := group.Wait(); err != nil {
 		return nil, oops.In("sourcecatalog").Owner("sidecar build").Wrap(err)
 	}

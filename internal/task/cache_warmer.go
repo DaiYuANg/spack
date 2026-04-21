@@ -124,10 +124,16 @@ func buildHotsetCatalog(
 	assets collectionx.List[*catalog.Asset],
 ) (catalog.Catalog, error) {
 	hotset := catalog.NewInMemoryCatalog()
-	for _, asset := range assets.Values() {
+	var copyErr error
+	assets.Range(func(_ int, asset *catalog.Asset) bool {
 		if err := copyHotsetAsset(ctx, hotset, cat, asset); err != nil {
-			return nil, err
+			copyErr = err
+			return false
 		}
+		return true
+	})
+	if copyErr != nil {
+		return nil, copyErr
 	}
 	return hotset, nil
 }
@@ -155,16 +161,23 @@ func copyHotsetVariants(
 	hotset catalog.Catalog,
 	variants collectionx.List[*catalog.Variant],
 ) error {
-	for _, variant := range variants.Values() {
+	var copyErr error
+	variants.Range(func(_ int, variant *catalog.Variant) bool {
 		if err := cacheWarmerContextErr(ctx); err != nil {
-			return err
+			copyErr = err
+			return false
 		}
 		if variant == nil {
-			continue
+			return true
 		}
 		if err := hotset.UpsertVariant(variant); err != nil {
-			return oops.In("task").Owner("cache warmer").With("artifact_path", variant.ArtifactPath).Wrap(err)
+			copyErr = oops.In("task").Owner("cache warmer").With("artifact_path", variant.ArtifactPath).Wrap(err)
+			return false
 		}
+		return true
+	})
+	if copyErr != nil {
+		return copyErr
 	}
 	return nil
 }

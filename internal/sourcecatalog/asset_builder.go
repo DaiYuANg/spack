@@ -55,7 +55,7 @@ func buildAssets(
 	results := make([]assetBuildResult, candidates.Len())
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.SetLimit(sourceScanBuildParallelism(candidates.Len()))
-	for index, candidate := range candidates.Values() {
+	candidates.Range(func(index int, candidate assetBuildCandidate) bool {
 		group.Go(func() error {
 			if err := scanContextErr(groupCtx); err != nil {
 				return err
@@ -67,7 +67,8 @@ func buildAssets(
 			results[index] = assetBuildResult{path: candidate.path, asset: asset}
 			return nil
 		})
-	}
+		return true
+	})
 	if err := group.Wait(); err != nil {
 		return nil, oops.In("sourcecatalog").Owner("asset build").Wrap(err)
 	}

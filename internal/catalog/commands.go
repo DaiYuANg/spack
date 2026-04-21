@@ -44,10 +44,16 @@ func (c *MemDBCatalog) UpsertVariant(variant *Variant) error {
 		return err
 	}
 
-	for _, existing := range pendingDeletes.Values() {
+	var deleteErr error
+	pendingDeletes.Range(func(_ string, existing *variantRecord) bool {
 		if err := txn.Delete(catalogVariantsTable, existing); err != nil && !errors.Is(err, memdb.ErrNotFound) {
-			return oops.In("catalog").Owner("variant upsert").Wrap(err)
+			deleteErr = oops.In("catalog").Owner("variant upsert").Wrap(err)
+			return false
 		}
+		return true
+	})
+	if deleteErr != nil {
+		return deleteErr
 	}
 	if err := txn.Insert(catalogVariantsTable, record); err != nil {
 		return oops.In("catalog").Owner("variant upsert").Wrap(err)
