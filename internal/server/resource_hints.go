@@ -12,9 +12,10 @@ import (
 const maxResourceHintScanBytes = 512 * 1024
 
 type resourceHintService struct {
-	cfg    config.ResourceHints
-	logger *slog.Logger
-	cache  collectionx.ConcurrentMultiMap[string, string]
+	cfg        config.ResourceHints
+	logger     *slog.Logger
+	cache      collectionx.ConcurrentMultiMap[string, string]
+	cachedKeys collectionx.ConcurrentSet[string]
 }
 
 type resourceHint struct {
@@ -30,9 +31,10 @@ func newResourceHintService(cfg *config.Frontend, logger *slog.Logger) *resource
 		hints = cfg.ResourceHints
 	}
 	return &resourceHintService{
-		cfg:    hints,
-		logger: logger,
-		cache:  collectionx.NewConcurrentMultiMap[string, string](),
+		cfg:        hints,
+		logger:     logger,
+		cache:      collectionx.NewConcurrentMultiMap[string, string](),
+		cachedKeys: collectionx.NewConcurrentSet[string](),
 	}
 }
 
@@ -65,11 +67,15 @@ func (s *resourceHintService) EarlyHintsEnabled() bool {
 }
 
 func (s *resourceHintService) cached(key string) (collectionx.List[string], bool) {
-	return collectionx.NewList(s.cache.Get(key)...), true
+	if !s.cachedKeys.Contains(key) {
+		return nil, false
+	}
+	return collectionx.NewList[string](s.cache.GetCopy(key)...), true
 }
 
 func (s *resourceHintService) store(key string, links collectionx.List[string]) {
 	s.cache.Set(key, links.Values()...)
+	s.cachedKeys.Add(key)
 }
 
 func applyResourceHints(c fiber.Ctx, links collectionx.List[string]) {
