@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/samber/lo"
 )
 
 func ParseFlexibleDuration(raw string) time.Duration {
@@ -46,5 +47,5 @@ func ParseWidths(raw string) collectionx.List[int] {
 	}
 
 	widths.Sort(cmp.Compare[int])
-	return collectionx.NewList[int](collectionx.NewOrderedSet[int](widths.Values()...).Values()...)
+	return collectionx.NewList[int](lo.Uniq[int](widths.Values())...)
 }

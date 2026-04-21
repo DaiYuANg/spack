@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/eventx"
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/cachepolicy"
@@ -186,16 +185,9 @@ func hasPreferredPipelineRequests(result *resolver.Result) bool {
 	if result == nil {
 		return false
 	}
-	return preferredListLen(result.PreferredEncodings) > 0 ||
-		preferredListLen(result.PreferredWidths) > 0 ||
-		preferredListLen(result.PreferredFormats) > 0
-}
-
-func preferredListLen[T any](values collectionx.List[T]) int {
-	if values == nil {
-		return 0
-	}
-	return values.Len()
+	return result.PreferredEncodings.Len() > 0 ||
+		result.PreferredWidths.Len() > 0 ||
+		result.PreferredFormats.Len() > 0
 }
 
 func parsePositiveInt(raw string) int {

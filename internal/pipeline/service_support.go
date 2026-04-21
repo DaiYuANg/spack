@@ -32,7 +32,7 @@ func normalizeRequestStrings(values collectionx.List[string]) collectionx.List[s
 		normalizedValue := strings.ToLower(strings.TrimSpace(value))
 		return normalizedValue, normalizedValue != ""
 	})
-	normalized = collectionx.NewList[string](collectionx.NewOrderedSet[string](normalized.Values()...).Values()...)
+	normalized = collectionx.NewList[string](lo.Uniq[string](normalized.Values())...)
 	if normalized.IsEmpty() {
 		return nil
 	}
@@ -47,7 +47,7 @@ func normalizeRequestInts(values collectionx.List[int]) collectionx.List[int] {
 	normalized := collectionx.FilterMapList[int, int](values, func(_ int, value int) (int, bool) {
 		return value, value > 0
 	})
-	normalized = collectionx.NewList[int](collectionx.NewOrderedSet[int](normalized.Values()...).Values()...)
+	normalized = collectionx.NewList[int](lo.Uniq[int](normalized.Values())...)
 	if normalized.IsEmpty() {
 		return nil
 	}

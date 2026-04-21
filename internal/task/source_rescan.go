@@ -28,6 +28,14 @@ type SourceRescanReport struct {
 	CacheInvalidations int
 }
 
+type sourceRescanRun struct {
+	ctx       context.Context
+	scanner   sourcecatalog.Scanner
+	cat       catalog.Catalog
+	bodyCache *assetcache.Cache
+	report    SourceRescanReport
+}
+
 func registerSourceRescanTask(ctx context.Context, scheduler gocron.Scheduler, runtime *sourceRescanRuntime) (bool, error) {
 	if runtime == nil {
 		return false, nil
@@ -84,32 +92,41 @@ func syncSourceCatalog(
 	cat catalog.Catalog,
 	bodyCache *assetcache.Cache,
 ) (SourceRescanReport, error) {
-	snapshot, report, err := collectScannedSnapshot(ctx, scanner, cat)
-	if err != nil {
-		return SourceRescanReport{}, err
+	run := sourceRescanRun{
+		ctx:       ctx,
+		scanner:   scanner,
+		cat:       cat,
+		bodyCache: bodyCache,
 	}
-
-	existingByPath := indexAssetsByPath(cat.AllAssets())
-	if err := reconcileScannedAssets(&report, snapshot.Assets, existingByPath, cat, bodyCache); err != nil {
-		return SourceRescanReport{}, err
-	}
-	reconcileRemovedAssets(&report, existingByPath, cat, bodyCache)
-	if err := reconcileSourceSidecars(&report, snapshot.Variants, cat, bodyCache); err != nil {
-		return SourceRescanReport{}, err
-	}
-	return report, nil
+	return run.sync()
 }
 
-func collectScannedSnapshot(ctx context.Context, scanner sourcecatalog.Scanner, cat catalog.Catalog) (sourcecatalog.Snapshot, SourceRescanReport, error) {
-	scanErr := oops.In("task").Owner("source rescan")
-	snapshot, err := scanner.ScanWithCatalog(ctx, cat)
+func (r *sourceRescanRun) sync() (SourceRescanReport, error) {
+	snapshot, err := r.collectScannedSnapshot()
 	if err != nil {
-		return sourcecatalog.Snapshot{}, SourceRescanReport{}, scanErr.Wrap(err)
+		return SourceRescanReport{}, err
 	}
-	return snapshot, SourceRescanReport{
-		TotalBytes: snapshot.TotalBytes,
-		Scanned:    snapshot.Assets.Len(),
-	}, nil
+
+	existingByPath := indexAssetsByPath(r.cat.AllAssets())
+	if err := r.reconcileScannedAssets(snapshot.Assets, existingByPath); err != nil {
+		return SourceRescanReport{}, err
+	}
+	r.reconcileRemovedAssets(existingByPath)
+	if err := r.reconcileSourceSidecars(snapshot.Variants); err != nil {
+		return SourceRescanReport{}, err
+	}
+	return r.report, nil
+}
+
+func (r *sourceRescanRun) collectScannedSnapshot() (sourcecatalog.Snapshot, error) {
+	scanErr := oops.In("task").Owner("source rescan")
+	snapshot, err := r.scanner.ScanWithCatalog(r.ctx, r.cat)
+	if err != nil {
+		return sourcecatalog.Snapshot{}, scanErr.Wrap(err)
+	}
+	r.report.TotalBytes = snapshot.TotalBytes
+	r.report.Scanned = snapshot.Assets.Len()
+	return snapshot, nil
 }
 
 func indexAssetsByPath(assets collectionx.List[*catalog.Asset]) collectionx.Map[string, *catalog.Asset] {
@@ -118,17 +135,14 @@ func indexAssetsByPath(assets collectionx.List[*catalog.Asset]) collectionx.Map[
 	})
 }
 
-func reconcileScannedAssets(
-	report *SourceRescanReport,
+func (r *sourceRescanRun) reconcileScannedAssets(
 	scannedAssets collectionx.Map[string, *catalog.Asset],
 	existingByPath collectionx.Map[string, *catalog.Asset],
-	cat catalog.Catalog,
-	bodyCache *assetcache.Cache,
 ) error {
 	var syncErr error
-	collectionx.NewList[string](scannedAssets.Keys()...).Sort(cmp.Compare[string]).Range(func(_ int, assetPath string) bool {
+	sortedMapKeys[*catalog.Asset](scannedAssets).Range(func(_ int, assetPath string) bool {
 		asset, _ := scannedAssets.Get(assetPath)
-		if err := syncScannedAsset(report, assetPath, asset, existingByPath, cat, bodyCache); err != nil {
+		if err := r.syncScannedAsset(assetPath, asset, existingByPath); err != nil {
 			syncErr = err
 			return false
 		}
@@ -137,13 +151,10 @@ func reconcileScannedAssets(
 	return syncErr
 }
 
-func syncScannedAsset(
-	report *SourceRescanReport,
+func (r *sourceRescanRun) syncScannedAsset(
 	assetPath string,
 	asset *catalog.Asset,
 	existingByPath collectionx.Map[string, *catalog.Asset],
-	cat catalog.Catalog,
-	bodyCache *assetcache.Cache,
 ) error {
 	existing, found := existingByPath.Get(assetPath)
 	if found {
@@ -151,44 +162,38 @@ func syncScannedAsset(
 	}
 
 	if !found {
-		report.Added++
+		r.report.Added++
 	} else if assetChanged(existing, asset) {
-		report.Updated++
-		invalidateAssetAndVariants(report, existing.FullPath, cat.DeleteVariants(assetPath), bodyCache)
+		r.report.Updated++
+		r.invalidateAssetAndVariants(existing.FullPath, r.cat.DeleteVariants(assetPath))
 	}
 
-	if err := cat.UpsertAsset(asset); err != nil {
+	if err := r.cat.UpsertAsset(asset); err != nil {
 		return oops.In("task").Owner("source rescan").With("asset_path", asset.Path).Wrap(err)
 	}
 	return nil
 }
 
-func reconcileRemovedAssets(
-	report *SourceRescanReport,
+func (r *sourceRescanRun) reconcileRemovedAssets(
 	existingByPath collectionx.Map[string, *catalog.Asset],
-	cat catalog.Catalog,
-	bodyCache *assetcache.Cache,
 ) {
 	collectionx.NewList[*catalog.Asset](existingByPath.Values()...).Sort(func(left, right *catalog.Asset) int {
 		return cmp.Compare(left.Path, right.Path)
 	}).Range(func(_ int, asset *catalog.Asset) bool {
-		report.Removed++
-		invalidateAssetAndVariants(report, asset.FullPath, cat.DeleteAsset(asset.Path), bodyCache)
+		r.report.Removed++
+		r.invalidateAssetAndVariants(asset.FullPath, r.cat.DeleteAsset(asset.Path))
 		return true
 	})
 }
 
-func reconcileSourceSidecars(
-	report *SourceRescanReport,
+func (r *sourceRescanRun) reconcileSourceSidecars(
 	scannedVariants collectionx.Map[string, *catalog.Variant],
-	cat catalog.Catalog,
-	bodyCache *assetcache.Cache,
 ) error {
-	existingByID := indexSourceSidecarVariants(cat)
+	existingByID := r.indexSourceSidecarVariants()
 	var syncErr error
-	collectionx.NewList[string](scannedVariants.Keys()...).Sort(cmp.Compare[string]).Range(func(_ int, variantID string) bool {
+	sortedMapKeys[*catalog.Variant](scannedVariants).Range(func(_ int, variantID string) bool {
 		variant, _ := scannedVariants.Get(variantID)
-		if err := cat.UpsertVariant(variant); err != nil {
+		if err := r.cat.UpsertVariant(variant); err != nil {
 			syncErr = oops.In("task").Owner("source rescan").With("variant_id", variantID).With("asset_path", variant.AssetPath).Wrap(err)
 			return false
 		}
@@ -202,19 +207,19 @@ func reconcileSourceSidecars(
 	collectionx.NewList[*catalog.Variant](existingByID.Values()...).Sort(func(left, right *catalog.Variant) int {
 		return cmp.Compare(left.ID, right.ID)
 	}).Range(func(_ int, variant *catalog.Variant) bool {
-		if !cat.DeleteVariantByArtifactPath(variant.ArtifactPath) {
+		if !r.cat.DeleteVariantByArtifactPath(variant.ArtifactPath) {
 			return true
 		}
-		report.RemovedVariants++
-		report.CacheInvalidations += invalidateAssetCache(bodyCache, variant.ArtifactPath)
+		r.report.RemovedVariants++
+		r.report.CacheInvalidations += invalidateAssetCache(r.bodyCache, variant.ArtifactPath)
 		return true
 	})
 	return nil
 }
 
-func indexSourceSidecarVariants(cat catalog.Catalog) collectionx.Map[string, *catalog.Variant] {
+func (r *sourceRescanRun) indexSourceSidecarVariants() collectionx.Map[string, *catalog.Variant] {
 	variantsByID := collectionx.NewMap[string, *catalog.Variant]()
-	cat.ListVariantsByStage(sourcecatalog.SourceSidecarStage).Range(func(_ int, variant *catalog.Variant) bool {
+	r.cat.ListVariantsByStage(sourcecatalog.SourceSidecarStage).Range(func(_ int, variant *catalog.Variant) bool {
 		if sourcecatalog.IsSourceSidecarVariant(variant) {
 			variantsByID.Set(variant.ID, variant)
 		}
@@ -223,34 +228,27 @@ func indexSourceSidecarVariants(cat catalog.Catalog) collectionx.Map[string, *ca
 	return variantsByID
 }
 
-func invalidateAssetAndVariants(
-	report *SourceRescanReport,
+func (r *sourceRescanRun) invalidateAssetAndVariants(
 	assetPath string,
 	variants collectionx.List[*catalog.Variant],
-	bodyCache *assetcache.Cache,
 ) {
-	if report == nil {
-		return
-	}
-	report.CacheInvalidations += invalidateAssetCache(bodyCache, assetPath)
-	report.RemovedVariants += removeAssetVariants(variants, bodyCache, report)
+	r.report.CacheInvalidations += invalidateAssetCache(r.bodyCache, assetPath)
+	r.report.RemovedVariants += r.removeAssetVariants(variants)
 }
 
-func removeAssetVariants(
-	variants collectionx.List[*catalog.Variant],
-	bodyCache *assetcache.Cache,
-	report *SourceRescanReport,
-) int {
+func (r *sourceRescanRun) removeAssetVariants(variants collectionx.List[*catalog.Variant]) int {
 	removed := 0
 	variants.Range(func(_ int, variant *catalog.Variant) bool {
 		removed++
-		if report != nil {
-			report.CacheInvalidations += invalidateAssetCache(bodyCache, variant.ArtifactPath)
-			report.RemovedArtifacts += removeVariantArtifact(variant)
-		}
+		r.report.CacheInvalidations += invalidateAssetCache(r.bodyCache, variant.ArtifactPath)
+		r.report.RemovedArtifacts += removeVariantArtifact(variant)
 		return true
 	})
 	return removed
+}
+
+func sortedMapKeys[T any](values collectionx.Map[string, T]) collectionx.List[string] {
+	return collectionx.NewList[string](values.Keys()...).Sort(cmp.Compare[string])
 }
 
 func removeVariantArtifact(variant *catalog.Variant) int {

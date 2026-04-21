@@ -18,7 +18,7 @@ const (
 	SourceBackendLocal SourceBackend = "local"
 )
 
-var supportedSourceBackends = collectionx.NewList[SourceBackend](SourceBackendLocal)
+var supportedSourceBackends = collectionx.NewOrderedSet[SourceBackend](SourceBackendLocal)
 
 const (
 	// FallbackOnNotFound indicates that the fallback target
@@ -111,10 +111,7 @@ func SupportedSourceBackendNames() collectionx.List[string] {
 }
 
 func IsSupportedSourceBackend(backend SourceBackend) bool {
-	_, ok := supportedSourceBackends.FirstWhere(func(_ int, candidate SourceBackend) bool {
-		return candidate == backend
-	}).Get()
-	return ok
+	return supportedSourceBackends.Contains(backend)
 }
 
 // NormalizedBackend returns the effective source backend name.

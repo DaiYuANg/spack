@@ -8,6 +8,7 @@ import (
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/media"
+	"github.com/samber/lo"
 )
 
 func (s *imageStage) planFormats(asset *catalog.Asset, request Request) collectionx.List[string] {
@@ -49,7 +50,7 @@ func (s *imageStage) planWidths(asset *catalog.Asset, request Request, formats c
 	}
 
 	widths.Sort(cmp.Compare[int])
-	return collectionx.NewList[int](collectionx.NewOrderedSet[int](widths.Values()...).Values()...)
+	return collectionx.NewList[int](lo.Uniq[int](widths.Values())...)
 }
 
 func shouldPlanOriginalFormatVariants(formats collectionx.List[string], sourceFormat string) bool {

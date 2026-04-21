@@ -220,10 +220,11 @@ func metricResult(err error) string {
 }
 
 func contextErr(ctx context.Context) error {
-	select {
-	case <-ctx.Done():
-		return fmt.Errorf("context done: %w", ctx.Err())
-	default:
+	if ctx == nil {
 		return nil
 	}
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("context done: %w", err)
+	}
+	return nil
 }

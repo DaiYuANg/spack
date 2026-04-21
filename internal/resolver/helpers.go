@@ -162,10 +162,3 @@ func preferredImageFormats(
 	}
 	return parseAcceptImageFormats(acceptHeader, media.ImageFormat(sourceMediaType), supportedImageFormats)
 }
-
-func listLen[T any](values collectionx.List[T]) int {
-	if values == nil {
-		return 0
-	}
-	return values.Len()
-}

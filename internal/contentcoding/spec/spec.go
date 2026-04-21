@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/samber/lo"
 )
 
 func DefaultNames() collectionx.List[string] {
@@ -47,5 +48,5 @@ func NormalizeNames(values collectionx.List[string]) collectionx.List[string] {
 	if normalized.IsEmpty() {
 		return nil
 	}
-	return collectionx.NewList[string](collectionx.NewOrderedSet[string](normalized.Values()...).Values()...)
+	return collectionx.NewList[string](lo.Uniq[string](normalized.Values())...)
 }

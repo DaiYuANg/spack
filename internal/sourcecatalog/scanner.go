@@ -105,5 +105,8 @@ func scanContextErr(ctx context.Context) error {
 	if ctx == nil {
 		return nil
 	}
-	return oops.In("sourcecatalog").Owner("scan context").Wrap(ctx.Err())
+	if err := ctx.Err(); err != nil {
+		return oops.In("sourcecatalog").Owner("scan context").Wrap(err)
+	}
+	return nil
 }

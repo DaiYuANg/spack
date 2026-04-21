@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/samber/lo"
 )
 
 type ImageFormatDescriptor struct {
@@ -98,7 +99,7 @@ func NormalizeImageFormats(formats collectionx.List[string]) collectionx.List[st
 		value := NormalizeImageFormat(format)
 		return value, value != ""
 	})
-	return collectionx.NewList[string](collectionx.NewOrderedSet[string](normalized.Values()...).Values()...)
+	return collectionx.NewList[string](lo.Uniq[string](normalized.Values())...)
 }
 
 func buildImageDescriptorsByAcceptToken(

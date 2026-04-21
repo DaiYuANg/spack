@@ -109,13 +109,13 @@ func (r *Resolver) resolvePreferredVariant(
 	encodings collectionx.List[string],
 	preferredImageFormats collectionx.List[string],
 ) (*Result, bool, error) {
-	if request.Width > 0 || listLen(preferredImageFormats) > 0 {
+	if request.Width > 0 || preferredImageFormats.Len() > 0 {
 		result, ok, err := r.resolveImageVariant(ctx, startedAt, asset, fallbackUsed, request.Width, preferredImageFormats)
 		if ok || err != nil {
 			return result, ok, err
 		}
 	}
-	if request.RangeRequested || listLen(encodings) == 0 {
+	if request.RangeRequested || encodings.Len() == 0 {
 		return nil, false, nil
 	}
 	return r.resolveEncodingVariant(ctx, startedAt, asset, fallbackUsed, encodings)
@@ -202,17 +202,17 @@ func (r *Resolver) recordMetrics(ctx context.Context, startedAt time.Time, resul
 		return
 	}
 
-	if count := int64(listLen(result.PreferredEncodings)); count > 0 {
+	if count := int64(result.PreferredEncodings.Len()); count > 0 {
 		r.obs.Counter(resolverGenerationRequestsTotalSpec).Add(ctx, count,
 			observabilityx.String("kind", "encoding"),
 		)
 	}
-	if count := int64(listLen(result.PreferredWidths)); count > 0 {
+	if count := int64(result.PreferredWidths.Len()); count > 0 {
 		r.obs.Counter(resolverGenerationRequestsTotalSpec).Add(ctx, count,
 			observabilityx.String("kind", "image_width"),
 		)
 	}
-	if count := int64(listLen(result.PreferredFormats)); count > 0 {
+	if count := int64(result.PreferredFormats.Len()); count > 0 {
 		r.obs.Counter(resolverGenerationRequestsTotalSpec).Add(ctx, count,
 			observabilityx.String("kind", "image_format"),
 		)
