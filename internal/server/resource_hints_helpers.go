@@ -173,11 +173,7 @@ func htmlTagAttrs(tokenizer *html.Tokenizer) collectionx.Map[string, string] {
 }
 
 func splitRelValues(raw string) collectionx.OrderedSet[string] {
-	values := collectionx.NewOrderedSet[string]()
-	for _, rel := range strings.Fields(strings.ToLower(raw)) {
-		values.Add(rel)
-	}
-	return values
+	return collectionx.NewOrderedSet[string](strings.Fields(strings.ToLower(raw))...)
 }
 
 func inferResourceHintAs(rawURL string) string {

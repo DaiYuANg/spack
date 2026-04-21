@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"cmp"
 	"fmt"
 	"os"
 
@@ -47,26 +48,14 @@ func (s *imageStage) planWidths(asset *catalog.Asset, request Request, formats c
 		return widths
 	}
 
-	widths.Sort(func(left, right int) int {
-		return left - right
-	})
+	widths.Sort(cmp.Compare[int])
 	return collectionx.NewList[int](collectionx.NewOrderedSet[int](widths.Values()...).Values()...)
 }
 
 func shouldPlanOriginalFormatVariants(formats collectionx.List[string], sourceFormat string) bool {
-	if formats == nil || formats.IsEmpty() {
-		return false
-	}
-
-	shouldPlan := false
-	formats.Range(func(_ int, format string) bool {
-		if format != "" && format != sourceFormat {
-			shouldPlan = true
-			return false
-		}
-		return true
+	return formats.AnyMatch(func(_ int, format string) bool {
+		return format != "" && format != sourceFormat
 	})
-	return shouldPlan
 }
 
 func (s *imageStage) planTasks(asset *catalog.Asset, formats collectionx.List[string], widths collectionx.List[int]) collectionx.List[Task] {
@@ -149,10 +138,8 @@ func filterSupportedImageFormats(formats, supported collectionx.List[string]) co
 		return normalized
 	}
 
-	return collectionx.FilterMapList[string, string](normalized, func(_ int, format string) (string, bool) {
-		_, ok := supported.FirstWhere(func(_ int, candidate string) bool {
-			return candidate == format
-		}).Get()
-		return format, ok
+	supportedSet := collectionx.NewOrderedSet[string](supported.Values()...)
+	return collectionx.FilterList[string](normalized, func(_ int, format string) bool {
+		return supportedSet.Contains(format)
 	})
 }

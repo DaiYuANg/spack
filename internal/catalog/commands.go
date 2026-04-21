@@ -44,7 +44,7 @@ func (c *MemDBCatalog) UpsertVariant(variant *Variant) error {
 		return err
 	}
 
-	for _, existing := range pendingDeletes {
+	for _, existing := range pendingDeletes.Values() {
 		if err := txn.Delete(catalogVariantsTable, existing); err != nil && !errors.Is(err, memdb.ErrNotFound) {
 			return oops.In("catalog").Owner("variant upsert").Wrap(err)
 		}
@@ -102,8 +102,8 @@ func (c *MemDBCatalog) DeleteVariantByArtifactPath(artifactPath string) bool {
 	return true
 }
 
-func collectPendingVariantDeletes(txn *memdb.Txn, record *variantRecord) (map[string]*variantRecord, error) {
-	pendingDeletes := make(map[string]*variantRecord, 4)
+func collectPendingVariantDeletes(txn *memdb.Txn, record *variantRecord) (collectionx.Map[string, *variantRecord], error) {
+	pendingDeletes := collectionx.NewMapWithCapacity[string, *variantRecord](4)
 	lookups := variantDeleteLookups(record)
 	for _, lookup := range lookups {
 		if err := collectVariantDelete(txn, pendingDeletes, lookup.index, lookup.args...); err != nil {
@@ -134,12 +134,12 @@ func variantDeleteLookups(record *variantRecord) []variantDeleteLookup {
 	return lookups
 }
 
-func collectVariantDelete(txn *memdb.Txn, pending map[string]*variantRecord, index string, args ...any) error {
+func collectVariantDelete(txn *memdb.Txn, pending collectionx.Map[string, *variantRecord], index string, args ...any) error {
 	record, ok, err := findVariantRecord(txn, index, args...)
 	if err != nil || !ok {
 		return err
 	}
-	pending[variantRecordKey(record)] = record
+	pending.Set(variantRecordKey(record), record)
 	return nil
 }
 
