@@ -2,7 +2,7 @@
 package validation
 
 import (
-	"github.com/DaiYuANg/arcgo/dix"
+	"github.com/arcgolabs/dix"
 )
 
 var Module = dix.NewModule("validation",

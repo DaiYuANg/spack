@@ -5,9 +5,10 @@ import (
 	"errors"
 	"log/slog"
 
-	"github.com/DaiYuANg/arcgo/dix"
-	"github.com/DaiYuANg/arcgo/observabilityx"
-	obsprom "github.com/DaiYuANg/arcgo/observabilityx/prometheus"
+	"github.com/arcgolabs/collectionx"
+	"github.com/arcgolabs/dix"
+	"github.com/arcgolabs/observabilityx"
+	obsprom "github.com/arcgolabs/observabilityx/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/samber/oops"
 )
@@ -18,8 +19,8 @@ var Module = dix.NewModule("metrics",
 		dix.Provider1(func(adapter *obsprom.Adapter) observabilityx.Observability {
 			return adapter
 		}),
-		dix.Provider1(func(obs observabilityx.Observability) []dix.Observer {
-			return []dix.Observer{NewObserver(obs)}
+		dix.Provider1(func(obs observabilityx.Observability) collectionx.List[dix.Observer] {
+			return collectionx.NewList[dix.Observer](NewObserver(obs))
 		}),
 	),
 )

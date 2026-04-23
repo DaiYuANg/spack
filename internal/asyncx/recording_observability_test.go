@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/DaiYuANg/arcgo/observabilityx"
+	"github.com/arcgolabs/observabilityx"
 )
 
 type recordedMetric struct {

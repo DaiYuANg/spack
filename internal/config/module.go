@@ -6,9 +6,9 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/DaiYuANg/arcgo/configx"
-	"github.com/DaiYuANg/arcgo/dix"
-	"github.com/DaiYuANg/arcgo/observabilityx"
+	"github.com/arcgolabs/configx"
+	"github.com/arcgolabs/dix"
+	"github.com/arcgolabs/observabilityx"
 	"github.com/daiyuang/spack/internal/validation"
 	"github.com/go-playground/validator/v10"
 	"github.com/samber/oops"

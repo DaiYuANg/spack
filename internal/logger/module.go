@@ -5,9 +5,9 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/DaiYuANg/arcgo/dix"
-	"github.com/DaiYuANg/arcgo/logx"
+	"github.com/arcgolabs/collectionx"
+	"github.com/arcgolabs/dix"
+	"github.com/arcgolabs/logx"
 	"github.com/daiyuang/spack/internal/config"
 )
 

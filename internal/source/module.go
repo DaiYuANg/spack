@@ -1,6 +1,6 @@
 package source
 
-import "github.com/DaiYuANg/arcgo/dix"
+import "github.com/arcgolabs/dix"
 
 var Module = dix.NewModule("source",
 	dix.WithModuleProviders(

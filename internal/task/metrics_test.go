@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DaiYuANg/arcgo/observabilityx"
+	"github.com/arcgolabs/observabilityx"
 	"github.com/daiyuang/spack/internal/task"
 )
 

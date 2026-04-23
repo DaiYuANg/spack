@@ -8,8 +8,8 @@ import (
 	"image/png"
 	"os"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/anthonynsimon/bild/transform"
+	"github.com/arcgolabs/collectionx"
 	"github.com/daiyuang/spack/internal/media"
 )
 

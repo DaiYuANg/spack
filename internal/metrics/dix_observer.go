@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/DaiYuANg/arcgo/dix"
-	"github.com/DaiYuANg/arcgo/observabilityx"
+	"github.com/arcgolabs/dix"
+	"github.com/arcgolabs/observabilityx"
 )
 
 type Option func(*config)

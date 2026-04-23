@@ -2,8 +2,8 @@
 package cmd
 
 import (
-	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/DaiYuANg/arcgo/dix"
+	"github.com/arcgolabs/collectionx"
+	"github.com/arcgolabs/dix"
 	"github.com/daiyuang/spack/internal/appmeta"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/DaiYuANg/arcgo/observabilityx"
+	"github.com/arcgolabs/collectionx"
+	"github.com/arcgolabs/observabilityx"
 	"golang.org/x/sync/errgroup"
 )
 

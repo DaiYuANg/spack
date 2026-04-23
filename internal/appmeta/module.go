@@ -5,7 +5,7 @@ import (
 	"errors"
 	"runtime/debug"
 
-	"github.com/DaiYuANg/arcgo/dix"
+	"github.com/arcgolabs/dix"
 	"github.com/samber/oops"
 )
 

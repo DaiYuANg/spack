@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/DaiYuANg/arcgo/observabilityx"
+	"github.com/arcgolabs/observabilityx"
 )
 
 var (

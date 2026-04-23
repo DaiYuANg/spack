@@ -8,9 +8,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/DaiYuANg/arcgo/dix"
-	"github.com/DaiYuANg/arcgo/observabilityx"
+	"github.com/arcgolabs/collectionx"
+	"github.com/arcgolabs/dix"
+	"github.com/arcgolabs/observabilityx"
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"

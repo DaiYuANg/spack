@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/arcgolabs/collectionx"
 	appEvent "github.com/daiyuang/spack/internal/event"
 	"github.com/samber/lo"
 )

@@ -1,6 +1,6 @@
 package catalog
 
-import "github.com/DaiYuANg/arcgo/collectionx"
+import "github.com/arcgolabs/collectionx"
 
 func (c *MemDBCatalog) FindAsset(assetPath string) (*Asset, bool) {
 	asset, ok, err := c.FindAssetViewResult(assetPath)

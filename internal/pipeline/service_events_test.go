@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DaiYuANg/arcgo/eventx"
+	"github.com/arcgolabs/eventx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	appEvent "github.com/daiyuang/spack/internal/event"

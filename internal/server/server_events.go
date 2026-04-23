@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/DaiYuANg/arcgo/eventx"
+	"github.com/arcgolabs/eventx"
 	appEvent "github.com/daiyuang/spack/internal/event"
 	"github.com/daiyuang/spack/internal/resolver"
 	"github.com/samber/lo"

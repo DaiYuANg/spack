@@ -3,7 +3,7 @@ package assetcache
 import (
 	"context"
 
-	"github.com/DaiYuANg/arcgo/dix"
+	"github.com/arcgolabs/dix"
 )
 
 var Module = dix.NewModule("assetcache",

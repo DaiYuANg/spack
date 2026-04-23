@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DaiYuANg/arcgo/dix"
-	"github.com/DaiYuANg/arcgo/observabilityx"
+	"github.com/arcgolabs/dix"
+	"github.com/arcgolabs/observabilityx"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/media"
 	"github.com/gofiber/fiber/v3"

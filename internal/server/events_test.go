@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/DaiYuANg/arcgo/eventx"
+	"github.com/arcgolabs/eventx"
 	"github.com/daiyuang/spack/internal/catalog"
 	appEvent "github.com/daiyuang/spack/internal/event"
 	"github.com/daiyuang/spack/internal/resolver"

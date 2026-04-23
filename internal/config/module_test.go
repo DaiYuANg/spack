@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/DaiYuANg/arcgo/configx"
+	"github.com/arcgolabs/configx"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/spf13/pflag"
 )

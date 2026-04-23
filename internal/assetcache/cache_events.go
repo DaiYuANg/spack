@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/DaiYuANg/arcgo/eventx"
+	"github.com/arcgolabs/eventx"
 	"github.com/daiyuang/spack/internal/cachepolicy"
 	appEvent "github.com/daiyuang/spack/internal/event"
 	"github.com/samber/lo"

@@ -3,7 +3,7 @@ package task
 import (
 	"context"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/arcgolabs/collectionx"
 	"github.com/go-co-op/gocron/v2"
 	"github.com/samber/oops"
 )

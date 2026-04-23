@@ -1,8 +1,8 @@
 package server
 
 import (
-	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/DaiYuANg/arcgo/dix"
+	"github.com/arcgolabs/collectionx"
+	"github.com/arcgolabs/dix"
 	"github.com/daiyuang/spack/internal/constant"
 )
 

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/arcgolabs/collectionx"
 	"github.com/daiyuang/spack/internal/asyncx"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/prometheus/client_golang/prometheus"

@@ -5,9 +5,9 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/DaiYuANg/arcgo/eventx"
-	"github.com/DaiYuANg/arcgo/observabilityx"
+	"github.com/arcgolabs/collectionx"
+	"github.com/arcgolabs/eventx"
+	"github.com/arcgolabs/observabilityx"
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"

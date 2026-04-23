@@ -1,9 +1,9 @@
 package config
 
 import (
-	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/DaiYuANg/arcgo/configx"
-	"github.com/DaiYuANg/arcgo/observabilityx"
+	"github.com/arcgolabs/collectionx"
+	"github.com/arcgolabs/configx"
+	"github.com/arcgolabs/observabilityx"
 	"github.com/daiyuang/spack/internal/constant"
 	"github.com/go-playground/validator/v10"
 	"github.com/spf13/pflag"

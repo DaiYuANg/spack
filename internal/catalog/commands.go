@@ -3,7 +3,7 @@ package catalog
 import (
 	"errors"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/arcgolabs/collectionx"
 	"github.com/hashicorp/go-memdb"
 	"github.com/samber/oops"
 )

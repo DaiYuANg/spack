@@ -1,6 +1,6 @@
 package catalog
 
-import "github.com/DaiYuANg/arcgo/dix"
+import "github.com/arcgolabs/dix"
 
 var Module = dix.NewModule("catalog",
 	dix.WithModuleProviders(

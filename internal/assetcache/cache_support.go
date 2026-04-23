@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/DaiYuANg/arcgo/observabilityx"
+	"github.com/arcgolabs/observabilityx"
 	"github.com/dgraph-io/ristretto/v2"
 )
 

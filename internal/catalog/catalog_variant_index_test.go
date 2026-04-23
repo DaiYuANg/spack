@@ -3,7 +3,7 @@ package catalog_test
 import (
 	"testing"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/arcgolabs/collectionx"
 	"github.com/daiyuang/spack/internal/catalog"
 )
 

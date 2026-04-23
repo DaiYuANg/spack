@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/DaiYuANg/arcgo/observabilityx"
+	"github.com/arcgolabs/observabilityx"
 	"github.com/daiyuang/spack/internal/server"
 	"github.com/gofiber/fiber/v3"
 	"github.com/prometheus/client_golang/prometheus/testutil"

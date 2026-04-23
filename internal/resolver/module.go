@@ -1,7 +1,7 @@
 // Package resolver maps requests to source assets or generated variants.
 package resolver
 
-import "github.com/DaiYuANg/arcgo/dix"
+import "github.com/arcgolabs/dix"
 
 var Module = dix.NewModule("resolver",
 	dix.WithModuleProviders(

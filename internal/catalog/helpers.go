@@ -3,7 +3,7 @@ package catalog
 import (
 	"strconv"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/arcgolabs/collectionx"
 )
 
 func cloneAsset(asset *Asset) *Asset {

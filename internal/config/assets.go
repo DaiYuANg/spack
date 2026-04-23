@@ -4,7 +4,7 @@ package config
 import (
 	"strings"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/arcgolabs/collectionx"
 )
 
 // FallbackOn defines the condition under which a fallback file is served.

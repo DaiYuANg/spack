@@ -3,7 +3,7 @@ package pipeline
 import (
 	"cmp"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/arcgolabs/collectionx"
 )
 
 type stageRegistration struct {

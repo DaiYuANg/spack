@@ -1,6 +1,6 @@
 package catalog
 
-import "github.com/DaiYuANg/arcgo/collectionx"
+import "github.com/arcgolabs/collectionx"
 
 type Asset struct {
 	Path       string                          `json:"path"`

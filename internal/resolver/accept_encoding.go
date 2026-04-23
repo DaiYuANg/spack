@@ -4,7 +4,7 @@ import (
 	"cmp"
 	"strings"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
+	"github.com/arcgolabs/collectionx"
 	contentcodingspec "github.com/daiyuang/spack/internal/contentcoding/spec"
 )
 

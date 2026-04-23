@@ -2,7 +2,7 @@
 package artifact
 
 import (
-	"github.com/DaiYuANg/arcgo/dix"
+	"github.com/arcgolabs/dix"
 	"github.com/daiyuang/spack/internal/config"
 )
 

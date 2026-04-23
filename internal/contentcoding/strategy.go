@@ -5,8 +5,8 @@ import (
 	"compress/gzip"
 	"fmt"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/andybalholm/brotli"
+	"github.com/arcgolabs/collectionx"
 	"github.com/daiyuang/spack/internal/contentcoding/spec"
 	"github.com/klauspost/compress/zstd"
 )

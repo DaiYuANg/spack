@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DaiYuANg/arcgo/dix"
-	"github.com/DaiYuANg/arcgo/observabilityx"
+	"github.com/arcgolabs/dix"
+	"github.com/arcgolabs/observabilityx"
 	"github.com/daiyuang/spack/internal/metrics"
 )
 

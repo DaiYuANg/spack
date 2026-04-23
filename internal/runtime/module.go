@@ -4,8 +4,8 @@ package runtime
 import (
 	"log/slog"
 
-	"github.com/DaiYuANg/arcgo/dix"
-	obsprom "github.com/DaiYuANg/arcgo/observabilityx/prometheus"
+	"github.com/arcgolabs/dix"
+	obsprom "github.com/arcgolabs/observabilityx/prometheus"
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/asyncx"
 	"github.com/daiyuang/spack/internal/catalog"

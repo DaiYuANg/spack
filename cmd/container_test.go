@@ -7,9 +7,10 @@ import (
 	"runtime/debug"
 	"strings"
 	"testing"
+	"time"
 
-	"github.com/DaiYuANg/arcgo/dix"
-	obsprom "github.com/DaiYuANg/arcgo/observabilityx/prometheus"
+	"github.com/arcgolabs/dix"
+	obsprom "github.com/arcgolabs/observabilityx/prometheus"
 	"github.com/daiyuang/spack/cmd"
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/assetcache"
@@ -65,11 +66,20 @@ func TestCreateContainerBuildPublishesDixMetrics(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/prometheus", http.NoBody)
-	response := httptest.NewRecorder()
-	adapter.Handler().ServeHTTP(response, request)
+	body := ""
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/prometheus", http.NoBody)
+		response := httptest.NewRecorder()
+		adapter.Handler().ServeHTTP(response, request)
 
-	body := response.Body.String()
+		body = response.Body.String()
+		if strings.Contains(body, "spack_dix_build_total") && strings.Contains(body, `app="spack"`) {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
 	if !strings.Contains(body, "spack_dix_build_total") {
 		t.Fatalf("expected dix build metric to be exported, got body:\n%s", body)
 	}
