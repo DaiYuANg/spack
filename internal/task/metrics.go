@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/arcgolabs/collectionx"
 	"github.com/arcgolabs/observabilityx"
 )
 
@@ -55,12 +56,13 @@ func recordTaskRunMetrics(
 		result = "error"
 	}
 
-	attrs := []observabilityx.Attribute{
+	attrs := collectionx.NewList(
 		observabilityx.String("task", taskName),
 		observabilityx.String("result", result),
-	}
-	obs.Counter(taskRunsTotalSpec).Add(ctx, 1, attrs...)
-	obs.Histogram(taskRunDurationSpec).Record(ctx, time.Since(startedAt).Seconds(), attrs...)
+	)
+
+	obs.Counter(taskRunsTotalSpec).Add(ctx, 1, attrs.Values()...)
+	obs.Histogram(taskRunDurationSpec).Record(ctx, time.Since(startedAt).Seconds(), attrs.Values()...)
 }
 
 func recordSourceRescanMetrics(ctx context.Context, obs observabilityx.Observability, report SourceRescanReport) {

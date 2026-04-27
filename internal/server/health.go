@@ -163,13 +163,12 @@ func recordHealthCheckMetrics(
 	startedAt time.Time,
 ) {
 	obs = observabilityx.Normalize(obs, nil)
-	attrs := []observabilityx.Attribute{
+	attrs := collectionx.NewList(
 		observabilityx.String("kind", string(kind)),
 		observabilityx.String("check", strings.TrimSpace(checkName)),
-		observabilityx.String("result", healthMetricResult(healthy)),
-	}
-	obs.Counter(healthCheckRunsTotalSpec).Add(ctx, 1, attrs...)
-	obs.Histogram(healthCheckDurationSpec).Record(ctx, time.Since(startedAt).Seconds(), attrs...)
+		observabilityx.String("result", healthMetricResult(healthy)))
+	obs.Counter(healthCheckRunsTotalSpec).Add(ctx, 1, attrs.Values()...)
+	obs.Histogram(healthCheckDurationSpec).Record(ctx, time.Since(startedAt).Seconds(), attrs.Values()...)
 }
 
 func recordHealthReportMetrics(
@@ -180,12 +179,12 @@ func recordHealthReportMetrics(
 	startedAt time.Time,
 ) {
 	obs = observabilityx.Normalize(obs, nil)
-	attrs := []observabilityx.Attribute{
+	attrs := collectionx.NewList(
 		observabilityx.String("kind", string(kind)),
 		observabilityx.String("result", healthMetricResult(healthy)),
-	}
-	obs.Counter(healthReportsTotalSpec).Add(ctx, 1, attrs...)
-	obs.Histogram(healthReportDurationSpec).Record(ctx, time.Since(startedAt).Seconds(), attrs...)
+	)
+	obs.Counter(healthReportsTotalSpec).Add(ctx, 1, attrs.Values()...)
+	obs.Histogram(healthReportDurationSpec).Record(ctx, time.Since(startedAt).Seconds(), attrs.Values()...)
 }
 
 func healthMetricResult(healthy bool) string {

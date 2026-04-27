@@ -6,11 +6,12 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/arcgolabs/collectionx"
 	"github.com/arcgolabs/observabilityx"
 	"github.com/dgraph-io/ristretto/v2"
 )
 
-var assetCacheCounterSpecs = map[string]observabilityx.CounterSpec{
+var assetCacheCounterSpecs = collectionx.NewMapFrom(map[string]observabilityx.CounterSpec{
 	metricAssetCacheWarmEntries: observabilityx.NewCounterSpec(
 		metricAssetCacheWarmEntries,
 		observabilityx.WithDescription("Total number of entries loaded into the in-memory asset cache during warmup."),
@@ -50,7 +51,7 @@ var assetCacheCounterSpecs = map[string]observabilityx.CounterSpec{
 		observabilityx.WithDescription("Total number of bytes inserted into the in-memory asset cache."),
 		observabilityx.WithUnit("By"),
 	),
-}
+})
 
 func (c *Cache) readFile(path string) ([]byte, error) {
 	// #nosec G304 -- path comes from resolver/catalog-selected asset paths already validated against the asset tree.
@@ -90,7 +91,7 @@ func (c *Cache) addCounterWithContext(ctx context.Context, name string, value in
 	if value == 0 || c == nil || c.obs == nil {
 		return
 	}
-	spec, ok := assetCacheCounterSpecs[name]
+	spec, ok := assetCacheCounterSpecs.Get(name)
 	if !ok {
 		spec = observabilityx.NewCounterSpec(name)
 	}
