@@ -31,6 +31,8 @@ github.com/arcgolabs/configx v0.3.0 h1:25vZTDx+1wdP+kTBWRon9UEZBCXi3Wh9HafCwbKt4
 github.com/arcgolabs/configx v0.3.0/go.mod h1:0qVym0bcQyfbo0A5PwzNihpjfuHcRKNFG+XXAV/tQoE=
 github.com/arcgolabs/dix v0.5.1 h1:oXhfh4exk6eNzTzp/WbVCNFnTntkxw9jXO2GJ4LcOPk=
 github.com/arcgolabs/dix v0.5.1/go.mod h1:tMTHDoZvoQU64L80DccJUhlP3T0yzY/fmST749zA7IQ=
+github.com/arcgolabs/dix v0.6.0 h1:GwAd5S0P14MtGucN1hur7zneXay20NmyB0TUXDsl2/E=
+github.com/arcgolabs/dix v0.6.0/go.mod h1:tMTHDoZvoQU64L80DccJUhlP3T0yzY/fmST749zA7IQ=
 github.com/arcgolabs/eventx v0.1.0 h1:eEbA4EGSM26jZ6iMeKyiA8E16v9nmJ1qR9OdQJrzQVw=
 github.com/arcgolabs/eventx v0.1.0/go.mod h1:QYUeJEW6Ninn3VH0y74YE7ip0IUDDkX8Ih2nOhRjSoo=
 github.com/arcgolabs/logx v0.1.0 h1:LT1Geo9NTc5pk3v2RNP9RZHKaFKsa3oeGj4ww+gXpF0=
@@ -96,6 +98,8 @@ github.com/go-viper/mapstructure/v2 v2.5.0 h1:vM5IJoUAy3d7zRSVtIwQgBj7BiWtMPfmPE
 github.com/go-viper/mapstructure/v2 v2.5.0/go.mod h1:oJDH3BJKyqBA2TXFhDsKDGDTlndYOZ6rGS0BRZIxGhM=
 github.com/gofiber/fiber/v3 v3.1.0 h1:1p4I820pIa+FGxfwWuQZ5rAyX0WlGZbGT6Hnuxt6hKY=
 github.com/gofiber/fiber/v3 v3.1.0/go.mod h1:n2nYQovvL9z3Too/FGOfgtERjW3GQcAUqgfoezGBZdU=
+github.com/gofiber/fiber/v3 v3.2.0 h1:g9+09D320foINPpCnR3ibQ5oBEFHjAWRRfDG1te54u8=
+github.com/gofiber/fiber/v3 v3.2.0/go.mod h1:FHOsc2Db7HhHpsE62QAaJlXVV1pNkbZEptZ4jtti7m4=
 github.com/gofiber/schema v1.7.1 h1:oSJBKdgP8JeIME4TQSAqlNKTU2iBB+2RNmKi8Nsc+TI=
 github.com/gofiber/schema v1.7.1/go.mod h1:A/X5Ffyru4p9eBdp99qu+nzviHzQiZ7odLT+TwxWhbk=
 github.com/gofiber/utils/v2 v2.0.4 h1:WwAxUA7L4MW2DjdEHF234lfqvBqd2vYYuBtA9TJq2ec=
@@ -163,6 +167,8 @@ github.com/mattn/go-colorable v0.1.14 h1:9A9LHSqF/7dyVVX6g0U9cwm9pG3kP9gSzcuIPHP
 github.com/mattn/go-colorable v0.1.14/go.mod h1:6LmQG8QLFO4G5z1gPvYEzlUgJ2wF+stgPZH1UqBm1s8=
 github.com/mattn/go-isatty v0.0.21 h1:xYae+lCNBP7QuW4PUnNG61ffM4hVIfm+zUzDuSzYLGs=
 github.com/mattn/go-isatty v0.0.21/go.mod h1:ZXfXG4SQHsB/w3ZeOYbR0PrPwLy+n6xiMrJlRFqopa4=
+github.com/mattn/go-isatty v0.0.22 h1:j8l17JJ9i6VGPUFUYoTUKPSgKe/83EYU2zBC7YNKMw4=
+github.com/mattn/go-isatty v0.0.22/go.mod h1:ZXfXG4SQHsB/w3ZeOYbR0PrPwLy+n6xiMrJlRFqopa4=
 github.com/mitchellh/copystructure v1.2.0 h1:vpKXTN4ewci03Vljg/q9QvCGUDttBOGBIa15WveJJGw=
 github.com/mitchellh/copystructure v1.2.0/go.mod h1:qLl+cE2AmVv+CoeAwDPye/v+N2HKCj9FbZEVFJRxO9s=
 github.com/mitchellh/reflectwalk v1.0.2 h1:G2LzWKi524PWgd3mLHV8Y5k7s6XUvT0Gef6zxSIeXaQ=

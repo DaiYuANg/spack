@@ -7,7 +7,7 @@ require (
 	github.com/anthonynsimon/bild v0.15.0
 	github.com/arcgolabs/collectionx v0.2.0
 	github.com/arcgolabs/configx v0.3.0
-	github.com/arcgolabs/dix v0.5.1
+	github.com/arcgolabs/dix v0.6.0
 	github.com/arcgolabs/eventx v0.1.0
 	github.com/arcgolabs/logx v0.1.0
 	github.com/arcgolabs/observabilityx v0.2.0
@@ -18,7 +18,7 @@ require (
 	github.com/go-co-op/gocron/v2 v2.21.1
 	github.com/go-git/go-git/v5 v5.17.2
 	github.com/go-playground/validator/v10 v10.30.2
-	github.com/gofiber/fiber/v3 v3.1.0
+	github.com/gofiber/fiber/v3 v3.2.0
 	github.com/google/uuid v1.6.0
 	github.com/goyek/goyek/v2 v2.3.0
 	github.com/hashicorp/go-memdb v1.3.5
@@ -80,7 +80,7 @@ require (
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
-	github.com/mattn/go-isatty v0.0.21 // indirect
+	github.com/mattn/go-isatty v0.0.22 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
