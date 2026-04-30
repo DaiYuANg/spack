@@ -2,19 +2,19 @@ package task
 
 import (
 	"context"
+	cxlist "github.com/arcgolabs/collectionx/list"
+	cxset "github.com/arcgolabs/collectionx/set"
+	"github.com/daiyuang/spack/internal/artifact"
+	"github.com/daiyuang/spack/internal/assetcache"
+	"github.com/daiyuang/spack/internal/catalog"
+	"github.com/go-co-op/gocron/v2"
+	"github.com/samber/oops"
 	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/arcgolabs/collectionx"
-	"github.com/daiyuang/spack/internal/artifact"
-	"github.com/daiyuang/spack/internal/assetcache"
-	"github.com/daiyuang/spack/internal/catalog"
-	"github.com/go-co-op/gocron/v2"
-	"github.com/samber/oops"
 )
 
 const artifactJanitorInterval = 15 * time.Minute
@@ -31,7 +31,7 @@ type artifactJanitorRun struct {
 	ctx        context.Context
 	root       string
 	rootHandle *os.Root
-	expected   collectionx.Set[string]
+	expected   *cxset.Set[string]
 	cat        catalog.Catalog
 	bodyCache  *assetcache.Cache
 	report     *ArtifactJanitorReport
@@ -99,7 +99,7 @@ func syncArtifactCatalog(
 	run := artifactJanitorRun{
 		ctx:       ctx,
 		root:      root,
-		expected:  collectionx.NewSet[string](),
+		expected:  cxset.NewSet[string](),
 		cat:       cat,
 		bodyCache: bodyCache,
 		report:    &ArtifactJanitorReport{},
@@ -201,7 +201,7 @@ func pruneEmptyArtifactDirs(root string) int {
 		return 0
 	}
 
-	directories := collectionx.NewList[string]()
+	directories := cxlist.NewList[string]()
 	if err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err

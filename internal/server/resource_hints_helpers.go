@@ -2,19 +2,20 @@ package server
 
 import (
 	"fmt"
-	"io"
-	"os"
-	"path"
-	"strings"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
+	cxset "github.com/arcgolabs/collectionx/set"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/media"
 	"golang.org/x/net/html"
+	"io"
+	"os"
+	"path"
+	"strings"
 )
 
-func parseHTMLResourceHints(filePath string, cfg config.ResourceHints) (collectionx.List[string], error) {
+func parseHTMLResourceHints(filePath string, cfg config.ResourceHints) (*cxlist.List[string], error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("open HTML asset: %w", err)
@@ -22,8 +23,8 @@ func parseHTMLResourceHints(filePath string, cfg config.ResourceHints) (collecti
 	defer file.Close()
 
 	tokenizer := html.NewTokenizer(io.LimitReader(file, maxResourceHintScanBytes))
-	links := collectionx.NewList[string]()
-	seen := collectionx.NewOrderedSet[string]()
+	links := cxlist.NewList[string]()
+	seen := cxset.NewOrderedSet[string]()
 	headerBytes := 0
 
 	for {
@@ -47,8 +48,8 @@ func parseHTMLResourceHints(filePath string, cfg config.ResourceHints) (collecti
 }
 
 func appendResourceHint(
-	links collectionx.List[string],
-	seen collectionx.OrderedSet[string],
+	links *cxlist.List[string],
+	seen *cxset.OrderedSet[string],
 	hint resourceHint,
 	cfg config.ResourceHints,
 	headerBytes *int,
@@ -75,7 +76,7 @@ func appendResourceHint(
 	return true
 }
 
-func resourceHintFromTag(tag string, attrs collectionx.Map[string, string]) (resourceHint, bool) {
+func resourceHintFromTag(tag string, attrs *cxmapping.Map[string, string]) (resourceHint, bool) {
 	switch strings.ToLower(tag) {
 	case "script":
 		return scriptResourceHint(attrs)
@@ -86,7 +87,7 @@ func resourceHintFromTag(tag string, attrs collectionx.Map[string, string]) (res
 	}
 }
 
-func scriptResourceHint(attrs collectionx.Map[string, string]) (resourceHint, bool) {
+func scriptResourceHint(attrs *cxmapping.Map[string, string]) (resourceHint, bool) {
 	src := attrs.GetOrDefault("src", "")
 	if !isValidResourceHintURL(src) {
 		return resourceHint{}, false
@@ -102,7 +103,7 @@ func scriptResourceHint(attrs collectionx.Map[string, string]) (resourceHint, bo
 	return resourceHint{}, false
 }
 
-func linkResourceHint(attrs collectionx.Map[string, string]) (resourceHint, bool) {
+func linkResourceHint(attrs *cxmapping.Map[string, string]) (resourceHint, bool) {
 	href := attrs.GetOrDefault("href", "")
 	if !isValidResourceHintURL(href) {
 		return resourceHint{}, false
@@ -127,7 +128,7 @@ func linkResourceHint(attrs collectionx.Map[string, string]) (resourceHint, bool
 	}
 }
 
-func preloadResourceHint(href string, attrs collectionx.Map[string, string]) (resourceHint, bool) {
+func preloadResourceHint(href string, attrs *cxmapping.Map[string, string]) (resourceHint, bool) {
 	as := strings.ToLower(strings.TrimSpace(attrs.GetOrDefault("as", "")))
 	if as == "" {
 		as = inferResourceHintAs(href)
@@ -147,7 +148,7 @@ func (h resourceHint) Header() (string, bool) {
 		return "", false
 	}
 
-	parts := collectionx.NewList[string]("<"+h.url+">", "rel="+h.rel)
+	parts := cxlist.NewList[string]("<"+h.url+">", "rel="+h.rel)
 	if h.as != "" {
 		parts.Add("as=" + h.as)
 	}
@@ -161,8 +162,8 @@ func (h resourceHint) Header() (string, bool) {
 	return parts.Join("; "), true
 }
 
-func htmlTagAttrs(tokenizer *html.Tokenizer) collectionx.Map[string, string] {
-	attrs := collectionx.NewMap[string, string]()
+func htmlTagAttrs(tokenizer *html.Tokenizer) *cxmapping.Map[string, string] {
+	attrs := cxmapping.NewMap[string, string]()
 	for {
 		key, value, more := tokenizer.TagAttr()
 		attrs.Set(strings.ToLower(string(key)), string(value))
@@ -172,8 +173,8 @@ func htmlTagAttrs(tokenizer *html.Tokenizer) collectionx.Map[string, string] {
 	}
 }
 
-func splitRelValues(raw string) collectionx.OrderedSet[string] {
-	return collectionx.NewOrderedSet[string](strings.Fields(strings.ToLower(raw))...)
+func splitRelValues(raw string) *cxset.OrderedSet[string] {
+	return cxset.NewOrderedSet[string](strings.Fields(strings.ToLower(raw))...)
 }
 
 func inferResourceHintAs(rawURL string) string {

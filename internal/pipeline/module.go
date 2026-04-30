@@ -3,15 +3,14 @@ package pipeline
 import (
 	"context"
 
-	"log/slog"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dix"
 	"github.com/arcgolabs/eventx"
 	"github.com/arcgolabs/observabilityx"
 	"github.com/daiyuang/spack/internal/asyncx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
+	"log/slog"
 )
 
 var Module = dix.NewModule("pipeline",
@@ -33,20 +32,20 @@ var Module = dix.NewModule("pipeline",
 	),
 )
 
-func newStageRegistrations(image *imageStage, compression *compressionStage) collectionx.List[stageRegistration] {
-	return collectionx.NewList[stageRegistration](
+func newStageRegistrations(image *imageStage, compression *compressionStage) *cxlist.List[stageRegistration] {
+	return cxlist.NewList[stageRegistration](
 		newStageRegistration(100, image),
 		newStageRegistration(200, compression),
 	)
 }
 
-func newStages(registrations collectionx.List[stageRegistration]) collectionx.List[Stage] {
+func newStages(registrations *cxlist.List[stageRegistration]) *cxlist.List[Stage] {
 	return buildStages(registrations)
 }
 
 type serviceDeps struct {
 	metrics    *Metrics
-	stages     collectionx.List[Stage]
+	stages     *cxlist.List[Stage]
 	bus        eventx.BusRuntime
 	workers    *asyncx.Settings
 	obs        observabilityx.Observability
@@ -55,7 +54,7 @@ type serviceDeps struct {
 
 func newServiceDeps(
 	metrics *Metrics,
-	stages collectionx.List[Stage],
+	stages *cxlist.List[Stage],
 	bus eventx.BusRuntime,
 	workers *asyncx.Settings,
 	obs observabilityx.Observability,

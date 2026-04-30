@@ -3,11 +3,11 @@ package media
 import (
 	"strings"
 
-	"github.com/arcgolabs/collectionx"
+	cxset "github.com/arcgolabs/collectionx/set"
 	"github.com/daiyuang/spack/internal/constant"
 )
 
-var textLikeMediaTypes = collectionx.NewOrderedSet[string](
+var textLikeMediaTypes = cxset.NewOrderedSet[string](
 	string(constant.ApplicationJavascript),
 	string(constant.XJavascript),
 	string(constant.JSON),
@@ -17,7 +17,7 @@ var textLikeMediaTypes = collectionx.NewOrderedSet[string](
 	string(constant.Svg),
 )
 
-var compressibleNonTextMediaTypes = collectionx.NewOrderedSet[string](
+var compressibleNonTextMediaTypes = cxset.NewOrderedSet[string](
 	string(constant.Wasm),
 )
 

@@ -1,15 +1,14 @@
 package pipeline_test
 
 import (
+	cxlist "github.com/arcgolabs/collectionx/list"
+	"github.com/daiyuang/spack/internal/catalog"
+	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/pipeline"
 	"os"
 	"path/filepath"
 	"slices"
 	"testing"
-
-	"github.com/arcgolabs/collectionx"
-	"github.com/daiyuang/spack/internal/catalog"
-	"github.com/daiyuang/spack/internal/config"
-	"github.com/daiyuang/spack/internal/pipeline"
 )
 
 func TestCompressionStagePlanSkipsExistingVariant(t *testing.T) {
@@ -48,7 +47,7 @@ func TestCompressionStagePlanSkipsExistingVariant(t *testing.T) {
 
 	tasks := stage.Plan(asset, pipeline.Request{
 		AssetPath:          asset.Path,
-		PreferredEncodings: collectionx.NewList("br", "gzip", "zstd"),
+		PreferredEncodings: cxlist.NewList("br", "gzip", "zstd"),
 	})
 	if tasks.Len() != 2 {
 		t.Fatalf("expected two tasks, got %d", tasks.Len())
@@ -111,7 +110,7 @@ func TestCompressionStagePlanFiltersDisabledRequestEncodings(t *testing.T) {
 
 	tasks := stage.Plan(asset, pipeline.Request{
 		AssetPath:          asset.Path,
-		PreferredEncodings: collectionx.NewList("zstd", "gzip"),
+		PreferredEncodings: cxlist.NewList("zstd", "gzip"),
 	})
 	values := tasks.Values()
 	if tasks.Len() != 1 || values[0].Encoding != "gzip" {

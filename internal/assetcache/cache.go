@@ -5,13 +5,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
-	"sync"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/daiyuang/spack/internal/asyncx"
 	"github.com/daiyuang/spack/internal/cachepolicy"
 	"github.com/daiyuang/spack/internal/catalog"
+	"strings"
+	"sync"
 )
 
 type WarmStats struct {
@@ -151,7 +150,7 @@ func (c *Cache) warmAsset(
 
 func (c *Cache) warmVariants(
 	ctx context.Context,
-	variants collectionx.List[*catalog.Variant],
+	variants *cxlist.List[*catalog.Variant],
 	stats *WarmStats,
 ) error {
 	var warmErr error

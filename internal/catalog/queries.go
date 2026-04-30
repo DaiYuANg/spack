@@ -1,6 +1,6 @@
 package catalog
 
-import "github.com/arcgolabs/collectionx"
+import cxlist "github.com/arcgolabs/collectionx/list"
 
 func (c *MemDBCatalog) FindAsset(assetPath string) (*Asset, bool) {
 	asset, ok, err := c.FindAssetViewResult(assetPath)
@@ -98,48 +98,48 @@ func (c *MemDBCatalog) FindImageVariantViewResult(assetPath, format string, widt
 	return record.Variant, true, nil
 }
 
-func (c *MemDBCatalog) ListVariants(assetPath string) collectionx.List[*Variant] {
+func (c *MemDBCatalog) ListVariants(assetPath string) *cxlist.List[*Variant] {
 	return cloneVariants(c.ListVariantsView(assetPath))
 }
 
-func (c *MemDBCatalog) ListVariantsView(assetPath string) collectionx.List[*Variant] {
+func (c *MemDBCatalog) ListVariantsView(assetPath string) *cxlist.List[*Variant] {
 	txn := c.db.Txn(false)
 	defer txn.Abort()
 
 	return variantViews(txn, catalogVariantAssetPathIndex, assetPath)
 }
 
-func (c *MemDBCatalog) ListImageVariants(assetPath, format string) collectionx.List[*Variant] {
+func (c *MemDBCatalog) ListImageVariants(assetPath, format string) *cxlist.List[*Variant] {
 	variants, err := c.ListImageVariantsViewResult(assetPath, format)
 	if err != nil {
-		return collectionx.NewList[*Variant]()
+		return cxlist.NewList[*Variant]()
 	}
 	return cloneVariants(variants)
 }
 
-func (c *MemDBCatalog) ListImageVariantsView(assetPath, format string) collectionx.List[*Variant] {
+func (c *MemDBCatalog) ListImageVariantsView(assetPath, format string) *cxlist.List[*Variant] {
 	variants, err := c.ListImageVariantsViewResult(assetPath, format)
 	if err != nil {
-		return collectionx.NewList[*Variant]()
+		return cxlist.NewList[*Variant]()
 	}
 	return variants
 }
 
-func (c *MemDBCatalog) ListImageVariantsViewResult(assetPath, format string) (collectionx.List[*Variant], error) {
+func (c *MemDBCatalog) ListImageVariantsViewResult(assetPath, format string) (*cxlist.List[*Variant], error) {
 	txn := c.db.Txn(false)
 	defer txn.Abort()
 
 	return variantViewsResult(txn, catalogVariantAssetFormatWidthIndex+"_prefix", assetPath, format)
 }
 
-func (c *MemDBCatalog) ListVariantsByStage(stage string) collectionx.List[*Variant] {
+func (c *MemDBCatalog) ListVariantsByStage(stage string) *cxlist.List[*Variant] {
 	txn := c.db.Txn(false)
 	defer txn.Abort()
 
 	return cloneVariants(variantViews(txn, catalogVariantStageIndex, stage))
 }
 
-func (c *MemDBCatalog) AllAssets() collectionx.List[*Asset] {
+func (c *MemDBCatalog) AllAssets() *cxlist.List[*Asset] {
 	txn := c.db.Txn(false)
 	defer txn.Abort()
 
@@ -148,7 +148,7 @@ func (c *MemDBCatalog) AllAssets() collectionx.List[*Asset] {
 		panic(err)
 	}
 
-	out := collectionx.NewList[*Asset]()
+	out := cxlist.NewList[*Asset]()
 	for raw := iter.Next(); raw != nil; raw = iter.Next() {
 		record, ok, err := assetRecordFrom(raw)
 		if err != nil {
@@ -161,7 +161,7 @@ func (c *MemDBCatalog) AllAssets() collectionx.List[*Asset] {
 	return out
 }
 
-func (c *MemDBCatalog) AllVariants() collectionx.List[*Variant] {
+func (c *MemDBCatalog) AllVariants() *cxlist.List[*Variant] {
 	txn := c.db.Txn(false)
 	defer txn.Abort()
 
@@ -185,7 +185,7 @@ func (c *MemDBCatalog) Snapshot() *Snapshot {
 		panic(err)
 	}
 
-	entries := collectionx.NewList[*Entry]()
+	entries := cxlist.NewList[*Entry]()
 	for raw := assets.Next(); raw != nil; raw = assets.Next() {
 		record, ok, err := assetRecordFrom(raw)
 		if err != nil {

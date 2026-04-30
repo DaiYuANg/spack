@@ -1,14 +1,13 @@
 package pipeline_test
 
 import (
-	"os"
-	"path/filepath"
-	"testing"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/pipeline"
+	"os"
+	"path/filepath"
+	"testing"
 )
 
 func TestImageStagePlanSchedulesWidthVariant(t *testing.T) {
@@ -31,7 +30,7 @@ func TestImageStagePlanSchedulesWidthVariant(t *testing.T) {
 
 	tasks := stage.Plan(asset, pipeline.Request{
 		AssetPath:       asset.Path,
-		PreferredWidths: collectionx.NewList(640),
+		PreferredWidths: cxlist.NewList(640),
 	})
 	values := tasks.Values()
 	if tasks.Len() != 1 || values[0].Width != 640 {
@@ -59,7 +58,7 @@ func TestImageStagePlanSchedulesFormatVariant(t *testing.T) {
 
 	tasks := stage.Plan(asset, pipeline.Request{
 		AssetPath:        asset.Path,
-		PreferredFormats: collectionx.NewList("jpeg"),
+		PreferredFormats: cxlist.NewList("jpeg"),
 	})
 	if tasks.Len() != 1 {
 		t.Fatalf("expected one format task, got %d", tasks.Len())
@@ -89,7 +88,7 @@ func TestImageStagePlanIgnoresUnsupportedModernFormatVariant(t *testing.T) {
 
 	tasks := stage.Plan(asset, pipeline.Request{
 		AssetPath:        asset.Path,
-		PreferredFormats: collectionx.NewList("webp"),
+		PreferredFormats: cxlist.NewList("webp"),
 	})
 	if tasks.Len() != 0 {
 		t.Fatalf("expected unsupported webp format to be ignored, got %#v", tasks.Values())

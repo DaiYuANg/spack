@@ -6,7 +6,9 @@ import (
 	"fmt"
 
 	"github.com/andybalholm/brotli"
-	"github.com/arcgolabs/collectionx"
+
+	cxlist "github.com/arcgolabs/collectionx/list"
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
 	"github.com/daiyuang/spack/internal/contentcoding/spec"
 	"github.com/klauspost/compress/zstd"
 )
@@ -24,12 +26,12 @@ type Strategy interface {
 }
 
 type Registry struct {
-	strategies collectionx.Map[string, Strategy]
-	names      collectionx.List[string]
+	strategies *cxmapping.Map[string, Strategy]
+	names      *cxlist.List[string]
 }
 
-func NewRegistry(opts Options, enabled collectionx.List[string]) Registry {
-	all := collectionx.AssociateList[Strategy, string, Strategy](newBuiltinStrategies(opts), func(_ int, strategy Strategy) (string, Strategy) {
+func NewRegistry(opts Options, enabled *cxlist.List[string]) Registry {
+	all := cxmapping.AssociateList[Strategy, string, Strategy](newBuiltinStrategies(opts), func(_ int, strategy Strategy) (string, Strategy) {
 		return strategy.Name(), strategy
 	})
 
@@ -38,7 +40,7 @@ func NewRegistry(opts Options, enabled collectionx.List[string]) Registry {
 		enabled = spec.DefaultNames()
 	}
 
-	strategies := collectionx.NewMapWithCapacity[string, Strategy](enabled.Len())
+	strategies := cxmapping.NewMapWithCapacity[string, Strategy](enabled.Len())
 	enabled.Range(func(_ int, name string) bool {
 		if strategy, ok := all.Get(name); ok {
 			strategies.Set(name, strategy)
@@ -52,15 +54,15 @@ func (r Registry) Lookup(name string) (Strategy, bool) {
 	return r.strategies.Get(name)
 }
 
-func (r Registry) Names() collectionx.List[string] {
+func (r Registry) Names() *cxlist.List[string] {
 	if r.names.IsEmpty() {
 		return spec.DefaultNames()
 	}
 	return r.names
 }
 
-func newBuiltinStrategies(opts Options) collectionx.List[Strategy] {
-	return collectionx.NewList[Strategy](
+func newBuiltinStrategies(opts Options) *cxlist.List[Strategy] {
+	return cxlist.NewList[Strategy](
 		NewBrotliStrategy(opts.BrotliQuality),
 		NewZstdStrategy(opts.ZstdLevel),
 		NewGzipStrategy(opts.GzipLevel),

@@ -5,15 +5,17 @@ go 1.26.2
 require (
 	github.com/andybalholm/brotli v1.2.1
 	github.com/anthonynsimon/bild v0.15.0
-	github.com/arcgolabs/collectionx v0.2.0
-	github.com/arcgolabs/configx v0.3.0
-	github.com/arcgolabs/dix v0.6.0
-	github.com/arcgolabs/eventx v0.1.0
-	github.com/arcgolabs/logx v0.1.0
-	github.com/arcgolabs/observabilityx v0.2.0
+	github.com/arcgolabs/collectionx/list v0.6.0
+	github.com/arcgolabs/collectionx/mapping v0.6.0
+	github.com/arcgolabs/collectionx/set v0.6.0
+	github.com/arcgolabs/configx v0.3.1
+	github.com/arcgolabs/dix v0.7.1
+	github.com/arcgolabs/eventx v0.1.1
+	github.com/arcgolabs/logx v0.1.1
+	github.com/arcgolabs/observabilityx v0.3.0
 	github.com/arl/statsviz v0.8.0
 	github.com/dgraph-io/ristretto/v2 v2.4.0
-	github.com/fsnotify/fsnotify v1.9.0
+	github.com/fsnotify/fsnotify v1.10.0
 	github.com/gabriel-vasile/mimetype v1.4.13
 	github.com/go-co-op/gocron/v2 v2.21.1
 	github.com/go-git/go-git/v5 v5.17.2
@@ -40,13 +42,7 @@ require (
 	dario.cat/mergo v1.0.2 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.1.6 // indirect
-	github.com/arcgolabs/collectionx/internal v0.2.0 // indirect
-	github.com/arcgolabs/collectionx/interval v0.2.0 // indirect
-	github.com/arcgolabs/collectionx/list v0.2.0 // indirect
-	github.com/arcgolabs/collectionx/mapping v0.2.0 // indirect
-	github.com/arcgolabs/collectionx/prefix v0.2.0 // indirect
-	github.com/arcgolabs/collectionx/set v0.2.0 // indirect
-	github.com/arcgolabs/collectionx/tree v0.2.0 // indirect
+	github.com/arcgolabs/collectionx/internal v0.6.0 // indirect
 	github.com/arcgolabs/pkg/option v0.0.3 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect

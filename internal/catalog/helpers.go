@@ -3,7 +3,7 @@ package catalog
 import (
 	"strconv"
 
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 )
 
 func cloneAsset(asset *Asset) *Asset {
@@ -26,8 +26,8 @@ func cloneVariant(variant *Variant) *Variant {
 	return &cloned
 }
 
-func cloneVariants(variants collectionx.List[*Variant]) collectionx.List[*Variant] {
-	return collectionx.MapList[*Variant, *Variant](variants, func(_ int, variant *Variant) *Variant {
+func cloneVariants(variants *cxlist.List[*Variant]) *cxlist.List[*Variant] {
+	return cxlist.MapList[*Variant, *Variant](variants, func(_ int, variant *Variant) *Variant {
 		return cloneVariant(variant)
 	})
 }
@@ -64,8 +64,8 @@ func defaultVariantID(variant *Variant) string {
 	return id
 }
 
-func cloneVariantRecords(records collectionx.List[*variantRecord]) collectionx.List[*Variant] {
-	return collectionx.MapList[*variantRecord, *Variant](records, func(_ int, record *variantRecord) *Variant {
+func cloneVariantRecords(records *cxlist.List[*variantRecord]) *cxlist.List[*Variant] {
+	return cxlist.MapList[*variantRecord, *Variant](records, func(_ int, record *variantRecord) *Variant {
 		return cloneVariant(record.Variant)
 	})
 }

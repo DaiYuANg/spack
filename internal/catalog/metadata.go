@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/arcgolabs/collectionx"
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
 	"github.com/samber/mo"
 )
 
@@ -15,14 +15,14 @@ const MetadataModTimeUnixKey = "mtime_unix"
 const MetadataModTimeUnixNanoKey = "mtime_unix_nano"
 const MetadataLastModifiedHTTPKey = "last_modified_http"
 
-func CloneMetadata(metadata collectionx.Map[string, string]) collectionx.Map[string, string] {
+func CloneMetadata(metadata *cxmapping.Map[string, string]) *cxmapping.Map[string, string] {
 	if metadata == nil {
-		return collectionx.NewMap[string, string]()
+		return cxmapping.NewMap[string, string]()
 	}
 	return metadata.Clone()
 }
 
-func MetadataModTime(metadata collectionx.Map[string, string]) mo.Option[time.Time] {
+func MetadataModTime(metadata *cxmapping.Map[string, string]) mo.Option[time.Time] {
 	if metadata == nil {
 		return mo.None[time.Time]()
 	}
@@ -48,7 +48,7 @@ func MetadataModTime(metadata collectionx.Map[string, string]) mo.Option[time.Ti
 	return mo.Some(time.Unix(seconds, 0))
 }
 
-func MetadataLastModifiedHTTP(metadata collectionx.Map[string, string]) mo.Option[string] {
+func MetadataLastModifiedHTTP(metadata *cxmapping.Map[string, string]) mo.Option[string] {
 	if metadata == nil {
 		return mo.None[string]()
 	}
@@ -66,7 +66,7 @@ func MetadataLastModifiedHTTP(metadata collectionx.Map[string, string]) mo.Optio
 	return mo.None[string]()
 }
 
-func MetadataWithModTime(metadata collectionx.Map[string, string], modTime time.Time) collectionx.Map[string, string] {
+func MetadataWithModTime(metadata *cxmapping.Map[string, string], modTime time.Time) *cxmapping.Map[string, string] {
 	cloned := CloneMetadata(metadata)
 	if modTime.IsZero() {
 		return cloned
@@ -89,7 +89,7 @@ func FileModTime(path string) mo.Option[time.Time] {
 	return mo.Some(info.ModTime())
 }
 
-func EnsureMetadataModTime(metadata collectionx.Map[string, string], path string) collectionx.Map[string, string] {
+func EnsureMetadataModTime(metadata *cxmapping.Map[string, string], path string) *cxmapping.Map[string, string] {
 	cloned := CloneMetadata(metadata)
 	if modTime, ok := MetadataModTime(cloned).Get(); ok {
 		if !MetadataLastModifiedHTTP(cloned).IsPresent() {
@@ -105,7 +105,7 @@ func EnsureMetadataModTime(metadata collectionx.Map[string, string], path string
 	return cloned
 }
 
-func setMetadataModTime(metadata collectionx.Map[string, string], modTime time.Time) {
+func setMetadataModTime(metadata *cxmapping.Map[string, string], modTime time.Time) {
 	if metadata == nil || modTime.IsZero() {
 		return
 	}

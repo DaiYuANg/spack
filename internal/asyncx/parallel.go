@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/observabilityx"
 	"golang.org/x/sync/errgroup"
 )
@@ -54,7 +54,7 @@ func RunList[T any](
 	obs observabilityx.Observability,
 	settings *Settings,
 	workload string,
-	values collectionx.List[T],
+	values *cxlist.List[T],
 	run func(context.Context, T) error,
 ) error {
 	obs = observabilityx.Normalize(obs, nil)
@@ -86,7 +86,7 @@ func runListParallel[T any](
 	workload string,
 	mode string,
 	settings *Settings,
-	values collectionx.List[T],
+	values *cxlist.List[T],
 	run func(context.Context, T) error,
 ) error {
 	group, groupCtx := errgroup.WithContext(ctx)
@@ -123,7 +123,7 @@ func runListSerial[T any](
 	obs observabilityx.Observability,
 	workload string,
 	mode string,
-	values collectionx.List[T],
+	values *cxlist.List[T],
 	run func(context.Context, T) error,
 ) error {
 	var runErr error

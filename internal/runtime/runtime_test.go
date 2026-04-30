@@ -1,19 +1,18 @@
 package runtime_test
 
 import (
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
+	"github.com/daiyuang/spack/internal/assetcache"
+	"github.com/daiyuang/spack/internal/catalog"
+	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/runtime"
+	"github.com/daiyuang/spack/internal/source"
 	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
-
-	"github.com/arcgolabs/collectionx"
-	"github.com/daiyuang/spack/internal/assetcache"
-	"github.com/daiyuang/spack/internal/catalog"
-	"github.com/daiyuang/spack/internal/config"
-	"github.com/daiyuang/spack/internal/runtime"
-	"github.com/daiyuang/spack/internal/source"
 )
 
 func TestBuildCatalogAssetSetsHashETagAndMtime(t *testing.T) {
@@ -74,7 +73,7 @@ func TestCatalogReadyAttrsIncludeCacheAndCompressionState(t *testing.T) {
 	}
 
 	attrs := runtime.CatalogReadyAttrsForTest(&cfg, cat, bodyCache, assetcache.WarmStats{Entries: 2, Bytes: 128}, 2048, 50*time.Millisecond)
-	attrMap := collectionx.NewMapWithCapacity[string, any](attrs.Len())
+	attrMap := cxmapping.NewMapWithCapacity[string, any](attrs.Len())
 	attrs.Range(func(_ int, attr slog.Attr) bool {
 		attrMap.Set(attr.Key, attr.Value.Any())
 		return true

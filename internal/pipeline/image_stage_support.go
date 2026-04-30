@@ -3,16 +3,16 @@ package pipeline
 import (
 	"cmp"
 	"fmt"
-	"os"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
+	cxset "github.com/arcgolabs/collectionx/set"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/media"
 	"github.com/samber/lo"
+	"os"
 )
 
-func (s *imageStage) planFormats(asset *catalog.Asset, request Request) collectionx.List[string] {
-	var supported collectionx.List[string]
+func (s *imageStage) planFormats(asset *catalog.Asset, request Request) *cxlist.List[string] {
+	var supported *cxlist.List[string]
 	if s.engine != nil {
 		supported = normalizeImageFormats(s.engine.SupportedTargetFormats())
 	}
@@ -26,22 +26,22 @@ func (s *imageStage) planFormats(asset *catalog.Asset, request Request) collecti
 	defaultFormats := filterSupportedImageFormats(s.cfg.ParsedFormats(), supported)
 	if sourceFormat != "" {
 		if defaultFormats == nil {
-			defaultFormats = collectionx.NewList[string]()
+			defaultFormats = cxlist.NewList[string]()
 		}
 		defaultFormats.Add(sourceFormat)
 	}
 	return filterSupportedImageFormats(defaultFormats, supported)
 }
 
-func (s *imageStage) planWidths(asset *catalog.Asset, request Request, formats collectionx.List[string]) collectionx.List[int] {
+func (s *imageStage) planWidths(asset *catalog.Asset, request Request, formats *cxlist.List[string]) *cxlist.List[int] {
 	if request.PreferredWidths != nil && !request.PreferredWidths.IsEmpty() {
 		return request.PreferredWidths
 	}
 	if request.PreferredFormats != nil && request.PreferredFormats.Len() > 0 {
-		return collectionx.NewList[int](0)
+		return cxlist.NewList[int](0)
 	}
 
-	widths := collectionx.NewList[int](s.cfg.ParsedWidths().Values()...)
+	widths := cxlist.NewList[int](s.cfg.ParsedWidths().Values()...)
 	if shouldPlanOriginalFormatVariants(formats, media.ImageFormat(asset.MediaType)) {
 		widths.Add(0)
 	}
@@ -50,29 +50,29 @@ func (s *imageStage) planWidths(asset *catalog.Asset, request Request, formats c
 	}
 
 	widths.Sort(cmp.Compare[int])
-	return collectionx.NewList[int](lo.Uniq[int](widths.Values())...)
+	return cxlist.NewList[int](lo.Uniq[int](widths.Values())...)
 }
 
-func shouldPlanOriginalFormatVariants(formats collectionx.List[string], sourceFormat string) bool {
+func shouldPlanOriginalFormatVariants(formats *cxlist.List[string], sourceFormat string) bool {
 	return formats.AnyMatch(func(_ int, format string) bool {
 		return format != "" && format != sourceFormat
 	})
 }
 
-func (s *imageStage) planTasks(asset *catalog.Asset, formats collectionx.List[string], widths collectionx.List[int]) collectionx.List[Task] {
+func (s *imageStage) planTasks(asset *catalog.Asset, formats *cxlist.List[string], widths *cxlist.List[int]) *cxlist.List[Task] {
 	if formats == nil || widths == nil {
 		return nil
 	}
-	return collectionx.FlatMapList[string, Task](formats, func(_ int, format string) []Task {
-		return collectionx.FilterMapList[int, Task](widths, func(_ int, width int) (Task, bool) {
+	return cxlist.FlatMapList[string, Task](formats, func(_ int, format string) []Task {
+		return cxlist.FlatMapList[int, Task](widths, func(_ int, width int) []Task {
 			if !shouldCreateImageTask(asset, s.catalog, width, format) {
-				return Task{}, false
+				return nil
 			}
-			return Task{
+			return []Task{{
 				AssetPath: asset.Path,
 				Format:    format,
 				Width:     width,
-			}, true
+			}}
 		}).Values()
 	})
 }
@@ -133,14 +133,14 @@ func isMatchingImageVariant(variant *catalog.Variant, sourceHash string, width i
 	return err == nil
 }
 
-func filterSupportedImageFormats(formats, supported collectionx.List[string]) collectionx.List[string] {
+func filterSupportedImageFormats(formats, supported *cxlist.List[string]) *cxlist.List[string] {
 	normalized := normalizeImageFormats(formats)
 	if normalized == nil || normalized.IsEmpty() || supported == nil || supported.IsEmpty() {
 		return normalized
 	}
 
-	supportedSet := collectionx.NewOrderedSet[string](supported.Values()...)
-	return collectionx.FilterList[string](normalized, func(_ int, format string) bool {
+	supportedSet := cxset.NewOrderedSet[string](supported.Values()...)
+	return normalized.Where(func(_ int, format string) bool {
 		return supportedSet.Contains(format)
 	})
 }

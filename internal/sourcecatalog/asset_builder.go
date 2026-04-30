@@ -3,14 +3,14 @@ package sourcecatalog
 import (
 	"context"
 	"fmt"
-	"runtime"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/source"
 	"github.com/daiyuang/spack/pkg"
 	"github.com/samber/oops"
 	"golang.org/x/sync/errgroup"
+	"runtime"
 )
 
 const maxSourceScanBuildParallelism = 16
@@ -43,10 +43,10 @@ func BuildAsset(file source.File) (*catalog.Asset, error) {
 
 func buildAssets(
 	ctx context.Context,
-	filesByPath collectionx.Map[string, source.File],
-	sidecars collectionx.Map[string, sidecarFile],
-	existingAssets collectionx.Map[string, *catalog.Asset],
-) (collectionx.Map[string, *catalog.Asset], error) {
+	filesByPath *cxmapping.Map[string, source.File],
+	sidecars *cxmapping.Map[string, sidecarFile],
+	existingAssets *cxmapping.Map[string, *catalog.Asset],
+) (*cxmapping.Map[string, *catalog.Asset], error) {
 	assets, candidates := collectAssetBuildCandidates(filesByPath, sidecars, existingAssets)
 	if candidates.IsEmpty() {
 		return assets, nil
@@ -80,12 +80,12 @@ func buildAssets(
 }
 
 func collectAssetBuildCandidates(
-	filesByPath collectionx.Map[string, source.File],
-	sidecars collectionx.Map[string, sidecarFile],
-	existingAssets collectionx.Map[string, *catalog.Asset],
-) (collectionx.Map[string, *catalog.Asset], collectionx.List[assetBuildCandidate]) {
-	assets := collectionx.NewMapWithCapacity[string, *catalog.Asset](filesByPath.Len())
-	candidates := collectionx.NewList[assetBuildCandidate]()
+	filesByPath *cxmapping.Map[string, source.File],
+	sidecars *cxmapping.Map[string, sidecarFile],
+	existingAssets *cxmapping.Map[string, *catalog.Asset],
+) (*cxmapping.Map[string, *catalog.Asset], *cxlist.List[assetBuildCandidate]) {
+	assets := cxmapping.NewMapWithCapacity[string, *catalog.Asset](filesByPath.Len())
+	candidates := cxlist.NewList[assetBuildCandidate]()
 
 	sortedKeys[source.File](filesByPath).Range(func(_ int, path string) bool {
 		if _, ok := sidecars.Get(path); ok {
@@ -125,6 +125,6 @@ func sourceScanBuildParallelism(total int) int {
 	return min(total, max(1, min(maxSourceScanBuildParallelism, runtime.GOMAXPROCS(0)*2)))
 }
 
-func assetMetadata(file source.File) collectionx.Map[string, string] {
-	return catalog.MetadataWithModTime(collectionx.NewMap[string, string](), file.ModTime)
+func assetMetadata(file source.File) *cxmapping.Map[string, string] {
+	return catalog.MetadataWithModTime(cxmapping.NewMap[string, string](), file.ModTime)
 }

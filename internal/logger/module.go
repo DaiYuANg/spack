@@ -3,12 +3,12 @@ package logger
 
 import (
 	"context"
-	"log/slog"
 
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dix"
 	"github.com/arcgolabs/logx"
 	"github.com/daiyuang/spack/internal/config"
+	"log/slog"
 )
 
 var Module = dix.NewModule("logger",
@@ -23,7 +23,7 @@ var Module = dix.NewModule("logger",
 )
 
 func Build(cfg *config.Config) *slog.Logger {
-	opts := collectionx.NewListWithCapacity[logx.Option](5,
+	opts := cxlist.NewListWithCapacity[logx.Option](5,
 		logx.WithLevelString(cfg.Logger.Level),
 		logx.WithConsole(cfg.Logger.Console.Enabled),
 		logx.WithCaller(true),

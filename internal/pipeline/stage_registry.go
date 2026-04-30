@@ -2,8 +2,7 @@ package pipeline
 
 import (
 	"cmp"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 )
 
 type stageRegistration struct {
@@ -18,9 +17,9 @@ func newStageRegistration(order int, stage Stage) stageRegistration {
 	}
 }
 
-func buildStages(registrations collectionx.List[stageRegistration]) collectionx.List[Stage] {
+func buildStages(registrations *cxlist.List[stageRegistration]) *cxlist.List[Stage] {
 	if registrations.IsEmpty() {
-		return collectionx.NewList[Stage]()
+		return cxlist.NewList[Stage]()
 	}
 
 	sorted := registrations.Clone().Sort(func(left, right stageRegistration) int {
@@ -39,8 +38,11 @@ func buildStages(registrations collectionx.List[stageRegistration]) collectionx.
 		}
 	})
 
-	return collectionx.FilterMapList[stageRegistration, Stage](sorted, func(_ int, registration stageRegistration) (Stage, bool) {
-		return registration.Stage, registration.Stage != nil
+	return cxlist.FlatMapList[stageRegistration, Stage](sorted, func(_ int, registration stageRegistration) []Stage {
+		if registration.Stage == nil {
+			return nil
+		}
+		return []Stage{registration.Stage}
 	})
 }
 

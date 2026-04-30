@@ -4,16 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"strings"
-	"time"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
 	"github.com/arcgolabs/dix"
 	"github.com/arcgolabs/observabilityx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/gofiber/fiber/v3"
+	"os"
+	"strings"
+	"time"
 )
 
 var (
@@ -53,8 +53,8 @@ type healthCheckDefinition struct {
 	Check dix.HealthCheckFunc
 }
 
-func newHealthCheckDefinitions(cfg *config.Config, cat catalog.Catalog) collectionx.List[healthCheckDefinition] {
-	return collectionx.NewList[healthCheckDefinition](
+func newHealthCheckDefinitions(cfg *config.Config, cat catalog.Catalog) *cxlist.List[healthCheckDefinition] {
+	return cxlist.NewList[healthCheckDefinition](
 		newHealthCheckDefinition(dix.HealthKindGeneral, "catalog", func(context.Context) error {
 			return checkCatalog(cat)
 		}),
@@ -76,7 +76,7 @@ func newHealthCheckDefinition(kind dix.HealthKind, name string, check dix.Health
 }
 
 func registerHealthCheckSetup(container *dix.Container, _ dix.Lifecycle) error {
-	checks, err := dix.ResolveAs[collectionx.List[healthCheckDefinition]](container)
+	checks, err := dix.ResolveAs[*cxlist.List[healthCheckDefinition]](container)
 	if err != nil {
 		return err
 	}
@@ -104,7 +104,7 @@ func registerHealthCheckSetup(container *dix.Container, _ dix.Lifecycle) error {
 func registerHealthRoutes(
 	app *fiber.App,
 	cat catalog.Catalog,
-	checks collectionx.List[healthCheckDefinition],
+	checks *cxlist.List[healthCheckDefinition],
 	obs observabilityx.Observability,
 ) {
 	app.Get(healthEndpoint, healthHandler(dix.HealthKindGeneral, checks, obs))
@@ -115,7 +115,7 @@ func registerHealthRoutes(
 	})
 }
 
-func healthHandler(kind dix.HealthKind, checks collectionx.List[healthCheckDefinition], obs observabilityx.Observability) fiber.Handler {
+func healthHandler(kind dix.HealthKind, checks *cxlist.List[healthCheckDefinition], obs observabilityx.Observability) fiber.Handler {
 	obs = observabilityx.Normalize(obs, nil)
 
 	return func(c fiber.Ctx) error {
@@ -134,7 +134,7 @@ func healthHandler(kind dix.HealthKind, checks collectionx.List[healthCheckDefin
 func runHealthChecks(
 	ctx context.Context,
 	kind dix.HealthKind,
-	checks collectionx.List[healthCheckDefinition],
+	checks *cxlist.List[healthCheckDefinition],
 	obs observabilityx.Observability,
 ) dix.HealthReport {
 	matched := checks.Where(func(_ int, check healthCheckDefinition) bool {
@@ -142,7 +142,7 @@ func runHealthChecks(
 	})
 	report := dix.HealthReport{
 		Kind:   kind,
-		Checks: collectionx.NewMapWithCapacity[string, error](matched.Len()),
+		Checks: cxmapping.NewMapWithCapacity[string, error](matched.Len()),
 	}
 	matched.Range(func(_ int, check healthCheckDefinition) bool {
 		startedAt := time.Now()
@@ -163,7 +163,7 @@ func recordHealthCheckMetrics(
 	startedAt time.Time,
 ) {
 	obs = observabilityx.Normalize(obs, nil)
-	attrs := collectionx.NewList(
+	attrs := cxlist.NewList(
 		observabilityx.String("kind", string(kind)),
 		observabilityx.String("check", strings.TrimSpace(checkName)),
 		observabilityx.String("result", healthMetricResult(healthy)))
@@ -179,7 +179,7 @@ func recordHealthReportMetrics(
 	startedAt time.Time,
 ) {
 	obs = observabilityx.Normalize(obs, nil)
-	attrs := collectionx.NewList(
+	attrs := cxlist.NewList(
 		observabilityx.String("kind", string(kind)),
 		observabilityx.String("result", healthMetricResult(healthy)),
 	)

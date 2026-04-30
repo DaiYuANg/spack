@@ -3,17 +3,18 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	cxlist "github.com/arcgolabs/collectionx/list"
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
+	cxset "github.com/arcgolabs/collectionx/set"
+	"github.com/arcgolabs/observabilityx"
+	"github.com/daiyuang/spack/internal/cachepolicy"
+	"github.com/daiyuang/spack/internal/catalog"
+	"github.com/daiyuang/spack/internal/config"
 	"log/slog"
 	"os"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/arcgolabs/collectionx"
-	"github.com/arcgolabs/observabilityx"
-	"github.com/daiyuang/spack/internal/cachepolicy"
-	"github.com/daiyuang/spack/internal/catalog"
-	"github.com/daiyuang/spack/internal/config"
 )
 
 var (
@@ -60,7 +61,7 @@ type serviceStateDeps struct {
 func newServiceState(deps serviceStateDeps) *Service {
 	stages := deps.services.stages
 	if stages == nil {
-		stages = collectionx.NewList[Stage]()
+		stages = cxlist.NewList[Stage]()
 	}
 	return &Service{
 		cfg:            deps.cfg,
@@ -72,8 +73,8 @@ func newServiceState(deps serviceStateDeps) *Service {
 		stages:         stages,
 		bus:            deps.services.bus,
 		tasks:          make(chan Request, deps.queueSize),
-		pending:        collectionx.NewConcurrentSetWithCapacity[string](deps.queueSize),
-		variantHits:    collectionx.NewConcurrentMapWithCapacity[string, time.Time](deps.queueSize),
+		pending:        cxset.NewConcurrentSetWithCapacity[string](deps.queueSize),
+		variantHits:    cxmapping.NewConcurrentMapWithCapacity[string, time.Time](deps.queueSize),
 		warmWorkers:    deps.services.workers,
 		artifactPolicy: cachepolicy.NewArtifactPolicy(deps.cfg),
 	}
@@ -215,7 +216,7 @@ func (s *Service) executeStageTask(ctx context.Context, stage Stage, asset *cata
 }
 
 func buildStageTaskKey(stage Stage, asset *catalog.Asset, task Task) string {
-	return collectionx.NewList(
+	return cxlist.NewList(
 		stage.Name(),
 		asset.Path,
 		asset.SourceHash,

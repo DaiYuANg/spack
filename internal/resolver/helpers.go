@@ -1,13 +1,12 @@
 package resolver
 
 import (
-	"strings"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/media"
 	"github.com/samber/lo"
 	"github.com/samber/oops"
+	"strings"
 )
 
 var supportedImageFormats = media.SupportedImageFormats()
@@ -22,12 +21,12 @@ type encodingVariantViewResultCatalog interface {
 
 type imageVariantViewCatalog interface {
 	FindImageVariantView(assetPath, format string, width int) (*catalog.Variant, bool)
-	ListImageVariantsView(assetPath, format string) collectionx.List[*catalog.Variant]
+	ListImageVariantsView(assetPath, format string) *cxlist.List[*catalog.Variant]
 }
 
 type imageVariantViewResultCatalog interface {
 	FindImageVariantViewResult(assetPath, format string, width int) (*catalog.Variant, bool, error)
-	ListImageVariantsViewResult(assetPath, format string) (collectionx.List[*catalog.Variant], error)
+	ListImageVariantsViewResult(assetPath, format string) (*cxlist.List[*catalog.Variant], error)
 }
 
 type assetViewCatalog interface {
@@ -77,7 +76,7 @@ func findImageVariantForRead(cat catalog.Catalog, assetPath, format string, widt
 	return variant, ok, nil
 }
 
-func listImageVariantsForRead(cat catalog.Catalog, assetPath, format string) (collectionx.List[*catalog.Variant], error) {
+func listImageVariantsForRead(cat catalog.Catalog, assetPath, format string) (*cxlist.List[*catalog.Variant], error) {
 	if checkedCat, ok := cat.(imageVariantViewResultCatalog); ok {
 		variants, err := checkedCat.ListImageVariantsViewResult(assetPath, format)
 		return variants, wrapCatalogReadErr(err)
@@ -142,20 +141,20 @@ func firstNonEmpty(values ...string) string {
 	})
 }
 
-func preferredWidths(width int) collectionx.List[int] {
+func preferredWidths(width int) *cxlist.List[int] {
 	if width <= 0 {
 		return nil
 	}
-	return collectionx.NewList[int](width)
+	return cxlist.NewList[int](width)
 }
 
 func preferredImageFormats(
 	acceptHeader,
 	explicitFormat,
 	sourceMediaType string,
-) collectionx.List[string] {
+) *cxlist.List[string] {
 	if explicitFormat != "" {
-		return collectionx.NewList[string](explicitFormat)
+		return cxlist.NewList[string](explicitFormat)
 	}
 	if !media.IsImageMediaType(sourceMediaType) {
 		return nil

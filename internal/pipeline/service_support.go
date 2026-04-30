@@ -4,15 +4,14 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	cxlist "github.com/arcgolabs/collectionx/list"
+	appEvent "github.com/daiyuang/spack/internal/event"
+	"github.com/samber/lo"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/arcgolabs/collectionx"
-	appEvent "github.com/daiyuang/spack/internal/event"
-	"github.com/samber/lo"
 )
 
 func requestKey(request Request) string {
@@ -23,31 +22,32 @@ func requestKey(request Request) string {
 	return buildRequestKey(assetPath, encodings, formats, widths)
 }
 
-func normalizeRequestStrings(values collectionx.List[string]) collectionx.List[string] {
+func normalizeRequestStrings(values *cxlist.List[string]) *cxlist.List[string] {
 	if values == nil || values.IsEmpty() {
 		return nil
 	}
 
-	normalized := collectionx.FilterMapList[string, string](values, func(_ int, value string) (string, bool) {
-		normalizedValue := strings.ToLower(strings.TrimSpace(value))
-		return normalizedValue, normalizedValue != ""
+	normalized := cxlist.MapList[string, string](values, func(_ int, value string) string {
+		return strings.ToLower(strings.TrimSpace(value))
+	}).Where(func(_ int, value string) bool {
+		return value != ""
 	})
-	normalized = collectionx.NewList[string](lo.Uniq[string](normalized.Values())...)
+	normalized = cxlist.NewList[string](lo.Uniq[string](normalized.Values())...)
 	if normalized.IsEmpty() {
 		return nil
 	}
 	return normalized.Sort(strings.Compare)
 }
 
-func normalizeRequestInts(values collectionx.List[int]) collectionx.List[int] {
+func normalizeRequestInts(values *cxlist.List[int]) *cxlist.List[int] {
 	if values == nil || values.IsEmpty() {
 		return nil
 	}
 
-	normalized := collectionx.FilterMapList[int, int](values, func(_ int, value int) (int, bool) {
-		return value, value > 0
+	normalized := values.Where(func(_ int, value int) bool {
+		return value > 0
 	})
-	normalized = collectionx.NewList[int](lo.Uniq[int](normalized.Values())...)
+	normalized = cxlist.NewList[int](lo.Uniq[int](normalized.Values())...)
 	if normalized.IsEmpty() {
 		return nil
 	}
@@ -176,7 +176,9 @@ func (s *Service) enforceCleanupCacheLimit(ctx context.Context, files []cleanupF
 		return
 	}
 
-	collectionx.NewList(sortCleanupFilesByLastUsed(files)...).Range(func(_ int, file cleanupFile) bool {
+	cxlist.NewList[cleanupFile](files...).Sort(func(left, right cleanupFile) int {
+		return left.lastUsed.Compare(right.lastUsed)
+	}).Range(func(_ int, file cleanupFile) bool {
 		if result.totalBytes <= maxCacheBytes {
 			return false
 		}
@@ -186,12 +188,6 @@ func (s *Service) enforceCleanupCacheLimit(ctx context.Context, files []cleanupF
 		recordSizeCleanupRemoval(result, file.size)
 		return true
 	})
-}
-
-func sortCleanupFilesByLastUsed(files []cleanupFile) []cleanupFile {
-	return collectionx.NewList[cleanupFile](files...).Sort(func(left, right cleanupFile) int {
-		return left.lastUsed.Compare(right.lastUsed)
-	}).Values()
 }
 
 func (s *Service) removeCleanupFile(ctx context.Context, file cleanupFile, reason appEvent.VariantRemovalReason) bool {
@@ -229,7 +225,7 @@ func (s *Service) clearVariantHit(path string) {
 }
 
 func collectCleanupFiles(root string) ([]cleanupFile, error) {
-	files := collectionx.NewList[cleanupFile]()
+	files := cxlist.NewList[cleanupFile]()
 	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr

@@ -2,15 +2,15 @@ package asyncx_test
 
 import (
 	"context"
-	"slices"
-	"strings"
-	"testing"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
+	cxset "github.com/arcgolabs/collectionx/set"
 	"github.com/daiyuang/spack/internal/asyncx"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	"slices"
+	"strings"
+	"testing"
 )
 
 func TestNewSettingsUsesNormalizedAsyncWorkers(t *testing.T) {
@@ -21,8 +21,8 @@ func TestNewSettingsUsesNormalizedAsyncWorkers(t *testing.T) {
 }
 
 func TestRunListFallsBackToSerialWithoutParallelSettings(t *testing.T) {
-	values := collectionx.NewList(1, 2, 3)
-	visited := collectionx.NewList[int]()
+	values := cxlist.NewList(1, 2, 3)
+	visited := cxlist.NewList[int]()
 
 	err := asyncx.RunListForTest[int](context.Background(), nil, nil, "test_serial", values, func(_ context.Context, value int) error {
 		visited.Add(value)
@@ -37,8 +37,8 @@ func TestRunListFallsBackToSerialWithoutParallelSettings(t *testing.T) {
 }
 
 func TestRunListUsesParallelSettings(t *testing.T) {
-	values := collectionx.NewList(1, 2, 3, 4)
-	visited := collectionx.NewConcurrentSet[int]()
+	values := cxlist.NewList(1, 2, 3, 4)
+	visited := cxset.NewConcurrentSet[int]()
 
 	err := asyncx.RunListForTest[int](context.Background(), nil, &asyncx.Settings{Size: 2}, "test_parallel", values, func(_ context.Context, value int) error {
 		visited.Add(value)
@@ -56,7 +56,7 @@ func TestRunListUsesParallelSettings(t *testing.T) {
 }
 
 func TestRunListRecordsMetrics(t *testing.T) {
-	values := collectionx.NewList(1, 2, 3)
+	values := cxlist.NewList(1, 2, 3)
 	obs := &recordingObservability{}
 
 	err := asyncx.RunListForTest[int](context.Background(), obs, nil, "asset_cache_warm", values, func(_ context.Context, value int) error {
@@ -86,7 +86,7 @@ func TestRunListRecordsMetrics(t *testing.T) {
 }
 
 func TestRunListRecordsParallelSubmissionMetrics(t *testing.T) {
-	values := collectionx.NewList(1, 2, 3)
+	values := cxlist.NewList(1, 2, 3)
 	obs := &recordingObservability{}
 	err := asyncx.RunListForTest[int](context.Background(), obs, &asyncx.Settings{Size: 2}, "pipeline_warm", values, func(_ context.Context, value int) error {
 		_ = value

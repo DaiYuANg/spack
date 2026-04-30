@@ -1,15 +1,14 @@
 package catalog_test
 
 import (
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
+	"github.com/daiyuang/spack/internal/catalog"
 	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
 	"testing"
 	"time"
-
-	"github.com/arcgolabs/collectionx"
-	"github.com/daiyuang/spack/internal/catalog"
 )
 
 func TestDeleteVariantByArtifactPath(t *testing.T) {
@@ -269,7 +268,7 @@ func TestListVariantsReturnsClonedMetadata(t *testing.T) {
 		SourceHash:   "hash-1",
 		ETag:         "\"hash-1-br\"",
 		Encoding:     "br",
-		Metadata: collectionx.NewMapFrom(map[string]string{
+		Metadata: cxmapping.NewMapFrom(map[string]string{
 			"stage": "compression",
 		}),
 	}); err != nil {

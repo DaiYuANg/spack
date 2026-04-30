@@ -1,14 +1,13 @@
 package pipeline
 
 import (
+	cxlist "github.com/arcgolabs/collectionx/list"
+	"github.com/samber/oops"
 	"strconv"
 	"strings"
-
-	"github.com/arcgolabs/collectionx"
-	"github.com/samber/oops"
 )
 
-func buildRequestKey(assetPath string, encodings, formats collectionx.List[string], widths collectionx.List[int]) string {
+func buildRequestKey(assetPath string, encodings, formats *cxlist.List[string], widths *cxlist.List[int]) string {
 	var builder strings.Builder
 	writeBuilderString(&builder, assetPath)
 	writeBuilderString(&builder, "|e=")
@@ -20,7 +19,7 @@ func buildRequestKey(assetPath string, encodings, formats collectionx.List[strin
 	return builder.String()
 }
 
-func writeStringList(builder *strings.Builder, values collectionx.List[string]) {
+func writeStringList(builder *strings.Builder, values *cxlist.List[string]) {
 	if values == nil {
 		return
 	}
@@ -33,7 +32,7 @@ func writeStringList(builder *strings.Builder, values collectionx.List[string]) 
 	})
 }
 
-func writeIntList(builder *strings.Builder, values collectionx.List[int]) {
+func writeIntList(builder *strings.Builder, values *cxlist.List[int]) {
 	if values == nil {
 		return
 	}

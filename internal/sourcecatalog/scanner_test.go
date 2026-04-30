@@ -2,18 +2,18 @@ package sourcecatalog_test
 
 import (
 	"context"
-	"log/slog"
-	"os"
-	"path/filepath"
-	"testing"
-	"time"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/contentcoding"
 	"github.com/daiyuang/spack/internal/source"
 	"github.com/daiyuang/spack/internal/sourcecatalog"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
 )
 
 func TestScannerRecognizesEnabledCompressionSidecars(t *testing.T) {
@@ -55,7 +55,7 @@ func TestScannerLeavesDisabledEncodingSidecarsAsAssets(t *testing.T) {
 	writeSourceFile(t, filepath.Join(root, "app.js"), []byte("console.log('ok');"))
 	writeSourceFile(t, filepath.Join(root, "app.js.br"), []byte("compressed"))
 
-	scanner := newScannerForTest(t, root, collectionx.NewList("gzip"))
+	scanner := newScannerForTest(t, root, cxlist.NewList("gzip"))
 	snapshot, err := scanner.Scan(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -86,7 +86,7 @@ func TestScannerReusesUnchangedAssetFromCatalog(t *testing.T) {
 		MediaType:  "application/javascript",
 		SourceHash: "hash-app",
 		ETag:       "\"hash-app\"",
-		Metadata:   catalog.MetadataWithModTime(collectionx.NewMap[string, string](), modTime),
+		Metadata:   catalog.MetadataWithModTime(cxmapping.NewMap[string, string](), modTime),
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +130,7 @@ func TestScannerReusesUnchangedSourceSidecarFromCatalog(t *testing.T) {
 		MediaType:  "application/javascript",
 		SourceHash: "hash-app",
 		ETag:       "\"hash-app\"",
-		Metadata:   catalog.MetadataWithModTime(collectionx.NewMap[string, string](), modTime),
+		Metadata:   catalog.MetadataWithModTime(cxmapping.NewMap[string, string](), modTime),
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +143,7 @@ func TestScannerReusesUnchangedSourceSidecarFromCatalog(t *testing.T) {
 		SourceHash:   "hash-app",
 		ETag:         "\"hash-sidecar\"",
 		Encoding:     "br",
-		Metadata: catalog.MetadataWithModTime(collectionx.NewMapFrom(map[string]string{
+		Metadata: catalog.MetadataWithModTime(cxmapping.NewMapFrom(map[string]string{
 			"stage":  sourcecatalog.SourceSidecarStage,
 			"source": "app.js.br",
 		}), modTime),
@@ -165,7 +165,7 @@ func TestScannerReusesUnchangedSourceSidecarFromCatalog(t *testing.T) {
 	}
 }
 
-func newScannerForTest(t *testing.T, root string, encodings collectionx.List[string]) sourcecatalog.Scanner {
+func newScannerForTest(t *testing.T, root string, encodings *cxlist.List[string]) sourcecatalog.Scanner {
 	t.Helper()
 
 	src, err := source.NewLocalFSForTest(&config.Assets{Root: root}, slog.New(slog.DiscardHandler))
@@ -176,7 +176,7 @@ func newScannerForTest(t *testing.T, root string, encodings collectionx.List[str
 	return newScannerFromSource(src, encodings)
 }
 
-func newScannerFromSource(src source.Source, encodings collectionx.List[string]) sourcecatalog.Scanner {
+func newScannerFromSource(src source.Source, encodings *cxlist.List[string]) sourcecatalog.Scanner {
 	cfg := config.DefaultConfigForTest()
 	return sourcecatalog.NewScanner(src, contentcoding.NewRegistry(contentcoding.Options{
 		BrotliQuality: cfg.Compression.BrotliQuality,

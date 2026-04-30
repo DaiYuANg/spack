@@ -2,19 +2,19 @@ package resolver
 
 import (
 	"cmp"
-	"strings"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
 	contentcodingspec "github.com/daiyuang/spack/internal/contentcoding/spec"
+	"strings"
 )
 
 type encodingPreferences struct {
-	explicit    collectionx.Map[string, float64]
+	explicit    *cxmapping.Map[string, float64]
 	wildcardQ   float64
 	hasWildcard bool
 }
 
-func parseAcceptEncoding(header string, supported collectionx.List[string]) collectionx.List[string] {
+func parseAcceptEncoding(header string, supported *cxlist.List[string]) *cxlist.List[string] {
 	if strings.TrimSpace(header) == "" {
 		return nil
 	}
@@ -24,7 +24,7 @@ func parseAcceptEncoding(header string, supported collectionx.List[string]) coll
 
 func collectEncodingPreferences(header string) encodingPreferences {
 	prefs := encodingPreferences{
-		explicit: collectionx.NewMapWithCapacity[string, float64](4),
+		explicit: cxmapping.NewMapWithCapacity[string, float64](4),
 	}
 	forEachAcceptEntry(header, func(entry acceptEntry) bool {
 		if entry.token == "*" {
@@ -32,15 +32,13 @@ func collectEncodingPreferences(header string) encodingPreferences {
 			prefs.wildcardQ = entry.q
 			return true
 		}
-		if entry.q > prefs.explicit.GetOrDefault(entry.token, -1) {
-			prefs.explicit.Set(entry.token, entry.q)
-		}
+		setMaxQuality(prefs.explicit, entry.token, entry.q)
 		return true
 	})
 	return prefs
 }
 
-func buildEncodingCandidates(prefs encodingPreferences, supported collectionx.List[string]) collectionx.List[string] {
+func buildEncodingCandidates(prefs encodingPreferences, supported *cxlist.List[string]) *cxlist.List[string] {
 	type candidate struct {
 		encoding string
 		q        float64
@@ -51,16 +49,16 @@ func buildEncodingCandidates(prefs encodingPreferences, supported collectionx.Li
 	if supported.IsEmpty() {
 		supported = contentcodingspec.DefaultNames()
 	}
-	choices := collectionx.FilterMapList[string, candidate](supported, func(index int, encoding string) (candidate, bool) {
+	choices := cxlist.FlatMapList[string, candidate](supported, func(index int, encoding string) []candidate {
 		q, ok := encodingQuality(prefs, encoding)
 		if !ok {
-			return candidate{}, false
+			return nil
 		}
-		return candidate{
+		return []candidate{{
 			encoding: encoding,
 			q:        q,
 			priority: index,
-		}, true
+		}}
 	})
 
 	choices.Sort(func(left, right candidate) int {
@@ -76,7 +74,7 @@ func buildEncodingCandidates(prefs encodingPreferences, supported collectionx.Li
 	if choices.IsEmpty() {
 		return nil
 	}
-	return collectionx.MapList[candidate, string](choices, func(_ int, choice candidate) string {
+	return cxlist.MapList[candidate, string](choices, func(_ int, choice candidate) string {
 		return choice.encoding
 	})
 }

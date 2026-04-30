@@ -3,7 +3,7 @@ package config
 import (
 	"strings"
 
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/daiyuang/spack/internal/validation"
 )
 
@@ -14,13 +14,13 @@ type Image struct {
 	JPEGQuality int    `koanf:"jpeg_quality" validate:"gte=1,lte=100"`
 }
 
-func (i Image) ParsedWidths() collectionx.List[int] {
+func (i Image) ParsedWidths() *cxlist.List[int] {
 	return validation.ParseWidths(i.Widths)
 }
 
-func (i Image) ParsedFormats() collectionx.List[string] {
+func (i Image) ParsedFormats() *cxlist.List[string] {
 	if strings.TrimSpace(i.Formats) == "" {
-		return collectionx.NewList[string]()
+		return cxlist.NewList[string]()
 	}
-	return collectionx.NewList[string](strings.Split(i.Formats, ",")...)
+	return cxlist.NewList[string](strings.Split(i.Formats, ",")...)
 }

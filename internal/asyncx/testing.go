@@ -3,7 +3,7 @@ package asyncx
 import (
 	"context"
 
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/observabilityx"
 	"github.com/daiyuang/spack/internal/config"
 )
@@ -24,7 +24,7 @@ func RunListForTest[T any](
 	obs observabilityx.Observability,
 	settings *Settings,
 	workload string,
-	values collectionx.List[T],
+	values *cxlist.List[T],
 	run func(context.Context, T) error,
 ) error {
 	return RunList(ctx, obs, settings, workload, values, run)

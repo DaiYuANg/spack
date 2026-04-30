@@ -1,12 +1,12 @@
 package resolver
 
 import (
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/daiyuang/spack/internal/catalog"
 )
 
 type imageVariantSelection struct {
-	variants     collectionx.List[*catalog.Variant]
+	variants     *cxlist.List[*catalog.Variant]
 	usable       variantUsabilityCache
 	sourceHash   string
 	format       string

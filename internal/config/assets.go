@@ -4,7 +4,8 @@ package config
 import (
 	"strings"
 
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
+	cxset "github.com/arcgolabs/collectionx/set"
 )
 
 // FallbackOn defines the condition under which a fallback file is served.
@@ -18,7 +19,7 @@ const (
 	SourceBackendLocal SourceBackend = "local"
 )
 
-var supportedSourceBackends = collectionx.NewOrderedSet[SourceBackend](SourceBackendLocal)
+var supportedSourceBackends = cxset.NewOrderedSet[SourceBackend](SourceBackendLocal)
 
 const (
 	// FallbackOnNotFound indicates that the fallback target
@@ -100,12 +101,12 @@ func NormalizeSourceBackend(raw SourceBackend) SourceBackend {
 	}
 }
 
-func SupportedSourceBackends() collectionx.List[SourceBackend] {
-	return collectionx.NewList[SourceBackend](supportedSourceBackends.Values()...)
+func SupportedSourceBackends() *cxlist.List[SourceBackend] {
+	return cxlist.NewList[SourceBackend](supportedSourceBackends.Values()...)
 }
 
-func SupportedSourceBackendNames() collectionx.List[string] {
-	return collectionx.MapList[SourceBackend, string](SupportedSourceBackends(), func(_ int, backend SourceBackend) string {
+func SupportedSourceBackendNames() *cxlist.List[string] {
+	return cxlist.MapList[SourceBackend, string](SupportedSourceBackends(), func(_ int, backend SourceBackend) string {
 		return string(backend)
 	})
 }

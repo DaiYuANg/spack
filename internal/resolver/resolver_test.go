@@ -3,17 +3,16 @@ package resolver_test
 import (
 	"context"
 	"errors"
+	cxlist "github.com/arcgolabs/collectionx/list"
+	"github.com/daiyuang/spack/internal/catalog"
+	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/resolver"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
-
-	"github.com/arcgolabs/collectionx"
-	"github.com/daiyuang/spack/internal/catalog"
-	"github.com/daiyuang/spack/internal/config"
-	"github.com/daiyuang/spack/internal/resolver"
 )
 
 const testSourceHash = "hash-1"
@@ -262,6 +261,6 @@ func writeTestFile(t *testing.T, path string, body []byte) {
 	}
 }
 
-func stringToList(raw string) collectionx.List[string] {
-	return collectionx.NewList(strings.Split(raw, ",")...)
+func stringToList(raw string) *cxlist.List[string] {
+	return cxlist.NewList(strings.Split(raw, ",")...)
 }

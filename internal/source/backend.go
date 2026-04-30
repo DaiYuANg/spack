@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/arcgolabs/collectionx"
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
 	"github.com/daiyuang/spack/internal/config"
 )
 
 type sourceFactory func(*config.Assets, *slog.Logger) (Source, error)
 
-var sourceFactories = collectionx.NewMapFrom[config.SourceBackend, sourceFactory](map[config.SourceBackend]sourceFactory{
+var sourceFactories = cxmapping.NewMapFrom[config.SourceBackend, sourceFactory](map[config.SourceBackend]sourceFactory{
 	config.SourceBackendLocal: newLocalFS,
 })
 

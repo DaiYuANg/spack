@@ -4,11 +4,7 @@ package task
 import (
 	"cmp"
 	"context"
-	"log/slog"
-	"strings"
-	"sync"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dix"
 	"github.com/arcgolabs/observabilityx"
 	"github.com/daiyuang/spack/internal/artifact"
@@ -18,6 +14,9 @@ import (
 	"github.com/daiyuang/spack/internal/sourcecatalog"
 	"github.com/go-co-op/gocron/v2"
 	"github.com/samber/oops"
+	"log/slog"
+	"strings"
+	"sync"
 )
 
 var Module = dix.NewModule("task",
@@ -86,8 +85,8 @@ func newTaskRegistrations(
 	sourceRescan sourceRescanTaskRegistration,
 	artifactJanitor artifactJanitorTaskRegistration,
 	cacheWarmer cacheWarmerTaskRegistration,
-) collectionx.List[taskRegistration] {
-	return collectionx.NewList[taskRegistration](
+) *cxlist.List[taskRegistration] {
+	return cxlist.NewList[taskRegistration](
 		sourceRescan.taskRegistration,
 		artifactJanitor.taskRegistration,
 		cacheWarmer.taskRegistration,
@@ -209,13 +208,13 @@ func newCacheWarmerTaskRegistration(runtime *cacheWarmerRuntime) cacheWarmerTask
 func startScheduledTasks(
 	ctx context.Context,
 	scheduler gocron.Scheduler,
-	registrations collectionx.List[taskRegistration],
+	registrations *cxlist.List[taskRegistration],
 ) error {
-	registered := collectionx.FilterMapList[taskRegistration, taskRegistration](registrations, func(_ int, registration taskRegistration) (taskRegistration, bool) {
+	registered := cxlist.FlatMapList[taskRegistration, taskRegistration](registrations, func(_ int, registration taskRegistration) []taskRegistration {
 		if registration.Register == nil {
-			return taskRegistration{}, false
+			return nil
 		}
-		return registration, true
+		return []taskRegistration{registration}
 	})
 	if registered.IsEmpty() {
 		return nil

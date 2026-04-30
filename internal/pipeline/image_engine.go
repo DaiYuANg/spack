@@ -9,7 +9,7 @@ import (
 	"os"
 
 	"github.com/anthonynsimon/bild/transform"
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/daiyuang/spack/internal/media"
 )
 
@@ -36,7 +36,7 @@ type imageGenerateResult struct {
 type imageEngine interface {
 	Name() string
 	SupportsSourceMediaType(mediaType string) bool
-	SupportedTargetFormats() collectionx.List[string]
+	SupportedTargetFormats() *cxlist.List[string]
 	Generate(request imageGenerateRequest) (imageGenerateResult, error)
 }
 
@@ -59,8 +59,8 @@ func (builtinImageEngine) SupportsSourceMediaType(mediaType string) bool {
 	}
 }
 
-func (builtinImageEngine) SupportedTargetFormats() collectionx.List[string] {
-	return collectionx.NewList[string]("jpeg", "png")
+func (builtinImageEngine) SupportedTargetFormats() *cxlist.List[string] {
+	return cxlist.NewList[string]("jpeg", "png")
 }
 
 func (builtinImageEngine) Generate(request imageGenerateRequest) (imageGenerateResult, error) {

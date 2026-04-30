@@ -4,7 +4,8 @@ package media
 import (
 	"strings"
 
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
 	"github.com/samber/lo"
 )
 
@@ -12,31 +13,31 @@ type ImageFormatDescriptor struct {
 	Name         string
 	MediaType    string
 	Extension    string
-	AcceptTokens collectionx.List[string]
+	AcceptTokens *cxlist.List[string]
 }
 
 var (
-	imageFormatDescriptors = collectionx.NewList[ImageFormatDescriptor](
+	imageFormatDescriptors = cxlist.NewList[ImageFormatDescriptor](
 		ImageFormatDescriptor{
 			Name:         "jpeg",
 			MediaType:    "image/jpeg",
 			Extension:    ".jpg",
-			AcceptTokens: collectionx.NewList[string]("image/jpeg", "image/jpg"),
+			AcceptTokens: cxlist.NewList[string]("image/jpeg", "image/jpg"),
 		},
 		ImageFormatDescriptor{
 			Name:         "png",
 			MediaType:    "image/png",
 			Extension:    ".png",
-			AcceptTokens: collectionx.NewList[string]("image/png"),
+			AcceptTokens: cxlist.NewList[string]("image/png"),
 		},
 	)
-	imageDescriptorsByName = collectionx.AssociateList[ImageFormatDescriptor, string, ImageFormatDescriptor](
+	imageDescriptorsByName = cxmapping.AssociateList[ImageFormatDescriptor, string, ImageFormatDescriptor](
 		imageFormatDescriptors,
 		func(_ int, descriptor ImageFormatDescriptor) (string, ImageFormatDescriptor) {
 			return descriptor.Name, descriptor
 		},
 	)
-	imageDescriptorsByMediaType = collectionx.AssociateList[ImageFormatDescriptor, string, ImageFormatDescriptor](
+	imageDescriptorsByMediaType = cxmapping.AssociateList[ImageFormatDescriptor, string, ImageFormatDescriptor](
 		imageFormatDescriptors,
 		func(_ int, descriptor ImageFormatDescriptor) (string, ImageFormatDescriptor) {
 			return descriptor.MediaType, descriptor
@@ -45,8 +46,8 @@ var (
 	imageDescriptorsByAcceptToken = buildImageDescriptorsByAcceptToken(imageFormatDescriptors)
 )
 
-func SupportedImageFormats() collectionx.List[string] {
-	return collectionx.MapList[ImageFormatDescriptor, string](imageFormatDescriptors, func(_ int, descriptor ImageFormatDescriptor) string {
+func SupportedImageFormats() *cxlist.List[string] {
+	return cxlist.MapList[ImageFormatDescriptor, string](imageFormatDescriptors, func(_ int, descriptor ImageFormatDescriptor) string {
 		return descriptor.Name
 	})
 }
@@ -90,22 +91,23 @@ func IsImageMediaType(mediaType string) bool {
 	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(mediaType)), "image/")
 }
 
-func NormalizeImageFormats(formats collectionx.List[string]) collectionx.List[string] {
+func NormalizeImageFormats(formats *cxlist.List[string]) *cxlist.List[string] {
 	if formats == nil || formats.IsEmpty() {
 		return nil
 	}
 
-	normalized := collectionx.FilterMapList[string, string](formats, func(_ int, format string) (string, bool) {
-		value := NormalizeImageFormat(format)
-		return value, value != ""
+	normalized := cxlist.MapList[string, string](formats, func(_ int, format string) string {
+		return NormalizeImageFormat(format)
+	}).Where(func(_ int, value string) bool {
+		return value != ""
 	})
-	return collectionx.NewList[string](lo.Uniq[string](normalized.Values())...)
+	return cxlist.NewList[string](lo.Uniq[string](normalized.Values())...)
 }
 
 func buildImageDescriptorsByAcceptToken(
-	descriptors collectionx.List[ImageFormatDescriptor],
-) collectionx.Map[string, ImageFormatDescriptor] {
-	out := collectionx.NewMap[string, ImageFormatDescriptor]()
+	descriptors *cxlist.List[ImageFormatDescriptor],
+) *cxmapping.Map[string, ImageFormatDescriptor] {
+	out := cxmapping.NewMap[string, ImageFormatDescriptor]()
 	descriptors.Range(func(_ int, descriptor ImageFormatDescriptor) bool {
 		descriptor.AcceptTokens.Range(func(_ int, token string) bool {
 			normalized := strings.ToLower(strings.TrimSpace(token))

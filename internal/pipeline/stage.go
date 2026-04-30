@@ -2,8 +2,7 @@ package pipeline
 
 import (
 	"errors"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/daiyuang/spack/internal/catalog"
 )
 
@@ -11,9 +10,9 @@ var ErrVariantSkipped = errors.New("variant skipped")
 
 type Request struct {
 	AssetPath          string
-	PreferredEncodings collectionx.List[string]
-	PreferredFormats   collectionx.List[string]
-	PreferredWidths    collectionx.List[int]
+	PreferredEncodings *cxlist.List[string]
+	PreferredFormats   *cxlist.List[string]
+	PreferredWidths    *cxlist.List[int]
 }
 
 type Task struct {
@@ -25,7 +24,7 @@ type Task struct {
 
 type Stage interface {
 	Name() string
-	Plan(asset *catalog.Asset, request Request) collectionx.List[Task]
+	Plan(asset *catalog.Asset, request Request) *cxlist.List[Task]
 	Execute(task Task, asset *catalog.Asset) (*catalog.Variant, error)
 }
 

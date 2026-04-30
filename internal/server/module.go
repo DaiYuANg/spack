@@ -3,9 +3,7 @@ package server
 import (
 	"cmp"
 	"context"
-	"log/slog"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dix"
 	"github.com/arcgolabs/eventx"
 	"github.com/arcgolabs/observabilityx"
@@ -15,6 +13,7 @@ import (
 	"github.com/daiyuang/spack/internal/pipeline"
 	"github.com/daiyuang/spack/internal/resolver"
 	"github.com/gofiber/fiber/v3"
+	"log/slog"
 )
 
 var Module = dix.NewModule("server",
@@ -85,7 +84,7 @@ func newMiddlewareRegistration(
 
 func newHealthRoutesRegistration(
 	cat catalog.Catalog,
-	checks collectionx.List[healthCheckDefinition],
+	checks *cxlist.List[healthCheckDefinition],
 	obs observabilityx.Observability,
 ) healthRoutesRegistration {
 	return healthRoutesRegistration{newAppRegistration(200, "health_routes", func(app *fiber.App) {
@@ -141,8 +140,8 @@ func newServerRegistrations(
 	healthRoutes healthRoutesRegistration,
 	robotsRoute robotsRouteRegistration,
 	assetRoute assetRouteRegistration,
-) collectionx.List[appRegistration] {
-	return collectionx.NewList[appRegistration](
+) *cxlist.List[appRegistration] {
+	return cxlist.NewList[appRegistration](
 		middleware.appRegistration,
 		healthRoutes.appRegistration,
 		robotsRoute.appRegistration,
@@ -158,7 +157,7 @@ func newServerRegistrations(
 func newServerFromDeps(
 	cfg *config.Config,
 	meta dix.AppMeta,
-	registrations collectionx.List[appRegistration],
+	registrations *cxlist.List[appRegistration],
 ) *fiber.App {
 	app := newServerApp(cfg, meta)
 	registrations.Range(func(_ int, registration appRegistration) bool {

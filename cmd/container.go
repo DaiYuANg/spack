@@ -2,7 +2,7 @@
 package cmd
 
 import (
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dix"
 	"github.com/daiyuang/spack/internal/appmeta"
 	"github.com/daiyuang/spack/internal/catalog"
@@ -16,7 +16,7 @@ import (
 )
 
 func createContainer(loadOptions config.LoadOptions, userModules ...dix.Module) (*dix.App, error) {
-	allModules := collectionx.NewListWithCapacity[dix.Module](8 + len(userModules))
+	allModules := cxlist.NewListWithCapacity[dix.Module](8 + len(userModules))
 	allModules.Add(appmeta.Module,
 		validation.Module,
 		config.NewModule(loadOptions),

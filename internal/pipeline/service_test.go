@@ -2,18 +2,17 @@ package pipeline_test
 
 import (
 	"context"
-	"log/slog"
-	"os"
-	"path/filepath"
-	"testing"
-	"time"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/eventx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	appEvent "github.com/daiyuang/spack/internal/event"
 	"github.com/daiyuang/spack/internal/pipeline"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
 )
 
 func TestEnqueueDeduplicatesRequests(t *testing.T) {
@@ -24,15 +23,15 @@ func TestEnqueueDeduplicatesRequests(t *testing.T) {
 
 	svc.Enqueue(pipeline.Request{
 		AssetPath:          "hero.png",
-		PreferredEncodings: collectionx.NewList("gzip", "br"),
-		PreferredFormats:   collectionx.NewList("jpeg", "png"),
-		PreferredWidths:    collectionx.NewList(1280, 640),
+		PreferredEncodings: cxlist.NewList("gzip", "br"),
+		PreferredFormats:   cxlist.NewList("jpeg", "png"),
+		PreferredWidths:    cxlist.NewList(1280, 640),
 	})
 	svc.Enqueue(pipeline.Request{
 		AssetPath:          "hero.png",
-		PreferredEncodings: collectionx.NewList("br", "gzip"),
-		PreferredFormats:   collectionx.NewList("png", "jpeg"),
-		PreferredWidths:    collectionx.NewList(640, 1280),
+		PreferredEncodings: cxlist.NewList("br", "gzip"),
+		PreferredFormats:   cxlist.NewList("png", "jpeg"),
+		PreferredWidths:    cxlist.NewList(640, 1280),
 	})
 
 	if pipeline.QueuedCountForTest(svc) != 1 {

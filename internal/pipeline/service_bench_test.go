@@ -2,13 +2,12 @@ package pipeline_test
 
 import (
 	"fmt"
-	"log/slog"
-	"testing"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/pipeline"
+	"log/slog"
+	"testing"
 )
 
 func BenchmarkServiceEnqueueUnique(b *testing.B) {
@@ -21,9 +20,9 @@ func BenchmarkServiceEnqueueUnique(b *testing.B) {
 	for i := range requests {
 		requests[i] = pipeline.Request{
 			AssetPath:          fmt.Sprintf("asset-%d.js", i),
-			PreferredEncodings: collectionx.NewList("br", "gzip"),
-			PreferredFormats:   collectionx.NewList("jpeg", "png"),
-			PreferredWidths:    collectionx.NewList(640, 1280),
+			PreferredEncodings: cxlist.NewList("br", "gzip"),
+			PreferredFormats:   cxlist.NewList("jpeg", "png"),
+			PreferredWidths:    cxlist.NewList(640, 1280),
 		}
 	}
 
@@ -47,9 +46,9 @@ func BenchmarkServiceEnqueueDeduplicated(b *testing.B) {
 
 	req := pipeline.Request{
 		AssetPath:          "hero.png",
-		PreferredEncodings: collectionx.NewList("br", "gzip"),
-		PreferredFormats:   collectionx.NewList("jpeg", "png"),
-		PreferredWidths:    collectionx.NewList(640, 1280),
+		PreferredEncodings: cxlist.NewList("br", "gzip"),
+		PreferredFormats:   cxlist.NewList("jpeg", "png"),
+		PreferredWidths:    cxlist.NewList(640, 1280),
 	}
 	svc.Enqueue(req)
 

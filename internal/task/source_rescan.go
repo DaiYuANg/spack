@@ -3,16 +3,16 @@ package task
 import (
 	"cmp"
 	"context"
-	"log/slog"
-	"os"
-	"time"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/sourcecatalog"
 	"github.com/go-co-op/gocron/v2"
 	"github.com/samber/oops"
+	"log/slog"
+	"os"
+	"time"
 )
 
 const sourceRescanInterval = 5 * time.Minute
@@ -129,15 +129,15 @@ func (r *sourceRescanRun) collectScannedSnapshot() (sourcecatalog.Snapshot, erro
 	return snapshot, nil
 }
 
-func indexAssetsByPath(assets collectionx.List[*catalog.Asset]) collectionx.Map[string, *catalog.Asset] {
-	return collectionx.AssociateList[*catalog.Asset, string, *catalog.Asset](assets, func(_ int, asset *catalog.Asset) (string, *catalog.Asset) {
+func indexAssetsByPath(assets *cxlist.List[*catalog.Asset]) *cxmapping.Map[string, *catalog.Asset] {
+	return cxmapping.AssociateList[*catalog.Asset, string, *catalog.Asset](assets, func(_ int, asset *catalog.Asset) (string, *catalog.Asset) {
 		return asset.Path, asset
 	})
 }
 
 func (r *sourceRescanRun) reconcileScannedAssets(
-	scannedAssets collectionx.Map[string, *catalog.Asset],
-	existingByPath collectionx.Map[string, *catalog.Asset],
+	scannedAssets *cxmapping.Map[string, *catalog.Asset],
+	existingByPath *cxmapping.Map[string, *catalog.Asset],
 ) error {
 	var syncErr error
 	sortedMapKeys[*catalog.Asset](scannedAssets).Range(func(_ int, assetPath string) bool {
@@ -154,7 +154,7 @@ func (r *sourceRescanRun) reconcileScannedAssets(
 func (r *sourceRescanRun) syncScannedAsset(
 	assetPath string,
 	asset *catalog.Asset,
-	existingByPath collectionx.Map[string, *catalog.Asset],
+	existingByPath *cxmapping.Map[string, *catalog.Asset],
 ) error {
 	existing, found := existingByPath.Get(assetPath)
 	if found {
@@ -175,9 +175,9 @@ func (r *sourceRescanRun) syncScannedAsset(
 }
 
 func (r *sourceRescanRun) reconcileRemovedAssets(
-	existingByPath collectionx.Map[string, *catalog.Asset],
+	existingByPath *cxmapping.Map[string, *catalog.Asset],
 ) {
-	collectionx.NewList[*catalog.Asset](existingByPath.Values()...).Sort(func(left, right *catalog.Asset) int {
+	cxlist.NewList[*catalog.Asset](existingByPath.Values()...).Sort(func(left, right *catalog.Asset) int {
 		return cmp.Compare(left.Path, right.Path)
 	}).Range(func(_ int, asset *catalog.Asset) bool {
 		r.report.Removed++
@@ -187,7 +187,7 @@ func (r *sourceRescanRun) reconcileRemovedAssets(
 }
 
 func (r *sourceRescanRun) reconcileSourceSidecars(
-	scannedVariants collectionx.Map[string, *catalog.Variant],
+	scannedVariants *cxmapping.Map[string, *catalog.Variant],
 ) error {
 	existingByID := r.indexSourceSidecarVariants()
 	var syncErr error
@@ -204,7 +204,7 @@ func (r *sourceRescanRun) reconcileSourceSidecars(
 		return syncErr
 	}
 
-	collectionx.NewList[*catalog.Variant](existingByID.Values()...).Sort(func(left, right *catalog.Variant) int {
+	cxlist.NewList[*catalog.Variant](existingByID.Values()...).Sort(func(left, right *catalog.Variant) int {
 		return cmp.Compare(left.ID, right.ID)
 	}).Range(func(_ int, variant *catalog.Variant) bool {
 		if !r.cat.DeleteVariantByArtifactPath(variant.ArtifactPath) {
@@ -217,8 +217,8 @@ func (r *sourceRescanRun) reconcileSourceSidecars(
 	return nil
 }
 
-func (r *sourceRescanRun) indexSourceSidecarVariants() collectionx.Map[string, *catalog.Variant] {
-	variantsByID := collectionx.NewMap[string, *catalog.Variant]()
+func (r *sourceRescanRun) indexSourceSidecarVariants() *cxmapping.Map[string, *catalog.Variant] {
+	variantsByID := cxmapping.NewMap[string, *catalog.Variant]()
 	r.cat.ListVariantsByStage(sourcecatalog.SourceSidecarStage).Range(func(_ int, variant *catalog.Variant) bool {
 		if sourcecatalog.IsSourceSidecarVariant(variant) {
 			variantsByID.Set(variant.ID, variant)
@@ -230,13 +230,13 @@ func (r *sourceRescanRun) indexSourceSidecarVariants() collectionx.Map[string, *
 
 func (r *sourceRescanRun) invalidateAssetAndVariants(
 	assetPath string,
-	variants collectionx.List[*catalog.Variant],
+	variants *cxlist.List[*catalog.Variant],
 ) {
 	r.report.CacheInvalidations += invalidateAssetCache(r.bodyCache, assetPath)
 	r.report.RemovedVariants += r.removeAssetVariants(variants)
 }
 
-func (r *sourceRescanRun) removeAssetVariants(variants collectionx.List[*catalog.Variant]) int {
+func (r *sourceRescanRun) removeAssetVariants(variants *cxlist.List[*catalog.Variant]) int {
 	removed := 0
 	variants.Range(func(_ int, variant *catalog.Variant) bool {
 		removed++
@@ -247,8 +247,8 @@ func (r *sourceRescanRun) removeAssetVariants(variants collectionx.List[*catalog
 	return removed
 }
 
-func sortedMapKeys[T any](values collectionx.Map[string, T]) collectionx.List[string] {
-	return collectionx.NewList[string](values.Keys()...).Sort(cmp.Compare[string])
+func sortedMapKeys[T any](values *cxmapping.Map[string, T]) *cxlist.List[string] {
+	return cxlist.NewList[string](values.Keys()...).Sort(cmp.Compare[string])
 }
 
 func removeVariantArtifact(variant *catalog.Variant) int {

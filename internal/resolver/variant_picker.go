@@ -1,12 +1,12 @@
 package resolver
 
 import (
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/media"
 )
 
-func (r *Resolver) pickVariant(asset *catalog.Asset, encodings collectionx.List[string]) (*catalog.Variant, error) {
+func (r *Resolver) pickVariant(asset *catalog.Asset, encodings *cxlist.List[string]) (*catalog.Variant, error) {
 	usable := newVariantUsabilityCache()
 
 	var picked *catalog.Variant
@@ -26,10 +26,10 @@ func (r *Resolver) pickVariant(asset *catalog.Asset, encodings collectionx.List[
 	return picked, pickErr
 }
 
-func (r *Resolver) pickImageVariant(asset *catalog.Asset, width int, formats collectionx.List[string]) (*catalog.Variant, error) {
+func (r *Resolver) pickImageVariant(asset *catalog.Asset, width int, formats *cxlist.List[string]) (*catalog.Variant, error) {
 	sourceFormat := media.ImageFormat(asset.MediaType)
 	if formats.IsEmpty() {
-		formats = collectionx.NewList(sourceFormat)
+		formats = cxlist.NewList(sourceFormat)
 	}
 
 	usable := newVariantUsabilityCache()

@@ -3,15 +3,14 @@ package runtime
 import (
 	"cmp"
 	"context"
-	"log/slog"
-	"time"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/sourcecatalog"
 	"github.com/samber/oops"
+	"log/slog"
+	"time"
 )
 
 func bootstrapCatalogOnStart(
@@ -53,7 +52,7 @@ func scanCatalogAssets(ctx context.Context, scanner sourcecatalog.Scanner, cat c
 	}
 
 	var upsertErr error
-	collectionx.NewList[*catalog.Asset](snapshot.Assets.Values()...).Sort(func(left, right *catalog.Asset) int {
+	cxlist.NewList[*catalog.Asset](snapshot.Assets.Values()...).Sort(func(left, right *catalog.Asset) int {
 		return cmp.Compare(left.Path, right.Path)
 	}).Range(func(_ int, asset *catalog.Asset) bool {
 		if err := cat.UpsertAsset(asset); err != nil {
@@ -66,7 +65,7 @@ func scanCatalogAssets(ctx context.Context, scanner sourcecatalog.Scanner, cat c
 		return 0, upsertErr
 	}
 
-	collectionx.NewList[*catalog.Variant](snapshot.Variants.Values()...).Sort(func(left, right *catalog.Variant) int {
+	cxlist.NewList[*catalog.Variant](snapshot.Variants.Values()...).Sort(func(left, right *catalog.Variant) int {
 		return cmp.Compare(left.ID, right.ID)
 	}).Range(func(_ int, variant *catalog.Variant) bool {
 		if err := cat.UpsertVariant(variant); err != nil {
@@ -94,8 +93,8 @@ func catalogReadyAttrs(
 	cacheStats assetcache.WarmStats,
 	totalBytes int64,
 	duration time.Duration,
-) collectionx.List[slog.Attr] {
-	return collectionx.NewList(
+) *cxlist.List[slog.Attr] {
+	return cxlist.NewList(
 		slog.Int("assets", cat.AssetCount()),
 		slog.Int("variants", cat.VariantCount()),
 		slog.Int64("bytes", totalBytes),
@@ -108,8 +107,8 @@ func catalogReadyAttrs(
 	)
 }
 
-func configLogAttrs(cfg *config.Config) collectionx.List[slog.Attr] {
-	return collectionx.NewList(
+func configLogAttrs(cfg *config.Config) *cxlist.List[slog.Attr] {
+	return cxlist.NewList(
 		slog.Int("http_port", cfg.HTTP.Port),
 		slog.Bool("http_low_memory", cfg.HTTP.LowMemory),
 		slog.Bool("http_memory_cache_enable", cfg.HTTP.MemoryCache.Enabled()),

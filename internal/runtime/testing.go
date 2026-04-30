@@ -1,10 +1,7 @@
 package runtime
 
 import (
-	"log/slog"
-	"time"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
@@ -12,6 +9,8 @@ import (
 	"github.com/daiyuang/spack/internal/sourcecatalog"
 	"github.com/gofiber/fiber/v3"
 	"github.com/samber/oops"
+	"log/slog"
+	"time"
 )
 
 func BuildCatalogAssetForTest(file source.File) (*catalog.Asset, error) {
@@ -29,7 +28,7 @@ func CatalogReadyAttrsForTest(
 	cacheStats assetcache.WarmStats,
 	totalBytes int64,
 	duration time.Duration,
-) collectionx.List[slog.Attr] {
+) *cxlist.List[slog.Attr] {
 	return catalogReadyAttrs(cfg, cat, bodyCache, cacheStats, totalBytes, duration)
 }
 

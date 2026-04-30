@@ -4,7 +4,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
 	contentcodingspec "github.com/daiyuang/spack/internal/contentcoding/spec"
 	"github.com/daiyuang/spack/internal/validation"
 )
@@ -58,7 +59,7 @@ func (c Compression) QueueCapacity() int {
 	return workers * 64
 }
 
-func (c Compression) NormalizedEncodings() collectionx.List[string] {
+func (c Compression) NormalizedEncodings() *cxlist.List[string] {
 	return contentcodingspec.ResolveNames(c.Encodings)
 }
 
@@ -78,8 +79,8 @@ func (c Compression) ParsedMaxAge() time.Duration {
 	return validation.ParseFlexibleDuration(c.MaxAge)
 }
 
-func (c Compression) NamespaceMaxAges() collectionx.Map[string, time.Duration] {
-	out := collectionx.NewMapWithCapacity[string, time.Duration](2)
+func (c Compression) NamespaceMaxAges() *cxmapping.Map[string, time.Duration] {
+	out := cxmapping.NewMapWithCapacity[string, time.Duration](2)
 	if d := validation.ParseFlexibleDuration(c.EncodingMaxAge); d > 0 {
 		out.Set("encoding", d)
 	}

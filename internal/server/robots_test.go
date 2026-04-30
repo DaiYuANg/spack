@@ -2,6 +2,11 @@ package server_test
 
 import (
 	"context"
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
+	"github.com/daiyuang/spack/internal/assetcache"
+	"github.com/daiyuang/spack/internal/catalog"
+	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/resolver"
 	"io"
 	"log/slog"
 	"net/http"
@@ -9,12 +14,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/arcgolabs/collectionx"
-	"github.com/daiyuang/spack/internal/assetcache"
-	"github.com/daiyuang/spack/internal/catalog"
-	"github.com/daiyuang/spack/internal/config"
-	"github.com/daiyuang/spack/internal/resolver"
 )
 
 func TestRobotsRouteGeneratesConfiguredContent(t *testing.T) {
@@ -84,7 +83,7 @@ func TestRobotsRoutePrefersStaticAssetWhenAvailable(t *testing.T) {
 		MediaType:  "text/plain; charset=utf-8",
 		SourceHash: "hash-robots",
 		ETag:       "\"hash-robots\"",
-		Metadata: collectionx.NewMapFrom(map[string]string{
+		Metadata: cxmapping.NewMapFrom(map[string]string{
 			"mtime_unix": "1720000200",
 		}),
 	}); err != nil {

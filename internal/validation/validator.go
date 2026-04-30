@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/go-playground/validator/v10"
 )
 
@@ -18,7 +18,7 @@ type validationRule struct {
 func New() (*validator.Validate, error) {
 	validate := validator.New(validator.WithRequiredStructEnabled())
 
-	rules := collectionx.NewList(
+	rules := cxlist.NewList(
 		validationRule{tag: "spack_duration", fn: validatePositiveDuration},
 		validationRule{tag: "spack_flexible_duration", fn: validatePositiveFlexibleDuration},
 		validationRule{tag: "spack_relative_path", fn: validateRelativePath},

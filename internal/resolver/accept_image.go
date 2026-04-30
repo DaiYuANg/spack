@@ -2,14 +2,14 @@ package resolver
 
 import (
 	"cmp"
-	"strings"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
 	"github.com/daiyuang/spack/internal/media"
+	"strings"
 )
 
 type imagePreferences struct {
-	explicit         collectionx.Map[string, float64]
+	explicit         *cxmapping.Map[string, float64]
 	wildcardImageQ   float64
 	hasWildcardImage bool
 	wildcardAnyQ     float64
@@ -25,7 +25,7 @@ const (
 	imagePreferenceExplicit
 )
 
-func parseAcceptImageFormats(header, sourceFormat string, supported collectionx.List[string]) collectionx.List[string] {
+func parseAcceptImageFormats(header, sourceFormat string, supported *cxlist.List[string]) *cxlist.List[string] {
 	if strings.TrimSpace(header) == "" {
 		return nil
 	}
@@ -35,7 +35,7 @@ func parseAcceptImageFormats(header, sourceFormat string, supported collectionx.
 
 func collectImagePreferences(header string) imagePreferences {
 	prefs := imagePreferences{
-		explicit: collectionx.NewMapWithCapacity[string, float64](4),
+		explicit: cxmapping.NewMapWithCapacity[string, float64](4),
 	}
 	forEachAcceptEntry(header, func(entry acceptEntry) bool {
 		applyImagePreference(&prefs, entry)
@@ -59,14 +59,16 @@ func applyImagePreference(prefs *imagePreferences, entry acceptEntry) {
 	}
 }
 
-func setMaxQuality(values collectionx.Map[string, float64], key string, q float64) {
+// setMaxQuality updates key to the maximum of its current value and q (using -1 when key is absent).
+// Used for Accept-Encoding tokens and image format names.
+func setMaxQuality(values *cxmapping.Map[string, float64], key string, q float64) {
 	if q <= values.GetOrDefault(key, -1) {
 		return
 	}
 	values.Set(key, q)
 }
 
-func buildImageCandidates(prefs imagePreferences, sourceFormat string, supported collectionx.List[string]) collectionx.List[string] {
+func buildImageCandidates(prefs imagePreferences, sourceFormat string, supported *cxlist.List[string]) *cxlist.List[string] {
 	type candidate struct {
 		format   string
 		q        float64
@@ -75,17 +77,17 @@ func buildImageCandidates(prefs imagePreferences, sourceFormat string, supported
 	}
 
 	supported = imageFormatCandidates(supported, sourceFormat)
-	candidates := collectionx.FilterMapList[string, candidate](supported, func(index int, format string) (candidate, bool) {
+	candidates := cxlist.FlatMapList[string, candidate](supported, func(index int, format string) []candidate {
 		q, match := imageQualityForFormat(prefs, format)
 		if q <= 0 || match == imagePreferenceNone {
-			return candidate{}, false
+			return nil
 		}
-		return candidate{
+		return []candidate{{
 			format:   format,
 			q:        q,
 			match:    match,
 			priority: imagePriority(index, format, sourceFormat),
-		}, true
+		}}
 	})
 
 	candidates.Sort(func(left, right candidate) int {
@@ -104,13 +106,13 @@ func buildImageCandidates(prefs imagePreferences, sourceFormat string, supported
 	if candidates.IsEmpty() {
 		return nil
 	}
-	return collectionx.MapList[candidate, string](candidates, func(_ int, candidate candidate) string {
+	return cxlist.MapList[candidate, string](candidates, func(_ int, candidate candidate) string {
 		return candidate.format
 	})
 }
 
-func imageFormatCandidates(supported collectionx.List[string], sourceFormat string) collectionx.List[string] {
-	candidates := collectionx.NewList[string]()
+func imageFormatCandidates(supported *cxlist.List[string], sourceFormat string) *cxlist.List[string] {
+	candidates := cxlist.NewList[string]()
 	if supported != nil && !supported.IsEmpty() {
 		candidates.Add(supported.Values()...)
 	}

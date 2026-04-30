@@ -8,7 +8,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/arcgolabs/collectionx"
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/resolver"
@@ -26,7 +26,7 @@ type ResponsePolicy interface {
 // StaticResponsePolicy applies cache-header rules derived from compression config.
 type StaticResponsePolicy struct {
 	defaultMaxAge   time.Duration
-	namespaceMaxAge collectionx.Map[string, time.Duration]
+	namespaceMaxAge *cxmapping.Map[string, time.Duration]
 	immutable       immutableAssetPolicy
 }
 

@@ -3,7 +3,8 @@ package catalog
 import (
 	"errors"
 
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
 	"github.com/hashicorp/go-memdb"
 	"github.com/samber/oops"
 )
@@ -62,13 +63,13 @@ func (c *MemDBCatalog) UpsertVariant(variant *Variant) error {
 	return nil
 }
 
-func (c *MemDBCatalog) DeleteAsset(assetPath string) collectionx.List[*Variant] {
+func (c *MemDBCatalog) DeleteAsset(assetPath string) *cxlist.List[*Variant] {
 	txn := c.db.Txn(true)
 	defer txn.Abort()
 
 	record, ok, err := findAssetRecord(txn, assetPath)
 	if err != nil {
-		return collectionx.NewList[*Variant]()
+		return cxlist.NewList[*Variant]()
 	}
 	if ok {
 		if err := txn.Delete(catalogAssetsTable, record); err != nil && !errors.Is(err, memdb.ErrNotFound) {
@@ -81,7 +82,7 @@ func (c *MemDBCatalog) DeleteAsset(assetPath string) collectionx.List[*Variant] 
 	return removed
 }
 
-func (c *MemDBCatalog) DeleteVariants(assetPath string) collectionx.List[*Variant] {
+func (c *MemDBCatalog) DeleteVariants(assetPath string) *cxlist.List[*Variant] {
 	txn := c.db.Txn(true)
 	defer txn.Abort()
 
@@ -108,8 +109,8 @@ func (c *MemDBCatalog) DeleteVariantByArtifactPath(artifactPath string) bool {
 	return true
 }
 
-func collectPendingVariantDeletes(txn *memdb.Txn, record *variantRecord) (collectionx.Map[string, *variantRecord], error) {
-	pendingDeletes := collectionx.NewMapWithCapacity[string, *variantRecord](4)
+func collectPendingVariantDeletes(txn *memdb.Txn, record *variantRecord) (*cxmapping.Map[string, *variantRecord], error) {
+	pendingDeletes := cxmapping.NewMapWithCapacity[string, *variantRecord](4)
 	lookups := variantDeleteLookups(record)
 	for _, lookup := range lookups {
 		if err := collectVariantDelete(txn, pendingDeletes, lookup.index, lookup.args...); err != nil {
@@ -140,7 +141,7 @@ func variantDeleteLookups(record *variantRecord) []variantDeleteLookup {
 	return lookups
 }
 
-func collectVariantDelete(txn *memdb.Txn, pending collectionx.Map[string, *variantRecord], index string, args ...any) error {
+func collectVariantDelete(txn *memdb.Txn, pending *cxmapping.Map[string, *variantRecord], index string, args ...any) error {
 	record, ok, err := findVariantRecord(txn, index, args...)
 	if err != nil || !ok {
 		return err
@@ -149,7 +150,7 @@ func collectVariantDelete(txn *memdb.Txn, pending collectionx.Map[string, *varia
 	return nil
 }
 
-func deleteVariantsByAssetPath(txn *memdb.Txn, assetPath string) collectionx.List[*Variant] {
+func deleteVariantsByAssetPath(txn *memdb.Txn, assetPath string) *cxlist.List[*Variant] {
 	records := variantRecords(txn, catalogVariantAssetPathIndex, assetPath)
 	removed := cloneVariantRecords(records)
 	records.Range(func(_ int, record *variantRecord) bool {

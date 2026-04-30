@@ -3,7 +3,7 @@ package cachepolicy
 import (
 	"time"
 
-	"github.com/arcgolabs/collectionx"
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
 	"github.com/daiyuang/spack/internal/config"
 )
 
@@ -19,7 +19,7 @@ type ArtifactPolicy interface {
 // CompressionArtifactPolicy applies compression/image artifact retention from config.
 type CompressionArtifactPolicy struct {
 	defaultMaxAge   time.Duration
-	namespaceMaxAge collectionx.Map[string, time.Duration]
+	namespaceMaxAge *cxmapping.Map[string, time.Duration]
 	maxCacheBytes   int64
 }
 

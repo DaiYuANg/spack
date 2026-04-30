@@ -2,14 +2,13 @@ package pipeline_test
 
 import (
 	"context"
-	"log/slog"
-	"testing"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/observabilityx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/pipeline"
+	"log/slog"
+	"testing"
 )
 
 type pipelineMetric struct {
@@ -103,7 +102,7 @@ func (s stageResultStage) Name() string {
 	return s.name
 }
 
-func (stageResultStage) Plan(_ *catalog.Asset, _ pipeline.Request) collectionx.List[pipeline.Task] {
+func (stageResultStage) Plan(_ *catalog.Asset, _ pipeline.Request) *cxlist.List[pipeline.Task] {
 	return nil
 }
 

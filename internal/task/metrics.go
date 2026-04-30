@@ -2,10 +2,9 @@ package task
 
 import (
 	"context"
-	"time"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/observabilityx"
+	"time"
 )
 
 var (
@@ -56,7 +55,7 @@ func recordTaskRunMetrics(
 		result = "error"
 	}
 
-	attrs := collectionx.NewList(
+	attrs := cxlist.NewList(
 		observabilityx.String("task", taskName),
 		observabilityx.String("result", result),
 	)

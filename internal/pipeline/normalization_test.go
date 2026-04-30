@@ -1,15 +1,14 @@
 package pipeline_test
 
 import (
+	cxlist "github.com/arcgolabs/collectionx/list"
+	"github.com/daiyuang/spack/internal/pipeline"
 	"slices"
 	"testing"
-
-	"github.com/arcgolabs/collectionx"
-	"github.com/daiyuang/spack/internal/pipeline"
 )
 
 func TestNormalizeEncodingsPreservesFirstSeenOrder(t *testing.T) {
-	got := pipeline.NormalizeEncodingsForTest(collectionx.NewList(" gzip ", "br", "gzip", "zstd", "bad", "br"))
+	got := pipeline.NormalizeEncodingsForTest(cxlist.NewList(" gzip ", "br", "gzip", "zstd", "bad", "br"))
 	want := []string{"gzip", "br", "zstd"}
 	if !slices.Equal(got.Values(), want) {
 		t.Fatalf("expected encodings %#v, got %#v", want, got)
@@ -17,7 +16,7 @@ func TestNormalizeEncodingsPreservesFirstSeenOrder(t *testing.T) {
 }
 
 func TestNormalizeImageFormatsPreservesFirstSeenOrder(t *testing.T) {
-	got := pipeline.NormalizeImageFormatsForTest(collectionx.NewList(" png ", "jpeg", "jpg", "png", "bad"))
+	got := pipeline.NormalizeImageFormatsForTest(cxlist.NewList(" png ", "jpeg", "jpg", "png", "bad"))
 	want := []string{"png", "jpeg"}
 	if !slices.Equal(got.Values(), want) {
 		t.Fatalf("expected formats %#v, got %#v", want, got)
@@ -25,7 +24,7 @@ func TestNormalizeImageFormatsPreservesFirstSeenOrder(t *testing.T) {
 }
 
 func TestNormalizeRequestStringsSortsAndDeduplicates(t *testing.T) {
-	got := pipeline.NormalizeRequestStringsForTest(collectionx.NewList(" gzip ", "br", "gzip", "zstd", "", " BR "))
+	got := pipeline.NormalizeRequestStringsForTest(cxlist.NewList(" gzip ", "br", "gzip", "zstd", "", " BR "))
 	want := []string{"br", "gzip", "zstd"}
 	if !slices.Equal(got.Values(), want) {
 		t.Fatalf("expected request strings %#v, got %#v", want, got)
@@ -33,7 +32,7 @@ func TestNormalizeRequestStringsSortsAndDeduplicates(t *testing.T) {
 }
 
 func TestNormalizeRequestIntsSortsAndDeduplicates(t *testing.T) {
-	got := pipeline.NormalizeRequestIntsForTest(collectionx.NewList(1280, 640, 1280, 0, -1))
+	got := pipeline.NormalizeRequestIntsForTest(cxlist.NewList(1280, 640, 1280, 0, -1))
 	want := []int{640, 1280}
 	if !slices.Equal(got.Values(), want) {
 		t.Fatalf("expected request ints %#v, got %#v", want, got)

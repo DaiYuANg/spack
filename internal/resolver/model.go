@@ -1,12 +1,11 @@
 package resolver
 
 import (
-	"log/slog"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/observabilityx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
+	"log/slog"
 )
 
 type Request struct {
@@ -25,15 +24,15 @@ type Result struct {
 	MediaType          string
 	ContentEncoding    string
 	ETag               string
-	PreferredEncodings collectionx.List[string]
-	PreferredWidths    collectionx.List[int]
-	PreferredFormats   collectionx.List[string]
+	PreferredEncodings *cxlist.List[string]
+	PreferredWidths    *cxlist.List[int]
+	PreferredFormats   *cxlist.List[string]
 	FallbackUsed       bool
 }
 
 type Resolver struct {
 	cfg                *config.Assets
-	supportedEncodings collectionx.List[string]
+	supportedEncodings *cxlist.List[string]
 	catalog            catalog.Catalog
 	logger             *slog.Logger
 	obs                observabilityx.Observability

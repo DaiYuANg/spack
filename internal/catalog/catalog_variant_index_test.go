@@ -1,10 +1,10 @@
 package catalog_test
 
 import (
-	"testing"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
 	"github.com/daiyuang/spack/internal/catalog"
+	"testing"
 )
 
 func TestFindEncodingVariantUsesAssetEncodingIndex(t *testing.T) {
@@ -117,7 +117,7 @@ func TestListVariantsByStageAndAllVariants(t *testing.T) {
 			SourceHash:   "hash-1",
 			ETag:         "\"hash-1-br\"",
 			Encoding:     "br",
-			Metadata: collectionx.NewMapFrom(map[string]string{
+			Metadata: cxmapping.NewMapFrom(map[string]string{
 				"stage": "source_sidecar",
 			}),
 		},
@@ -129,7 +129,7 @@ func TestListVariantsByStageAndAllVariants(t *testing.T) {
 			SourceHash:   "hash-1",
 			ETag:         "\"hash-1-gzip\"",
 			Encoding:     "gzip",
-			Metadata: collectionx.NewMapFrom(map[string]string{
+			Metadata: cxmapping.NewMapFrom(map[string]string{
 				"stage": "compression",
 			}),
 		},
@@ -177,7 +177,7 @@ func upsertIndexedAssetWithVariant(t *testing.T, cat catalog.Catalog, assetPath 
 	}
 }
 
-func assertExactAppVariant(t *testing.T, variants collectionx.List[*catalog.Variant]) {
+func assertExactAppVariant(t *testing.T, variants *cxlist.List[*catalog.Variant]) {
 	t.Helper()
 	if variants.Len() != 1 {
 		t.Fatalf("expected exact app variants only, got %#v", variants.Values())

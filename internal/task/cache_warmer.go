@@ -2,17 +2,17 @@ package task
 
 import (
 	"context"
-	"log/slog"
-	"strings"
-	"time"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
+	cxset "github.com/arcgolabs/collectionx/set"
 	"github.com/daiyuang/spack/internal/assetcache"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/go-co-op/gocron/v2"
 	"github.com/samber/lo"
 	"github.com/samber/oops"
+	"log/slog"
+	"strings"
+	"time"
 )
 
 const staticRobotsAssetPath = "robots.txt"
@@ -100,8 +100,8 @@ func warmCacheHotset(
 	return report, nil
 }
 
-func collectWarmAssets(cfg *config.Config, cat catalog.Catalog) collectionx.List[*catalog.Asset] {
-	assetPaths := collectionx.NewOrderedSet[string](
+func collectWarmAssets(cfg *config.Config, cat catalog.Catalog) *cxlist.List[*catalog.Asset] {
+	assetPaths := cxset.NewOrderedSet[string](
 		strings.TrimSpace(cfg.Assets.Entry),
 		strings.TrimSpace(cfg.Assets.Fallback.Target),
 	)
@@ -109,19 +109,22 @@ func collectWarmAssets(cfg *config.Config, cat catalog.Catalog) collectionx.List
 		assetPaths.Add(staticRobotsAssetPath)
 	}
 
-	return collectionx.FilterMapList[string, *catalog.Asset](collectionx.NewList[string](assetPaths.Values()...), func(_ int, assetPath string) (*catalog.Asset, bool) {
+	return cxlist.FlatMapList[string, *catalog.Asset](cxlist.NewList[string](assetPaths.Values()...), func(_ int, assetPath string) []*catalog.Asset {
 		if assetPath == "" {
-			return nil, false
+			return nil
 		}
 		asset, ok := cat.FindAsset(assetPath)
-		return asset, ok && asset != nil
+		if !ok || asset == nil {
+			return nil
+		}
+		return []*catalog.Asset{asset}
 	})
 }
 
 func buildHotsetCatalog(
 	ctx context.Context,
 	cat catalog.Catalog,
-	assets collectionx.List[*catalog.Asset],
+	assets *cxlist.List[*catalog.Asset],
 ) (catalog.Catalog, error) {
 	hotset := catalog.NewInMemoryCatalog()
 	var copyErr error
@@ -159,7 +162,7 @@ func copyHotsetAsset(
 func copyHotsetVariants(
 	ctx context.Context,
 	hotset catalog.Catalog,
-	variants collectionx.List[*catalog.Variant],
+	variants *cxlist.List[*catalog.Variant],
 ) error {
 	var copyErr error
 	variants.Range(func(_ int, variant *catalog.Variant) bool {
@@ -182,7 +185,7 @@ func copyHotsetVariants(
 	return nil
 }
 
-func buildCacheWarmerReport(cat catalog.Catalog, assets collectionx.List[*catalog.Asset]) CacheWarmerReport {
+func buildCacheWarmerReport(cat catalog.Catalog, assets *cxlist.List[*catalog.Asset]) CacheWarmerReport {
 	return CacheWarmerReport{
 		Assets: assets.Len(),
 		Variants: lo.SumBy[*catalog.Asset, int](assets.Values(), func(asset *catalog.Asset) int {

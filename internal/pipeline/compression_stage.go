@@ -4,10 +4,9 @@ package pipeline
 import (
 	"errors"
 	"fmt"
-	"os"
-	"time"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
+	cxset "github.com/arcgolabs/collectionx/set"
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
@@ -15,6 +14,8 @@ import (
 	contentcodingspec "github.com/daiyuang/spack/internal/contentcoding/spec"
 	"github.com/daiyuang/spack/internal/media"
 	"github.com/samber/oops"
+	"os"
+	"time"
 )
 
 type compressionStage struct {
@@ -42,7 +43,7 @@ func (s *compressionStage) Name() string {
 	return "compression"
 }
 
-func (s *compressionStage) Plan(asset *catalog.Asset, request Request) collectionx.List[Task] {
+func (s *compressionStage) Plan(asset *catalog.Asset, request Request) *cxlist.List[Task] {
 	if !s.cfg.PipelineEnabled() || !isCompressible(asset) {
 		return nil
 	}
@@ -53,15 +54,15 @@ func (s *compressionStage) Plan(asset *catalog.Asset, request Request) collectio
 		encodings = supportedEncodings
 	}
 
-	return collectionx.FilterMapList[string, Task](encodings, func(_ int, encoding string) (Task, bool) {
+	return cxlist.FlatMapList[string, Task](encodings, func(_ int, encoding string) []Task {
 		variant, ok := s.catalog.FindEncodingVariant(asset.Path, encoding)
 		if ok && hasEncodingVariant(variant, asset.SourceHash, encoding) {
-			return Task{}, false
+			return nil
 		}
-		return Task{
+		return []Task{{
 			AssetPath: asset.Path,
 			Encoding:  encoding,
-		}, true
+		}}
 	})
 }
 
@@ -103,7 +104,7 @@ func (s *compressionStage) Execute(task Task, asset *catalog.Asset) (*catalog.Va
 		SourceHash:   asset.SourceHash,
 		ETag:         fmt.Sprintf("\"%s-%s\"", asset.SourceHash, task.Encoding),
 		Encoding:     task.Encoding,
-		Metadata: catalog.MetadataWithModTime(collectionx.NewMapFrom(map[string]string{
+		Metadata: catalog.MetadataWithModTime(cxmapping.NewMapFrom(map[string]string{
 			"stage": "compression",
 		}), time.Now()),
 	}, nil
@@ -140,19 +141,19 @@ func isCompressible(asset *catalog.Asset) bool {
 	return media.IsCompressibleMediaType(asset.MediaType)
 }
 
-func normalizeEncodings(encodings collectionx.List[string]) collectionx.List[string] {
+func normalizeEncodings(encodings *cxlist.List[string]) *cxlist.List[string] {
 	if encodings == nil {
 		return nil
 	}
 	return contentcodingspec.NormalizeNames(encodings)
 }
 
-func filterConfiguredEncodings(encodings, supported collectionx.List[string]) collectionx.List[string] {
+func filterConfiguredEncodings(encodings, supported *cxlist.List[string]) *cxlist.List[string] {
 	if encodings == nil || supported == nil {
 		return nil
 	}
-	supportedSet := collectionx.NewOrderedSet[string](supported.Values()...)
-	return collectionx.FilterList[string](encodings, func(_ int, encoding string) bool {
+	supportedSet := cxset.NewOrderedSet[string](supported.Values()...)
+	return encodings.Where(func(_ int, encoding string) bool {
 		return supportedSet.Contains(encoding)
 	})
 }

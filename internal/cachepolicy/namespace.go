@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/arcgolabs/collectionx"
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
 	"github.com/daiyuang/spack/internal/catalog"
 )
 
@@ -13,12 +13,12 @@ const (
 	artifactNamespaceImage    = "image"
 )
 
-func emptyNamespaceMaxAges() collectionx.Map[string, time.Duration] {
-	return collectionx.NewMap[string, time.Duration]()
+func emptyNamespaceMaxAges() *cxmapping.Map[string, time.Duration] {
+	return cxmapping.NewMap[string, time.Duration]()
 }
 
 func resolveNamespaceMaxAge(
-	namespaceMaxAge collectionx.Map[string, time.Duration],
+	namespaceMaxAge *cxmapping.Map[string, time.Duration],
 	namespace string,
 	fallback time.Duration,
 ) time.Duration {

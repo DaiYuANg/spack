@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/arcgolabs/collectionx"
+	cxset "github.com/arcgolabs/collectionx/set"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/media"
 )
@@ -56,7 +56,7 @@ type StaticMemoryPolicy struct {
 	priorityTTL   time.Duration
 	variantTTL    time.Duration
 	genericTTL    time.Duration
-	priorityPaths collectionx.OrderedSet[string]
+	priorityPaths *cxset.OrderedSet[string]
 }
 
 // NewMemoryPolicy builds a memory-cache admission policy from HTTP config.
@@ -123,11 +123,11 @@ func (p StaticMemoryPolicy) isVariant(request MemoryRequest) bool {
 	return strings.TrimSpace(request.Encoding) != "" || strings.TrimSpace(request.Format) != "" || request.Width > 0
 }
 
-func memoryPriorityPaths(cfg *config.Config) collectionx.OrderedSet[string] {
+func memoryPriorityPaths(cfg *config.Config) *cxset.OrderedSet[string] {
 	if cfg == nil {
-		return collectionx.NewOrderedSet[string]()
+		return cxset.NewOrderedSet[string]()
 	}
-	return collectionx.NewOrderedSet[string](
+	return cxset.NewOrderedSet[string](
 		strings.TrimSpace(cfg.Assets.Entry),
 		strings.TrimSpace(cfg.Assets.Fallback.Target),
 		robotsAssetPath,

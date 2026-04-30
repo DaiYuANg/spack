@@ -2,6 +2,13 @@ package server_test
 
 import (
 	"context"
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
+	"github.com/daiyuang/spack/internal/assetcache"
+	"github.com/daiyuang/spack/internal/catalog"
+	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/resolver"
+	"github.com/daiyuang/spack/internal/server"
+	"github.com/gofiber/fiber/v3"
 	"io"
 	"log/slog"
 	"net/http"
@@ -10,14 +17,6 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
-
-	"github.com/arcgolabs/collectionx"
-	"github.com/daiyuang/spack/internal/assetcache"
-	"github.com/daiyuang/spack/internal/catalog"
-	"github.com/daiyuang/spack/internal/config"
-	"github.com/daiyuang/spack/internal/resolver"
-	"github.com/daiyuang/spack/internal/server"
-	"github.com/gofiber/fiber/v3"
 )
 
 func TestAssetRouteReturnsNotModifiedForFreshValidator(t *testing.T) {
@@ -40,7 +39,7 @@ func TestAssetRouteReturnsNotModifiedForFreshValidator(t *testing.T) {
 		MediaType:  "application/javascript",
 		SourceHash: "hash-app",
 		ETag:       "\"hash-app\"",
-		Metadata: collectionx.NewMapFrom(map[string]string{
+		Metadata: cxmapping.NewMapFrom(map[string]string{
 			"mtime_unix": "1720000000",
 		}),
 	}); err != nil {
@@ -228,7 +227,7 @@ func newVariantTestApp(t *testing.T) *fiber.App {
 		SourceHash:   "hash-app",
 		ETag:         "\"hash-app-br\"",
 		Encoding:     "br",
-		Metadata: collectionx.NewMapFrom(map[string]string{
+		Metadata: cxmapping.NewMapFrom(map[string]string{
 			"stage":      "compression",
 			"mtime_unix": "1720000100",
 		}),

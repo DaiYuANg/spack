@@ -2,13 +2,12 @@ package task
 
 import (
 	"context"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/go-co-op/gocron/v2"
 	"github.com/samber/oops"
 )
 
-func startTaskRuntime(ctx context.Context, scheduler gocron.Scheduler, registrations collectionx.List[taskRegistration]) error {
+func startTaskRuntime(ctx context.Context, scheduler gocron.Scheduler, registrations *cxlist.List[taskRegistration]) error {
 	return startScheduledTasks(context.WithoutCancel(ctx), scheduler, registrations)
 }
 

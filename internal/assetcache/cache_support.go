@@ -3,15 +3,14 @@ package assetcache
 import (
 	"context"
 	"fmt"
-	"log/slog"
-	"os"
-
-	"github.com/arcgolabs/collectionx"
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
 	"github.com/arcgolabs/observabilityx"
 	"github.com/dgraph-io/ristretto/v2"
+	"log/slog"
+	"os"
 )
 
-var assetCacheCounterSpecs = collectionx.NewMapFrom(map[string]observabilityx.CounterSpec{
+var assetCacheCounterSpecs = cxmapping.NewMapFrom(map[string]observabilityx.CounterSpec{
 	metricAssetCacheWarmEntries: observabilityx.NewCounterSpec(
 		metricAssetCacheWarmEntries,
 		observabilityx.WithDescription("Total number of entries loaded into the in-memory asset cache during warmup."),

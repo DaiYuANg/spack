@@ -1,7 +1,7 @@
 package catalog
 
 import (
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/hashicorp/go-memdb"
 	"github.com/samber/oops"
 )
@@ -48,45 +48,45 @@ func countRecords(txn *memdb.Txn, table string) int {
 	return total
 }
 
-func variantViews(txn *memdb.Txn, index string, args ...any) collectionx.List[*Variant] {
+func variantViews(txn *memdb.Txn, index string, args ...any) *cxlist.List[*Variant] {
 	records, err := variantRecordsResult(txn, index, args...)
 	if err != nil {
-		return collectionx.NewList[*Variant]()
+		return cxlist.NewList[*Variant]()
 	}
-	return collectionx.MapList[*variantRecord, *Variant](records, func(_ int, record *variantRecord) *Variant {
+	return cxlist.MapList[*variantRecord, *Variant](records, func(_ int, record *variantRecord) *Variant {
 		return record.Variant
 	})
 }
 
-func variantRecords(txn *memdb.Txn, index string, args ...any) collectionx.List[*variantRecord] {
+func variantRecords(txn *memdb.Txn, index string, args ...any) *cxlist.List[*variantRecord] {
 	records, err := variantRecordsResult(txn, index, args...)
 	if err != nil {
-		return collectionx.NewList[*variantRecord]()
+		return cxlist.NewList[*variantRecord]()
 	}
 	return records
 }
 
-func variantViewsResult(txn *memdb.Txn, index string, args ...any) (collectionx.List[*Variant], error) {
+func variantViewsResult(txn *memdb.Txn, index string, args ...any) (*cxlist.List[*Variant], error) {
 	records, err := variantRecordsResult(txn, index, args...)
 	if err != nil {
-		return collectionx.NewList[*Variant](), err
+		return cxlist.NewList[*Variant](), err
 	}
-	return collectionx.MapList[*variantRecord, *Variant](records, func(_ int, record *variantRecord) *Variant {
+	return cxlist.MapList[*variantRecord, *Variant](records, func(_ int, record *variantRecord) *Variant {
 		return record.Variant
 	}), nil
 }
 
-func variantRecordsResult(txn *memdb.Txn, index string, args ...any) (collectionx.List[*variantRecord], error) {
+func variantRecordsResult(txn *memdb.Txn, index string, args ...any) (*cxlist.List[*variantRecord], error) {
 	iter, err := txn.Get(catalogVariantsTable, index, args...)
 	if err != nil {
-		return collectionx.NewList[*variantRecord](), catalogQueryError(err)
+		return cxlist.NewList[*variantRecord](), catalogQueryError(err)
 	}
 
-	out := collectionx.NewList[*variantRecord]()
+	out := cxlist.NewList[*variantRecord]()
 	for raw := iter.Next(); raw != nil; raw = iter.Next() {
 		record, ok, err := variantRecordFrom(raw)
 		if err != nil {
-			return collectionx.NewList[*variantRecord](), err
+			return cxlist.NewList[*variantRecord](), err
 		}
 		if ok {
 			out.Add(record)

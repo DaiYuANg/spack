@@ -2,17 +2,16 @@ package task_test
 
 import (
 	"context"
-	"log/slog"
-	"os"
-	"path/filepath"
-	"testing"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/source"
 	"github.com/daiyuang/spack/internal/sourcecatalog"
 	"github.com/daiyuang/spack/internal/task"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"testing"
 )
 
 func TestSyncSourceCatalogRemovesDeletedAssetsAndVariants(t *testing.T) {
@@ -254,7 +253,7 @@ func assertFileRemoved(t *testing.T, path string) {
 	}
 }
 
-func singleVariantForTest(t *testing.T, variants collectionx.List[*catalog.Variant]) *catalog.Variant {
+func singleVariantForTest(t *testing.T, variants *cxlist.List[*catalog.Variant]) *catalog.Variant {
 	t.Helper()
 	variant, ok := variants.Get(0)
 	if !ok || variant == nil {

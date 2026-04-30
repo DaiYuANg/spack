@@ -2,16 +2,15 @@ package pipeline
 
 import (
 	"context"
-	"log/slog"
-	"time"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/eventx"
 	"github.com/arcgolabs/observabilityx"
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/contentcoding"
+	"log/slog"
+	"time"
 )
 
 // NewCompressionStageForTest exposes compression stage construction for external tests.
@@ -34,22 +33,22 @@ func NewImageStageForTest(cfg *config.Image, store artifact.Store, cat catalog.C
 }
 
 // NormalizeEncodingsForTest exposes compression encoding normalization for external tests.
-func NormalizeEncodingsForTest(values collectionx.List[string]) collectionx.List[string] {
+func NormalizeEncodingsForTest(values *cxlist.List[string]) *cxlist.List[string] {
 	return normalizeEncodings(values)
 }
 
 // NormalizeImageFormatsForTest exposes image format normalization for external tests.
-func NormalizeImageFormatsForTest(values collectionx.List[string]) collectionx.List[string] {
+func NormalizeImageFormatsForTest(values *cxlist.List[string]) *cxlist.List[string] {
 	return normalizeImageFormats(values)
 }
 
 // NormalizeRequestStringsForTest exposes request string normalization for external tests.
-func NormalizeRequestStringsForTest(values collectionx.List[string]) collectionx.List[string] {
+func NormalizeRequestStringsForTest(values *cxlist.List[string]) *cxlist.List[string] {
 	return normalizeRequestStrings(values)
 }
 
 // NormalizeRequestIntsForTest exposes request integer normalization for external tests.
-func NormalizeRequestIntsForTest(values collectionx.List[int]) collectionx.List[int] {
+func NormalizeRequestIntsForTest(values *cxlist.List[int]) *cxlist.List[int] {
 	return normalizeRequestInts(values)
 }
 
@@ -113,7 +112,7 @@ func (s testStage) Name() string {
 	return s.name
 }
 
-func (testStage) Plan(_ *catalog.Asset, _ Request) collectionx.List[Task] {
+func (testStage) Plan(_ *catalog.Asset, _ Request) *cxlist.List[Task] {
 	return nil
 }
 

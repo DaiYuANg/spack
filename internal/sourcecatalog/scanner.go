@@ -2,8 +2,8 @@ package sourcecatalog
 
 import (
 	"context"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/contentcoding"
 	"github.com/daiyuang/spack/internal/source"
@@ -13,14 +13,14 @@ import (
 const SourceSidecarStage = "source_sidecar"
 
 type Snapshot struct {
-	Assets     collectionx.Map[string, *catalog.Asset]
-	Variants   collectionx.Map[string, *catalog.Variant]
+	Assets     *cxmapping.Map[string, *catalog.Asset]
+	Variants   *cxmapping.Map[string, *catalog.Variant]
 	TotalBytes int64
 }
 
 type Scanner struct {
 	src      source.Source
-	matchers collectionx.List[sidecarMatcher]
+	matchers *cxlist.List[sidecarMatcher]
 }
 
 func NewScanner(src source.Source, registry contentcoding.Registry) Scanner {
@@ -72,9 +72,9 @@ func (s Scanner) ScanWithCatalog(ctx context.Context, cat catalog.Catalog) (Snap
 	}, nil
 }
 
-func (s Scanner) collectSourceFiles(ctx context.Context) (collectionx.Map[string, source.File], int64, error) {
+func (s Scanner) collectSourceFiles(ctx context.Context) (*cxmapping.Map[string, source.File], int64, error) {
 	scanErr := oops.In("sourcecatalog").Owner("scan")
-	filesByPath := collectionx.NewMap[string, source.File]()
+	filesByPath := cxmapping.NewMap[string, source.File]()
 	totalBytes := int64(0)
 
 	if err := s.src.Walk(func(file source.File) error {

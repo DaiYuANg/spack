@@ -1,13 +1,14 @@
 package config
 
 import (
-	"github.com/arcgolabs/collectionx"
+	"log/slog"
+
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/configx"
 	"github.com/arcgolabs/observabilityx"
 	"github.com/daiyuang/spack/internal/constant"
 	"github.com/go-playground/validator/v10"
 	"github.com/spf13/pflag"
-	"log/slog"
 )
 
 // LoadOptions controls which external config sources are consulted in addition
@@ -22,7 +23,7 @@ func (o LoadOptions) configxOptions(
 	logger *slog.Logger,
 	obs observabilityx.Observability,
 ) []configx.Option {
-	options := collectionx.NewList[configx.Option](
+	options := cxlist.NewList[configx.Option](
 		configx.WithEnvPrefix(constant.EnvPrefix),
 		configx.WithIgnoreDotenvError(true),
 		configx.WithDotenv(),

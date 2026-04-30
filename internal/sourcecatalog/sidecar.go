@@ -4,10 +4,8 @@ import (
 	"cmp"
 	"context"
 	"fmt"
-	"path/filepath"
-	"strings"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/contentcoding"
 	"github.com/daiyuang/spack/internal/source"
@@ -15,6 +13,8 @@ import (
 	"github.com/samber/mo"
 	"github.com/samber/oops"
 	"golang.org/x/sync/errgroup"
+	"path/filepath"
+	"strings"
 )
 
 type sidecarMatcher struct {
@@ -41,16 +41,16 @@ func IsSourceSidecarVariant(variant *catalog.Variant) bool {
 	return strings.TrimSpace(variant.Metadata.GetOrDefault("stage", "")) == SourceSidecarStage
 }
 
-func buildSidecarMatchers(registry contentcoding.Registry) collectionx.List[sidecarMatcher] {
-	return collectionx.FilterMapList[string, sidecarMatcher](registry.Names(), func(_ int, name string) (sidecarMatcher, bool) {
+func buildSidecarMatchers(registry contentcoding.Registry) *cxlist.List[sidecarMatcher] {
+	return cxlist.FlatMapList[string, sidecarMatcher](registry.Names(), func(_ int, name string) []sidecarMatcher {
 		strategy, ok := registry.Lookup(name)
 		if !ok {
-			return sidecarMatcher{}, false
+			return nil
 		}
-		return sidecarMatcher{
+		return []sidecarMatcher{{
 			encoding: strategy.Name(),
 			suffix:   strategy.Suffix(),
-		}, true
+		}}
 	}).Sort(func(left, right sidecarMatcher) int {
 		if len(left.suffix) == len(right.suffix) {
 			return cmp.Compare(left.encoding, right.encoding)
@@ -59,8 +59,8 @@ func buildSidecarMatchers(registry contentcoding.Registry) collectionx.List[side
 	})
 }
 
-func recognizeSidecars(filesByPath collectionx.Map[string, source.File], matchers collectionx.List[sidecarMatcher]) collectionx.Map[string, sidecarFile] {
-	sidecars := collectionx.NewMapWithCapacity[string, sidecarFile](filesByPath.Len())
+func recognizeSidecars(filesByPath *cxmapping.Map[string, source.File], matchers *cxlist.List[sidecarMatcher]) *cxmapping.Map[string, sidecarFile] {
+	sidecars := cxmapping.NewMapWithCapacity[string, sidecarFile](filesByPath.Len())
 	sortedKeys[source.File](filesByPath).Range(func(_ int, path string) bool {
 		match, ok := matchSidecar(path, filesByPath, matchers).Get()
 		if !ok {
@@ -74,8 +74,8 @@ func recognizeSidecars(filesByPath collectionx.Map[string, source.File], matcher
 	return sidecars
 }
 
-func matchSidecar(path string, filesByPath collectionx.Map[string, source.File], matchers collectionx.List[sidecarMatcher]) mo.Option[sidecarFile] {
-	matcher, ok := collectionx.FindList[sidecarMatcher](matchers, func(_ int, matcher sidecarMatcher) bool {
+func matchSidecar(path string, filesByPath *cxmapping.Map[string, source.File], matchers *cxlist.List[sidecarMatcher]) mo.Option[sidecarFile] {
+	matcher, ok := cxlist.FindList[sidecarMatcher](matchers, func(_ int, matcher sidecarMatcher) bool {
 		if !strings.HasSuffix(path, matcher.suffix) {
 			return false
 		}
@@ -99,10 +99,10 @@ func matchSidecar(path string, filesByPath collectionx.Map[string, source.File],
 
 func buildSidecarVariants(
 	ctx context.Context,
-	sidecars collectionx.Map[string, sidecarFile],
-	assets collectionx.Map[string, *catalog.Asset],
-	existingSidecars collectionx.Map[string, *catalog.Variant],
-) (collectionx.Map[string, *catalog.Variant], error) {
+	sidecars *cxmapping.Map[string, sidecarFile],
+	assets *cxmapping.Map[string, *catalog.Asset],
+	existingSidecars *cxmapping.Map[string, *catalog.Variant],
+) (*cxmapping.Map[string, *catalog.Variant], error) {
 	variants, candidates := collectSidecarVariantBuildCandidates(sidecars, assets, existingSidecars)
 	if candidates.IsEmpty() {
 		return variants, nil
@@ -136,12 +136,12 @@ func buildSidecarVariants(
 }
 
 func collectSidecarVariantBuildCandidates(
-	sidecars collectionx.Map[string, sidecarFile],
-	assets collectionx.Map[string, *catalog.Asset],
-	existingSidecars collectionx.Map[string, *catalog.Variant],
-) (collectionx.Map[string, *catalog.Variant], collectionx.List[sidecarVariantBuildCandidate]) {
-	variants := collectionx.NewMapWithCapacity[string, *catalog.Variant](sidecars.Len())
-	candidates := collectionx.NewList[sidecarVariantBuildCandidate]()
+	sidecars *cxmapping.Map[string, sidecarFile],
+	assets *cxmapping.Map[string, *catalog.Asset],
+	existingSidecars *cxmapping.Map[string, *catalog.Variant],
+) (*cxmapping.Map[string, *catalog.Variant], *cxlist.List[sidecarVariantBuildCandidate]) {
+	variants := cxmapping.NewMapWithCapacity[string, *catalog.Variant](sidecars.Len())
+	candidates := cxlist.NewList[sidecarVariantBuildCandidate]()
 
 	sortedKeys[sidecarFile](sidecars).Range(func(_ int, sidecarPath string) bool {
 		sidecar, _ := sidecars.Get(sidecarPath)
@@ -160,7 +160,7 @@ func collectSidecarVariantBuildCandidates(
 }
 
 func reusableSidecarVariant(
-	existingSidecars collectionx.Map[string, *catalog.Variant],
+	existingSidecars *cxmapping.Map[string, *catalog.Variant],
 	sidecar sidecarFile,
 	asset *catalog.Asset,
 ) mo.Option[*catalog.Variant] {
@@ -219,8 +219,8 @@ func normalizedAssetPath(path, suffix string) string {
 	return strings.TrimSpace(strings.TrimSuffix(path, suffix))
 }
 
-func sidecarMetadata(sidecar sidecarFile) collectionx.Map[string, string] {
-	return catalog.MetadataWithModTime(collectionx.NewMapFrom(map[string]string{
+func sidecarMetadata(sidecar sidecarFile) *cxmapping.Map[string, string] {
+	return catalog.MetadataWithModTime(cxmapping.NewMapFrom(map[string]string{
 		"stage":  SourceSidecarStage,
 		"source": filepath.ToSlash(sidecar.Path),
 	}), sidecar.ModTime)

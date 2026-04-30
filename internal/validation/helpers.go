@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/samber/lo"
 )
 
@@ -30,22 +30,22 @@ func ParseFlexibleDuration(raw string) time.Duration {
 	return time.Duration(seconds) * time.Second
 }
 
-func ParseWidths(raw string) collectionx.List[int] {
+func ParseWidths(raw string) *cxlist.List[int] {
 	if strings.TrimSpace(raw) == "" {
-		return collectionx.NewList[int]()
+		return cxlist.NewList[int]()
 	}
 
-	widths := collectionx.FilterMapList[string, int](collectionx.NewList[string](strings.Split(raw, ",")...), func(_ int, part string) (int, bool) {
+	widths := cxlist.FlatMapList[string, int](cxlist.NewList[string](strings.Split(raw, ",")...), func(_ int, part string) []int {
 		width, err := strconv.Atoi(strings.TrimSpace(part))
 		if err != nil || width <= 0 {
-			return 0, false
+			return nil
 		}
-		return width, true
+		return []int{width}
 	})
 	if widths.IsEmpty() {
 		return widths
 	}
 
 	widths.Sort(cmp.Compare[int])
-	return collectionx.NewList[int](lo.Uniq[int](widths.Values())...)
+	return cxlist.NewList[int](lo.Uniq[int](widths.Values())...)
 }

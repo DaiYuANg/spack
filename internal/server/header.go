@@ -1,7 +1,7 @@
 package server
 
 import (
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dix"
 	"github.com/daiyuang/spack/internal/constant"
 )
@@ -9,5 +9,5 @@ import (
 const RequestIDHeader = "X-Request-ID"
 
 func buildServerHeader(meta dix.AppMeta) string {
-	return collectionx.NewList[string](constant.ServerHeaderPrefix, meta.Version).Join("/")
+	return cxlist.NewList[string](constant.ServerHeaderPrefix, meta.Version).Join("/")
 }

@@ -1,15 +1,14 @@
 package resolver
 
 import (
-	"log/slog"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/observabilityx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/contentcoding"
 	contentcodingspec "github.com/daiyuang/spack/internal/contentcoding/spec"
 	"github.com/daiyuang/spack/internal/media"
+	"log/slog"
 )
 
 // NewResolverForTest exposes resolver construction for external tests.
@@ -47,16 +46,16 @@ func NewResolverWithCompressionForTest(
 }
 
 // ParseAcceptEncodingForTest exposes encoding preference parsing for external tests.
-func ParseAcceptEncodingForTest(header string) collectionx.List[string] {
+func ParseAcceptEncodingForTest(header string) *cxlist.List[string] {
 	return parseAcceptEncoding(header, contentcodingspec.DefaultNames())
 }
 
 // ParseAcceptEncodingWithSupportedForTest exposes encoding preference parsing with a custom support list for external tests.
-func ParseAcceptEncodingWithSupportedForTest(header string, supported collectionx.List[string]) collectionx.List[string] {
+func ParseAcceptEncodingWithSupportedForTest(header string, supported *cxlist.List[string]) *cxlist.List[string] {
 	return parseAcceptEncoding(header, supported)
 }
 
 // ParseAcceptImageFormatsForTest exposes image format preference parsing for external tests.
-func ParseAcceptImageFormatsForTest(header, sourceFormat string) collectionx.List[string] {
+func ParseAcceptImageFormatsForTest(header, sourceFormat string) *cxlist.List[string] {
 	return parseAcceptImageFormats(header, sourceFormat, media.SupportedImageFormats())
 }

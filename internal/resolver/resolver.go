@@ -3,12 +3,7 @@ package resolver
 import (
 	"context"
 	"errors"
-	"log/slog"
-	"path"
-	"strings"
-	"time"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/observabilityx"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
@@ -16,6 +11,10 @@ import (
 	contentcodingspec "github.com/daiyuang/spack/internal/contentcoding/spec"
 	"github.com/daiyuang/spack/internal/media"
 	"github.com/daiyuang/spack/internal/requestpath"
+	"log/slog"
+	"path"
+	"strings"
+	"time"
 )
 
 var (
@@ -106,8 +105,8 @@ func (r *Resolver) resolvePreferredVariant(
 	asset *catalog.Asset,
 	fallbackUsed bool,
 	request Request,
-	encodings collectionx.List[string],
-	preferredImageFormats collectionx.List[string],
+	encodings *cxlist.List[string],
+	preferredImageFormats *cxlist.List[string],
 ) (*Result, bool, error) {
 	if request.Width > 0 || preferredImageFormats.Len() > 0 {
 		result, ok, err := r.resolveImageVariant(ctx, startedAt, asset, fallbackUsed, request.Width, preferredImageFormats)
@@ -127,7 +126,7 @@ func (r *Resolver) resolveImageVariant(
 	asset *catalog.Asset,
 	fallbackUsed bool,
 	width int,
-	formats collectionx.List[string],
+	formats *cxlist.List[string],
 ) (*Result, bool, error) {
 	variant, err := r.pickImageVariant(asset, width, formats)
 	if err != nil {
@@ -154,7 +153,7 @@ func (r *Resolver) resolveEncodingVariant(
 	startedAt time.Time,
 	asset *catalog.Asset,
 	fallbackUsed bool,
-	encodings collectionx.List[string],
+	encodings *cxlist.List[string],
 ) (*Result, bool, error) {
 	variant, err := r.pickVariant(asset, encodings)
 	if err != nil {

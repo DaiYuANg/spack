@@ -1,17 +1,16 @@
 package server
 
 import (
-	"net/http"
-	"strconv"
-	"strings"
-	"time"
-
-	"github.com/arcgolabs/collectionx"
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
 	"github.com/daiyuang/spack/internal/cachepolicy"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/resolver"
 	"github.com/gofiber/fiber/v3"
 	"github.com/samber/mo"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
 )
 
 type resolvedHeaderPlan struct {
@@ -118,7 +117,7 @@ func resolvedLastModified(result *resolver.Result) resolvedLastModifiedValue {
 	}
 }
 
-func metadataLastModifiedValue(metadata collectionx.Map[string, string]) (resolvedLastModifiedValue, bool) {
+func metadataLastModifiedValue(metadata *cxmapping.Map[string, string]) (resolvedLastModifiedValue, bool) {
 	modTime, hasModTime := catalog.MetadataModTime(metadata).Get()
 	header, hasHeader := catalog.MetadataLastModifiedHTTP(metadata).Get()
 	if !hasModTime && !hasHeader {

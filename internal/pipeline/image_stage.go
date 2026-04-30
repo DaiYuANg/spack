@@ -2,14 +2,14 @@ package pipeline
 
 import (
 	"fmt"
-	"time"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
 	"github.com/daiyuang/spack/internal/artifact"
 	"github.com/daiyuang/spack/internal/catalog"
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/daiyuang/spack/internal/media"
 	"github.com/samber/oops"
+	"time"
 )
 
 type imageStage struct {
@@ -32,7 +32,7 @@ func (s *imageStage) Name() string {
 	return "image"
 }
 
-func (s *imageStage) Plan(asset *catalog.Asset, request Request) collectionx.List[Task] {
+func (s *imageStage) Plan(asset *catalog.Asset, request Request) *cxlist.List[Task] {
 	if !s.cfg.Enable || !isResizableImage(s.engine, asset) {
 		return nil
 	}
@@ -86,7 +86,7 @@ func (s *imageStage) Execute(task Task, asset *catalog.Asset) (*catalog.Variant,
 		ETag:         imageVariantETag(asset.SourceHash, result.Width, targetFormat),
 		Format:       targetFormat,
 		Width:        result.Width,
-		Metadata: catalog.MetadataWithModTime(collectionx.NewMapFrom(map[string]string{
+		Metadata: catalog.MetadataWithModTime(cxmapping.NewMapFrom(map[string]string{
 			"stage":   "image",
 			"backend": s.engine.Name(),
 		}), time.Now()),
@@ -103,12 +103,12 @@ func isResizableImage(engine imageEngine, asset *catalog.Asset) bool {
 	return engine.SupportsSourceMediaType(asset.MediaType)
 }
 
-func normalizeImageFormats(formats collectionx.List[string]) collectionx.List[string] {
+func normalizeImageFormats(formats *cxlist.List[string]) *cxlist.List[string] {
 	return media.NormalizeImageFormats(formats)
 }
 
 func imageVariantSuffix(width int, format, ext string) string {
-	parts := collectionx.NewList[string]()
+	parts := cxlist.NewList[string]()
 	if width > 0 {
 		parts.Add(fmt.Sprintf("w%d", width))
 	}
@@ -122,7 +122,7 @@ func imageVariantSuffix(width int, format, ext string) string {
 }
 
 func imageVariantID(assetPath string, width int, format string) string {
-	parts := collectionx.NewList(assetPath)
+	parts := cxlist.NewList(assetPath)
 	if width > 0 {
 		parts.Add(fmt.Sprintf("width=%d", width))
 	}
@@ -133,7 +133,7 @@ func imageVariantID(assetPath string, width int, format string) string {
 }
 
 func imageVariantETag(sourceHash string, width int, format string) string {
-	parts := collectionx.NewList(sourceHash)
+	parts := cxlist.NewList(sourceHash)
 	if width > 0 {
 		parts.Add(fmt.Sprintf("w%d", width))
 	}

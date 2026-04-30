@@ -5,7 +5,7 @@ import (
 	"errors"
 	"log/slog"
 
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dix"
 	"github.com/arcgolabs/observabilityx"
 	obsprom "github.com/arcgolabs/observabilityx/prometheus"
@@ -19,8 +19,8 @@ var Module = dix.NewModule("metrics",
 		dix.Provider1(func(adapter *obsprom.Adapter) observabilityx.Observability {
 			return adapter
 		}),
-		dix.Provider1(func(obs observabilityx.Observability) collectionx.List[dix.Observer] {
-			return collectionx.NewList[dix.Observer](NewObserver(obs))
+		dix.Provider1(func(obs observabilityx.Observability) *cxlist.List[dix.Observer] {
+			return cxlist.NewList[dix.Observer](NewObserver(obs))
 		}),
 	),
 )

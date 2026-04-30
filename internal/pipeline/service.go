@@ -3,12 +3,9 @@ package pipeline
 import (
 	"context"
 	"fmt"
-	"log/slog"
-	"strings"
-	"sync"
-	"time"
-
-	"github.com/arcgolabs/collectionx"
+	cxlist "github.com/arcgolabs/collectionx/list"
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
+	cxset "github.com/arcgolabs/collectionx/set"
 	"github.com/arcgolabs/eventx"
 	"github.com/arcgolabs/observabilityx"
 	"github.com/daiyuang/spack/internal/asyncx"
@@ -17,6 +14,10 @@ import (
 	"github.com/daiyuang/spack/internal/config"
 	"github.com/samber/oops"
 	"golang.org/x/sync/singleflight"
+	"log/slog"
+	"strings"
+	"sync"
+	"time"
 )
 
 type Service struct {
@@ -26,19 +27,19 @@ type Service struct {
 	metrics    *Metrics
 	obs        observabilityx.Observability
 	catMetrics *catalog.RuntimeMetrics
-	stages     collectionx.List[Stage]
+	stages     *cxlist.List[Stage]
 	bus        eventx.BusRuntime
 
 	tasks   chan Request
 	wg      sync.WaitGroup
 	sf      singleflight.Group
-	pending collectionx.ConcurrentSet[string]
+	pending *cxset.ConcurrentSet[string]
 
 	cleanupMu   sync.Mutex
 	cleanupStop chan struct{}
 	cleanupDone chan struct{}
 
-	variantHits collectionx.ConcurrentMap[string, time.Time]
+	variantHits *cxmapping.ConcurrentMap[string, time.Time]
 	warmWorkers *asyncx.Settings
 
 	artifactPolicy cachepolicy.ArtifactPolicy
