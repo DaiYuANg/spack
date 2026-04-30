@@ -1,6 +1,8 @@
 package server
 
 import (
+	"fmt"
+
 	cxlist "github.com/arcgolabs/collectionx/list"
 	cxmapping "github.com/arcgolabs/collectionx/mapping"
 	cxset "github.com/arcgolabs/collectionx/set"
@@ -90,5 +92,8 @@ func (r *assetDeliveryRuntime) sendEarlyResourceHints(c fiber.Ctx, links *cxlist
 	if links == nil || links.IsEmpty() {
 		return nil
 	}
-	return c.SendEarlyHints(links.Values())
+	if err := c.SendEarlyHints(links.Values()); err != nil {
+		return fmt.Errorf("send early resource hints: %w", err)
+	}
+	return nil
 }

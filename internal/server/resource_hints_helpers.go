@@ -1,28 +1,65 @@
 package server
 
 import (
+	"errors"
 	"fmt"
-	cxlist "github.com/arcgolabs/collectionx/list"
-	cxmapping "github.com/arcgolabs/collectionx/mapping"
-	cxset "github.com/arcgolabs/collectionx/set"
-	"github.com/daiyuang/spack/internal/catalog"
-	"github.com/daiyuang/spack/internal/config"
-	"github.com/daiyuang/spack/internal/media"
-	"golang.org/x/net/html"
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
+
+	cxlist "github.com/arcgolabs/collectionx/list"
+	cxmapping "github.com/arcgolabs/collectionx/mapping"
+	cxset "github.com/arcgolabs/collectionx/set"
+	"golang.org/x/net/html"
+
+	"github.com/daiyuang/spack/internal/catalog"
+	"github.com/daiyuang/spack/internal/config"
+	"github.com/daiyuang/spack/internal/media"
 )
 
-func parseHTMLResourceHints(filePath string, cfg config.ResourceHints) (*cxlist.List[string], error) {
-	file, err := os.Open(filePath)
+func parseHTMLResourceHints(filePath string, cfg config.ResourceHints) (links *cxlist.List[string], err error) {
+	cleanPath := filepath.Clean(filePath)
+	file, err := os.Open(cleanPath)
 	if err != nil {
 		return nil, fmt.Errorf("open HTML asset: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if cerr := file.Close(); cerr != nil {
+			err = errors.Join(err, fmt.Errorf("close HTML asset: %w", cerr))
+		}
+	}()
 
-	tokenizer := html.NewTokenizer(io.LimitReader(file, maxResourceHintScanBytes))
+	links, err = collectResourceHintsFromHTML(io.LimitReader(file, maxResourceHintScanBytes), cfg)
+	return links, err
+}
+
+func tokenizerHTMLParseError(tokenizer *html.Tokenizer) error {
+	err := tokenizer.Err()
+	if err == nil || errors.Is(err, io.EOF) {
+		return nil
+	}
+	return fmt.Errorf("parse HTML asset: %w", err)
+}
+
+func consumeStartTagResourceHint(
+	tokenizer *html.Tokenizer,
+	links *cxlist.List[string],
+	seen *cxset.OrderedSet[string],
+	cfg config.ResourceHints,
+	headerBytes *int,
+) bool {
+	name, _ := tokenizer.TagName()
+	hint, ok := resourceHintFromTag(string(name), htmlTagAttrs(tokenizer))
+	if !ok {
+		return true
+	}
+	return appendResourceHint(links, seen, hint, cfg, headerBytes)
+}
+
+func collectResourceHintsFromHTML(r io.Reader, cfg config.ResourceHints) (*cxlist.List[string], error) {
+	tokenizer := html.NewTokenizer(r)
 	links := cxlist.NewList[string]()
 	seen := cxset.NewOrderedSet[string]()
 	headerBytes := 0
@@ -30,19 +67,15 @@ func parseHTMLResourceHints(filePath string, cfg config.ResourceHints) (*cxlist.
 	for {
 		switch tokenizer.Next() {
 		case html.ErrorToken:
-			if err := tokenizer.Err(); err != nil && err != io.EOF {
-				return links, fmt.Errorf("parse HTML asset: %w", err)
+			if err := tokenizerHTMLParseError(tokenizer); err != nil {
+				return links, err
 			}
 			return links, nil
 		case html.StartTagToken, html.SelfClosingTagToken:
-			name, _ := tokenizer.TagName()
-			hint, ok := resourceHintFromTag(string(name), htmlTagAttrs(tokenizer))
-			if !ok {
-				continue
-			}
-			if !appendResourceHint(links, seen, hint, cfg, &headerBytes) {
+			if !consumeStartTagResourceHint(tokenizer, links, seen, cfg, &headerBytes) {
 				return links, nil
 			}
+		case html.TextToken, html.EndTagToken, html.CommentToken, html.DoctypeToken:
 		}
 	}
 }

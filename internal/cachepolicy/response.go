@@ -156,7 +156,10 @@ func isFingerprintSegment(segment string) bool {
 	if len(segment) < 8 {
 		return false
 	}
+	return fingerprintSegmentPassesScan(segment)
+}
 
+func fingerprintSegmentPassesScan(segment string) bool {
 	hasSignal := false
 	hexOnly := true
 	for _, char := range segment {

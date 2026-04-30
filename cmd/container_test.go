@@ -25,9 +25,8 @@ import (
 	"github.com/daiyuang/spack/internal/sourcecatalog"
 )
 
-func TestCreateContainerBuildPublishesDixMetrics(t *testing.T) {
-	t.Setenv("SPACK_ASSETS_ROOT", t.TempDir())
-	t.Setenv("SPACK_LOGGER_CONSOLE_ENABLED", "false")
+func mustCreatePrometheusTestContainer(t *testing.T) *dix.App {
+	t.Helper()
 
 	app, err := cmd.CreateContainerForTest(
 		config.LoadOptions{},
@@ -45,14 +44,22 @@ func TestCreateContainerBuildPublishesDixMetrics(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if got := app.RunStopTimeout(); got != dix.DefaultRunStopTimeout {
 		t.Fatalf("expected run stop timeout %s, got %s", dix.DefaultRunStopTimeout, got)
 	}
+
+	return app
+}
+
+func mustBuildPrometheusRuntime(t *testing.T, app *dix.App) *dix.Runtime {
+	t.Helper()
 
 	rt, err := app.Build()
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	info, ok := debug.ReadBuildInfo()
 	if !ok {
 		t.Fatal("expected build info to be available")
@@ -61,10 +68,11 @@ func TestCreateContainerBuildPublishesDixMetrics(t *testing.T) {
 		t.Fatalf("expected runtime version %q, got %q", info.Main.Version, got)
 	}
 
-	adapter, err := dix.ResolveAs[*obsprom.Adapter](rt.Container())
-	if err != nil {
-		t.Fatal(err)
-	}
+	return rt
+}
+
+func prometheusBodyUntilDixMetrics(t *testing.T, adapter *obsprom.Adapter) string {
+	t.Helper()
 
 	body := ""
 	deadline := time.Now().Add(time.Second)
@@ -75,11 +83,27 @@ func TestCreateContainerBuildPublishesDixMetrics(t *testing.T) {
 
 		body = response.Body.String()
 		if strings.Contains(body, "spack_dix_build_total") && strings.Contains(body, `app="spack"`) {
-			break
+			return body
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
 
+	return body
+}
+
+func TestCreateContainerBuildPublishesDixMetrics(t *testing.T) {
+	t.Setenv("SPACK_ASSETS_ROOT", t.TempDir())
+	t.Setenv("SPACK_LOGGER_CONSOLE_ENABLED", "false")
+
+	app := mustCreatePrometheusTestContainer(t)
+	rt := mustBuildPrometheusRuntime(t, app)
+
+	adapter, err := dix.ResolveAs[*obsprom.Adapter](rt.Container())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	body := prometheusBodyUntilDixMetrics(t, adapter)
 	if !strings.Contains(body, "spack_dix_build_total") {
 		t.Fatalf("expected dix build metric to be exported, got body:\n%s", body)
 	}
