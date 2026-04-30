@@ -31,7 +31,7 @@ require (
 	github.com/samber/lo v1.53.0
 	github.com/samber/mo v1.16.0
 	github.com/samber/oops v1.21.0
-	github.com/samber/slog-fiber v1.22.1
+	github.com/samber/slog-fiber v1.22.2
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	golang.org/x/net v0.53.0
